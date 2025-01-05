@@ -1,0 +1,18 @@
+# R specific
+.Rhistory
+.RData
+.Rproj.user/
+*.Rproj
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Output files
+*.html
+*.pdf
+*.docx
+/output/
+
+# ai tools
+ai_context/
