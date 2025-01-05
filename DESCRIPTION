@@ -1,11 +1,38 @@
 Package: regrake
 Type: Package
-Title: What the Package Does (Title Case)
+Title: Regularized Raking for Survey Weighting
 Version: 0.1.0
-Author: Who wrote it
-Maintainer: The package maintainer <yourself@somewhere.net>
-Description: More about what it does (maybe more than one line)
-    Use four spaces when indenting paragraphs within the Description.
-License: What license is it under?
+Authors@R: 
+    person("Andy", "Timm", 
+           email = "timmandrew1@gmail.com",
+           role = c("aut", "cre"))
+Description: A modern implementation of regularized survey raking that prioritizes 
+    intuitive interfaces while maintaining flexibility and power. Built on the 
+    mathematical framework from Barratt et al. (2021) 
+    <https://www-leland.stanford.edu/~boyd/papers/pdf/optimal_representative_sampling.pdf>, 
+    the package provides straightforward formula interfaces for survey weight calibration 
+    using various loss functions and regularization methods. Supports multiple target 
+    specification formats and integrates smoothly with common survey analysis workflows.
+License: Apache License (>= 2.0)
 Encoding: UTF-8
 LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.2.3
+Imports:
+    Matrix,
+    rlang (>= 1.0.0),
+    stats,
+    lamW,
+    methods,
+    tibble,
+    checkmate
+Suggests:
+    dplyr,
+    survey,
+    testthat (>= 3.0.0),
+    knitr,
+    rmarkdown
+Config/testthat/edition: 3
+VignetteBuilder: knitr
+URL: https://github.com/andytimm/regrake
+BugReports: https://github.com/andytimm/regrake/issues
