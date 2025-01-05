@@ -31,7 +31,8 @@ Suggests:
     survey,
     testthat (>= 3.0.0),
     knitr,
-    rmarkdown
+    rmarkdown,
+    CVXR
 Config/testthat/edition: 3
 VignetteBuilder: knitr
 URL: https://github.com/andytimm/regrake
