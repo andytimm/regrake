@@ -1,10 +1,10 @@
 # regrake
 
-An R implementation of optimal representative sample weighting, providing modern interfaces for survey raking. Built on the mathematical framework from Barratt et al. (2021) <https://www-leland.stanford.edu/~boyd/papers/pdf/optimal_representative_sampling.pdf>.
+An R implementation of optimal representative sample weighting, enabling signifcantly more flexible raking objectives. Built on the mathematical framework from Barratt et al. (2021) <https://www-leland.stanford.edu/~boyd/papers/pdf/optimal_representative_sampling.pdf>.
 
 🚧 This is a work in progress- it's not yet sufficiently developed to be useable. 🚧
 
-## Features
+## (Intended) Features
 - Intuitive formula interface for specifying raking constraints
 - Multiple target specification formats (raw population data, weighted data, direct proportions)
 - Various loss functions and regularization methods
@@ -43,4 +43,4 @@ Interested in contributing? Please note that this project is released with a Cod
 
 ## License
 
-Licensed under Apache License 2.0 
+Licensed under Apache License 2.0
