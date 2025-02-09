@@ -112,3 +112,117 @@ test_that("loss functions handle NA/NaN values", {
   expect_true(any(is.na(l2_loss(x, target))))
   expect_true(any(is.na(kl_loss(x, target))))
 })
+
+# Test proximal operators --------------------------------------------------------
+
+test_that("equality prox matches optimization solution", {
+  set.seed(605)
+  m <- 10
+  f <- rnorm(m)
+  fdes <- rnorm(m)
+  rho <- 1
+
+  # Our prox
+  prox_result <- prox_equality(f, fdes, rho)
+
+  # CVXR solution
+  library(CVXR)
+  fhat <- CVXR::Variable(m)
+  objective <- CVXR::Minimize((1/rho) * CVXR::sum_squares(fhat - f))
+  constraints <- list(fhat == fdes)
+  prob <- CVXR::Problem(objective, constraints)
+  result <- CVXR::solve(prob)
+
+  expect_equal(as.numeric(result$getValue(fhat)), prox_result, tolerance = 1e-5)
+})
+
+test_that("l2 prox matches optimization solution", {
+  set.seed(605)
+  m <- 10
+  f <- rnorm(m)
+  fdes <- rnorm(m)
+  rho <- 1
+
+  # Our prox
+  prox_result <- prox_l2(f, fdes, rho)
+
+  # CVXR solution
+  library(CVXR)
+  fhat <- CVXR::Variable(m)
+  objective <- CVXR::Minimize(0.5 * CVXR::sum_squares(fhat - fdes) +
+                       1/(2 * rho) * CVXR::sum_squares(fhat - f))
+  prob <- CVXR::Problem(objective)
+  result <- CVXR::solve(prob)
+
+  expect_equal(as.numeric(result$getValue(fhat)), prox_result, tolerance = 1e-5)
+})
+
+test_that("inequality prox matches optimization solution", {
+  set.seed(605)
+  m <- 10
+  f <- rnorm(m)
+  fdes <- rnorm(m)
+  rho <- 1
+  lower <- rep(-0.3, m)
+  upper <- rep(0.3, m)
+
+  # Our prox
+  prox_result <- prox_inequality(f, fdes, rho, lower, upper)
+
+  # CVXR solution
+  library(CVXR)
+  fhat <- CVXR::Variable(m)
+  objective <- CVXR::Minimize((1/rho) * CVXR::sum_squares(fhat - f))
+  constraints <- list(lower <= fhat - fdes, fhat - fdes <= upper)
+  prob <- CVXR::Problem(objective, constraints)
+  result <- CVXR::solve(prob)
+
+  expect_equal(as.numeric(result$getValue(fhat)), prox_result, tolerance = 1e-5)
+})
+
+test_that("kl prox matches optimization solution", {
+  set.seed(605)
+  m <- 10
+  # Use positive values and normalize
+  f <- abs(rnorm(m)) + 0.1
+  f <- f/sum(f)
+  fdes <- abs(rnorm(m)) + 0.1
+  fdes <- fdes/sum(fdes)
+  rho <- 1
+
+  # Our prox
+  prox_result <- prox_kl(f, fdes, rho)
+
+  # CVXR solution
+  library(CVXR)
+  fhat <- CVXR::Variable(m, nonneg = TRUE)
+  # Match Python test formulation
+  objective <- CVXR::Minimize(0.5 * (-CVXR::sum_entries(CVXR::entr(fhat)) -
+                                    CVXR::sum_entries(fhat * log(fdes))) +
+                       1/(2 * rho) * CVXR::sum_squares(fhat - f))
+  prob <- CVXR::Problem(objective)
+  result <- CVXR::solve(prob, solver = "ECOS")
+
+  expect_equal(as.numeric(result$getValue(fhat)), prox_result, tolerance = 1e-4)
+})
+
+test_that("proximal operators handle edge cases", {
+  x <- numeric(0)
+  target <- numeric(0)
+  rho <- 1
+
+  # Test zero-length inputs
+  expect_equal(length(prox_equality(x, target, rho)), 0)
+  expect_equal(length(prox_l2(x, target, rho)), 0)
+  expect_equal(length(prox_kl(x, target, rho)), 0)
+
+  # Test with NA/NaN
+  x_na <- c(1, NA, NaN)
+  target_na <- c(1, 2, 3)
+  expect_true(any(is.na(prox_l2(x_na, target_na, rho))))
+  expect_true(any(is.na(prox_kl(x_na, target_na, rho))))
+
+  # Test KL with non-positive values
+  expect_error(prox_kl(c(0, 1), c(1, 1), rho), class = "regrake_domain_error")
+  expect_error(prox_kl(c(1, 1), c(0, 1), rho), class = "regrake_domain_error")
+})
