@@ -2,8 +2,8 @@
 #'
 #' Projects a vector onto the probability simplex using a sort-based algorithm.
 #' While algorithms with better theoretical complexity exist (e.g., Blondel
-#'  2014, Condat 2016, Dai/Chen 2022), with a decent bit of testing I found this
-#'  sort-based approach is hard to beat in practice.
+#' 2014, Condat 2016, Dai/Chen 2022), with a decent bit of testing I found this
+#' sort-based approach is hard to beat in practice.
 #'
 #' @param v Numeric vector to project
 #' @param z Target sum (default 1)
@@ -21,7 +21,7 @@ projection_simplex <- function(v, z = 1) {
 #' Compute ADMM convergence metrics
 #'
 #' Computes primal and dual residual norms and their corresponding epsilon thresholds
-#' for ADMM convergence checking.
+#' for ADMM convergence checking. Implementation follows Boyd et al. (2011) ADMM paper.
 #'
 #' @param f Current f vector
 #' @param w Current w vector
@@ -29,32 +29,36 @@ projection_simplex <- function(v, z = 1) {
 #' @param y Current y vector
 #' @param z Current z vector
 #' @param u Current u vector
-#' @param F Design matrix
+#' @param F Design matrix (sparse)
 #' @param rho ADMM penalty parameter
 #' @param eps_abs Absolute convergence tolerance
 #' @param eps_rel Relative convergence tolerance
-#' @return List containing s_norm, r_norm, eps_pri, eps_dual
+#' @return List containing:
+#'   \item{s_norm}{Dual residual norm}
+#'   \item{r_norm}{Primal residual norm}
+#'   \item{eps_pri}{Primal feasibility threshold}
+#'   \item{eps_dual}{Dual feasibility threshold}
 #' @keywords internal
 compute_norms_and_epsilons <- function(f, w, w_old, y, z, u, F, rho, eps_abs, eps_rel) {
-  # Use dense form for calculations (if F is sparse)
+  # Compute residuals using dense operations for numerical stability
   Fw <- drop(as.matrix(F %*% w))
 
-  # s uses differences from the previous iteration.
+  # Dual residual using differences from previous iteration
   s <- rho * c(Fw - f, w - w_old, w - w_old)
   s_norm <- sqrt(sum(s^2))
 
-  # Dual residual: only the block f - Fw matters.
+  # Primal residual (only f - Fw block matters)
   r <- c(f - Fw, rep(0, length(w)), rep(0, length(w)))
   r_norm <- sqrt(sum(r^2))
 
-  # p is the total number of components for the residuals.
+  # Total number of residual components
   p <- nrow(F) + 2 * length(w)
-  # Change epsilon definitions to follow the Python code.
+
+  # Compute epsilon thresholds following Boyd et al.
   Ax <- c(f, w, w)
   Ax_k_norm <- sqrt(sum(Ax^2))
   Bz <- c(w, w, w)
   Bz_k_norm <- sqrt(sum(Bz^2))
-
   ATy <- rho * c(y, z, u)
   ATy_k_norm <- sqrt(sum(ATy^2))
 
@@ -71,101 +75,135 @@ compute_norms_and_epsilons <- function(f, w, w_old, y, z, u, F, rho, eps_abs, ep
 
 #' ADMM solver for regularized survey weighting
 #'
-#' Implements the ADMM algorithm for solving the regularized survey weighting problem.
+#' Implements the ADMM (Alternating Direction Method of Multipliers) algorithm for
+#' solving regularized survey weighting problems. The algorithm minimizes a sum of loss
+#' functions subject to simplex constraints and regularization.
 #'
-#' @param F Design matrix
-#' @param losses List of loss functions
-#' @param reg Regularizer object
-#' @param lam Regularization parameter
+#' The implementation uses sparse matrix operations and cached Cholesky factorization
+#' for efficiency. Numerical stability is ensured through careful matrix conditioning
+#' and damping.
+#'
+#' @param F Design matrix (converted to sparse internally)
+#' @param losses List of loss functions, each containing:
+#'   \item{fn}{Loss function}
+#'   \item{target}{Target values}
+#'   \item{prox}{Proximal operator}
+#'   \item{lower,upper}{Optional bounds for inequality constraints}
+#' @param reg Regularizer object with:
+#'   \item{fn}{Regularization function}
+#'   \item{prox}{Proximal operator}
+#' @param lam Regularization strength parameter
 #' @param rho ADMM penalty parameter (default 50)
 #' @param maxiter Maximum iterations (default 5000)
-#' @param warm_start List of initial values (optional)
-#' @param verbose Print progress (default FALSE)
+#' @param warm_start List of initial values for variables (optional)
+#' @param verbose Print convergence progress (default FALSE)
 #' @param eps_abs Absolute convergence tolerance (default 1e-5)
 #' @param eps_rel Relative convergence tolerance (default 1e-5)
-#' @return List containing solution vectors and convergence information
+#' @return List containing:
+#'   \item{f}{Final f vector}
+#'   \item{w}{Final weights}
+#'   \item{w_bar}{Projected weights}
+#'   \item{w_tilde}{Regularized weights}
+#'   \item{y,z,u}{Final dual variables}
+#'   \item{w_best}{Best solution found (w_bar or w_tilde for boolean regularizer)}
 #' @export
 admm <- function(F, losses, reg, lam, rho = 50, maxiter = 5000,
                 warm_start = list(), verbose = FALSE,
                 eps_abs = 1e-5, eps_rel = 1e-5) {
-
-  # Get dimensions
-  m <- nrow(F)
-  n <- ncol(F)
-  ms <- sapply(losses, function(l) l$m)
-
-  # Initialize warm start values
-  f <- warm_start$f %||% rep(mean(F), m)
-  w <- warm_start$w %||% rep(1/n, n)
-  w_bar <- warm_start$w_bar %||% rep(1/n, n)
-  w_tilde <- warm_start$w_tilde %||% rep(1/n, n)
-  y <- warm_start$y %||% rep(0, m)
-  z <- warm_start$z %||% rep(0, n)
-  u <- warm_start$u %||% rep(0, n)
-
-  # Convert F to sparse matrix if not already
+  # Convert F to sparse matrix first
   if (!inherits(F, "Matrix")) {
     F <- Matrix::Matrix(F, sparse = TRUE)
   }
 
-  # Construct and factorize Q matrix
-  Q <- Matrix::bdiag(2 * Matrix::Diagonal(n), t(F)) %*%
-       Matrix::bdiag(Matrix::Diagonal(n), -Matrix::Diagonal(m))
+  m <- nrow(F)
+  n <- ncol(F)
 
-  # Initialize best solution tracking
+  # Pre-allocate vectors
+  rhs <- numeric(n + m)
+
+  # Initialize warm start values
+  f <- if (is.null(warm_start$f)) Matrix::rowMeans(F) else warm_start$f
+  w <- if (is.null(warm_start$w)) rep(1/n, n) else warm_start$w
+  w_bar <- if (is.null(warm_start$w_bar)) rep(1/n, n) else warm_start$w_bar
+  w_tilde <- if (is.null(warm_start$w_tilde)) rep(1/n, n) else warm_start$w_tilde
+  y <- if (is.null(warm_start$y)) rep(0, m) else warm_start$y
+  z <- if (is.null(warm_start$z)) rep(0, n) else warm_start$z
+  u <- if (is.null(warm_start$u)) rep(0, n) else warm_start$u
+
+  # Cache matrix operations
+  # Note: This is a key difference from the Python implementation which uses QDLDL.
+  # While both are LDL^T factorizations, QDLDL (used in Python) is specifically
+  # designed for quasi-definite matrices and includes built-in regularization.
+  # Here we use R's sparse Cholesky with explicit damping for stability:
+  # 1. Construct the KKT matrix Q
+  Q <- rbind(
+    cbind(2 * Matrix::Diagonal(n), Matrix::t(F)),
+    cbind(F, -Matrix::Diagonal(m))
+  )
+  # 2. Add small diagonal perturbation for numerical stability
+  damp <- max(1e-8, max(Matrix::rowSums(abs(Q))) * 1e-6)
+  Q <- Q + damp * Matrix::Diagonal(nrow(Q))
+  # 3. Compute LDL^T factorization with permutation for sparsity
+  Q_factor <- Matrix::Cholesky(Q, LDL = TRUE, perm = TRUE)
+
+  # Pre-process losses
+  ct_cum <- 0
+  for (i in seq_along(losses)) {
+    losses[[i]]$m <- length(losses[[i]]$target)
+    losses[[i]]$start <- ct_cum + 1
+    losses[[i]]$end <- ct_cum + losses[[i]]$m
+    ct_cum <- ct_cum + losses[[i]]$m
+  }
+  if (ct_cum != m) stop("Loss dimensions mismatch")
+
   w_best <- NULL
   best_objective_value <- Inf
 
-  if (verbose) {
-    message("Iteration     | ||r||/eps_pri | ||s||/eps_dual")
-  }
-
-  # Main ADMM loop
   for (k in seq_len(maxiter)) {
-    ct_cum <- 0
-
-    # Update f block
-    for (l in losses) {
-      idx <- seq(ct_cum + 1, ct_cum + l$m)
-      f_update <- l$prox(
-        F[idx, , drop = FALSE] %*% w - y[idx],
-        1/rho
-      )
-      f[idx] <- f_update
-      ct_cum <- ct_cum + l$m
-    }
+    # Update f block (vectorized)
+    f_updates <- lapply(losses, function(l) {
+      idx <- seq(l$start, l$end)
+      Fw <- Matrix::rowSums(F[idx, , drop = FALSE] * rep(w, each = length(idx)))
+      if (!is.null(l$lower) || !is.null(l$upper)) {
+        l$prox(Fw - y[idx], l$target, 1/rho, l$lower, l$upper)
+      } else {
+        l$prox(Fw - y[idx], l$target, 1/rho)
+      }
+    })
+    f <- do.call(c, f_updates)
 
     # Update w_tilde and w_bar
     w_tilde <- reg$prox(w - z, lam/rho)
     w_bar <- projection_simplex(w - u)
 
-    # Solve for w_new
-    rhs <- c(
-      t(F) %*% (f + y) + w_tilde + z + w_bar + u,
-      rep(0, m)
-    )
+    # Solve for w_new using cached factorization
+    Ft_fy <- Matrix::crossprod(F, f + y)
+    rhs[1:n] <- Ft_fy + w_tilde + z + w_bar + u
+    rhs[(n+1):(n+m)] <- 0
+    w_new <- Matrix::solve(Q_factor, rhs)[1:n]
 
-    # Use sparse solver for w update
-    # Note: Need to implement or find equivalent to qdldl for R
-    # For now using Matrix::solve, but should be replaced with more efficient solver
-    sol <- try(Matrix::solve(Q, rhs), silent = TRUE)
-    if (inherits(sol, "try-error")) {
-      warning("Matrix solve failed, trying with regularization")
-      sol <- Matrix::solve(Q + 1e-8 * Matrix::Diagonal(nrow(Q)), rhs)
-    }
-    w_new <- sol[1:n]
-
-    # Store old w and update
     w_old <- w
     w <- w_new
 
-    # Dual updates
-    y <- y + (f - F %*% w)
+    # Dual updates (optimized)
+    Fw <- Matrix::rowSums(F * rep(w, each = m))
+    y <- f - Fw + y
     z <- z + (w_tilde - w)
     u <- u + (w_bar - w)
 
     # Check convergence
-    norms <- compute_norms_and_epsilons(f, w, w_old, y, z, u, F, rho, eps_abs, eps_rel)
+    norms <- compute_norms_and_epsilons(
+      f = f,
+      w = w,
+      w_old = w_old,
+      y = y,
+      z = z,
+      u = u,
+      F = F,
+      rho = rho,
+      eps_abs = eps_abs,
+      eps_rel = eps_rel
+    )
 
     if (verbose && k %% 50 == 0) {
       message(sprintf("It %03d / %03d | %8.5e | %8.5e",
@@ -205,20 +243,11 @@ admm <- function(F, losses, reg, lam, rho = 50, maxiter = 5000,
     }
   }
 
-  # Set final best weights
   if (!inherits(reg, "BooleanRegularizer")) {
     w_best <- w_bar
   }
 
   # Return results
-  list(
-    f = f,
-    w = w,
-    w_bar = w_bar,
-    w_tilde = w_tilde,
-    y = y,
-    z = z,
-    u = u,
-    w_best = w_best
-  )
+  list(f = f, w = w, w_bar = w_bar, w_tilde = w_tilde,
+       y = y, z = z, u = u, w_best = w_best)
 }

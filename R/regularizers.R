@@ -69,15 +69,52 @@ kl_regularizer <- function(w, lambda, prior, limit = NULL) {
   entropy_regularizer(w + lambda * log(prior), lambda, limit)
 }
 
-#' @describeIn regularizers Sum of squares regularization
+#' @describeIn regularizers Equality regularization
+#' @export
+equality_regularizer <- function(w, lambda) {
+  w
+}
+
+#' @describeIn regularizers Least squares regularization
 #' @export
 sum_squares_regularizer <- function(w, lambda) {
-  if (!is.numeric(w)) {
-    rlang::abort(
-      "Input must be numeric",
-      i = "w is of class {class(w)}",
-      class = "regrake_type_error"
-    )
-  }
   w / (1 + 2 * lambda)
+}
+
+#' Proximal operator for KL regularizer
+#' @param w Input vector
+#' @param lam Regularization parameter
+#' @param tau Proximal parameter
+#' @param prior Prior weights (default uniform)
+#' @param limit Optional upper bound on weight magnitudes
+#' @return Updated vector minimizing KL divergence plus proximal term
+#' @export
+prox_kl_reg <- function(w, lam, tau = 1, prior = NULL, limit = NULL) {
+  if (is.null(prior)) {
+    prior <- rep(1/length(w), length(w))
+  }
+  # Exactly match Python implementation
+  what <- lam * Re(lamW::lambertW0(exp((w + lam * log(prior)) / lam - 1) / lam))
+  if (!is.null(limit)) {
+    what <- pmin(pmax(what, 1/(limit * length(w))), limit/length(w))
+  }
+  what
+}
+
+#' Proximal operator for equality regularizer
+#' @param w Input vector
+#' @param lam Regularization parameter
+#' @return Original vector (identity operation)
+#' @export
+prox_equality_reg <- function(w, lam) {
+  w
+}
+
+#' Proximal operator for sum squares regularizer
+#' @param w Input vector
+#' @param lam Regularization parameter
+#' @return Updated vector minimizing sum squares plus proximal term
+#' @export
+prox_sum_squares_reg <- function(w, lam) {
+  w / (1 + 2 * lam)
 }

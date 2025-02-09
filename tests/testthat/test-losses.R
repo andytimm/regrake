@@ -22,7 +22,7 @@ test_that("equality loss matches optimization solution", {
   expect_equal(sum(equality_loss(opt_x, fdes)), 0, tolerance = 1e-5)
 })
 
-test_that("l2 loss matches optimization solution", {
+test_that("least squares loss matches optimization solution", {
   set.seed(605)
   m <- 10
   f <- rnorm(m)
@@ -30,7 +30,7 @@ test_that("l2 loss matches optimization solution", {
   lambda <- 1
 
   # Direct loss calculation
-  direct_loss <- sum(l2_loss(f, fdes))
+  direct_loss <- sum(least_squares_loss(f, fdes))
 
   # Optimization solution using CVXR
   library(CVXR)
@@ -41,7 +41,7 @@ test_that("l2 loss matches optimization solution", {
   opt_x <- as.vector(result$getValue(x))
 
   expect_equal(opt_x, fdes, tolerance = 1e-5)
-  expect_equal(sum(l2_loss(opt_x, fdes)), 0, tolerance = 1e-5)
+  expect_equal(sum(least_squares_loss(opt_x, fdes)), 0, tolerance = 1e-5)
 })
 
 test_that("kl loss matches optimization solution", {
@@ -74,7 +74,7 @@ test_that("loss functions handle zero-length inputs", {
   target <- numeric(0)
 
   expect_equal(length(equality_loss(x, target)), 0)
-  expect_equal(length(l2_loss(x, target)), 0)
+  expect_equal(length(least_squares_loss(x, target)), 0)
   expect_equal(length(kl_loss(x, target)), 0)
 })
 
@@ -83,7 +83,7 @@ test_that("loss functions handle mismatched lengths", {
   target <- 0.1
 
   expect_error(equality_loss(x, target))
-  expect_error(l2_loss(x, target))
+  expect_error(least_squares_loss(x, target))
   expect_error(kl_loss(x, target))
 })
 
@@ -109,7 +109,7 @@ test_that("loss functions handle NA/NaN values", {
   target <- c(0.2, 0.3, 0.4)
 
   expect_true(any(is.na(equality_loss(x, target))))
-  expect_true(any(is.na(l2_loss(x, target))))
+  expect_true(any(is.na(least_squares_loss(x, target))))
   expect_true(any(is.na(kl_loss(x, target))))
 })
 
@@ -136,7 +136,7 @@ test_that("equality prox matches optimization solution", {
   expect_equal(as.numeric(result$getValue(fhat)), prox_result, tolerance = 1e-5)
 })
 
-test_that("l2 prox matches optimization solution", {
+test_that("least squares prox matches optimization solution", {
   set.seed(605)
   m <- 10
   f <- rnorm(m)
@@ -144,7 +144,7 @@ test_that("l2 prox matches optimization solution", {
   rho <- 1
 
   # Our prox
-  prox_result <- prox_l2(f, fdes, rho)
+  prox_result <- prox_least_squares(f, fdes, rho)
 
   # CVXR solution
   library(CVXR)
@@ -213,13 +213,13 @@ test_that("proximal operators handle edge cases", {
 
   # Test zero-length inputs
   expect_equal(length(prox_equality(x, target, rho)), 0)
-  expect_equal(length(prox_l2(x, target, rho)), 0)
+  expect_equal(length(prox_least_squares(x, target, rho)), 0)
   expect_equal(length(prox_kl(x, target, rho)), 0)
 
   # Test with NA/NaN
   x_na <- c(1, NA, NaN)
   target_na <- c(1, 2, 3)
-  expect_true(any(is.na(prox_l2(x_na, target_na, rho))))
+  expect_true(any(is.na(prox_least_squares(x_na, target_na, rho))))
   expect_true(any(is.na(prox_kl(x_na, target_na, rho))))
 
   # Test KL with non-positive values

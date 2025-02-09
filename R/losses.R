@@ -2,7 +2,7 @@
 #'
 #' These functions implement different loss metrics for survey weight optimization:
 #' - equality_loss: Absolute difference for exact matching
-#' - l2_loss: Squared error loss
+#' - least_squares_loss: Squared error loss
 #' - kl_loss: Kullback-Leibler divergence
 #'
 #' @param x Numeric vector of values
@@ -37,12 +37,12 @@ prox_equality <- function(x, target, rho) {
   target
 }
 
-#' @describeIn losses Squared error loss
+#' @describeIn losses Squared error (least squares) loss
 #' @return Numeric vector of squared differences between x and target
 #' @export
 #' @examples
-#' l2_loss(c(0.1, 0.2), c(0.15, 0.25))
-l2_loss <- function(x, target) {
+#' least_squares_loss(c(0.1, 0.2), c(0.15, 0.25))
+least_squares_loss <- function(x, target) {
   if (length(x) != length(target)) {
     rlang::abort(
       "Inputs must have equal lengths",
@@ -56,11 +56,13 @@ l2_loss <- function(x, target) {
 #' Proximal operator for least squares loss
 #' @param x Input vector
 #' @param target Target vector
-#' @param rho Proximal parameter
+#' @param tau Proximal parameter (1/rho)
 #' @return Updated vector minimizing quadratic plus proximal term
 #' @export
-prox_l2 <- function(x, target, rho) {
-  (rho * x + target) / (1 + rho)
+prox_least_squares <- function(x, target, tau) {
+  # tau is passed as 1/ρ, so set r = 1/tau = ρ.
+  r <- 1 / tau
+  (target + r * x) / (1 + r)
 }
 
 #' @describeIn losses Inequality constraint loss
