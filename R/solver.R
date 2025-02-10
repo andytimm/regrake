@@ -39,11 +39,11 @@ projection_simplex <- function(v, z = 1) {
 #'   \item{eps_pri}{Primal feasibility threshold}
 #'   \item{eps_dual}{Dual feasibility threshold}
 #' @keywords internal
-compute_norms_and_epsilons <- function(f, w, w_old, y, z, u, F, rho, eps_abs, eps_rel) {
-  # Compute residuals using dense operations for numerical stability
-  Fw <- drop(as.matrix(F %*% w))
-
-  # Dual residual using differences from previous iteration
+compute_norms_and_epsilons <- function(f, w, w_old, y, z, u, F, rho, eps_abs, eps_rel, Fw = NULL) {
+  if (is.null(Fw)) {
+    Fw <- drop(as.matrix(F %*% w))
+  }
+  # Dual residual using differences from the previous iteration
   s <- rho * c(Fw - f, w - w_old, w - w_old)
   s_norm <- sqrt(sum(s^2))
 
@@ -55,9 +55,9 @@ compute_norms_and_epsilons <- function(f, w, w_old, y, z, u, F, rho, eps_abs, ep
   p <- nrow(F) + 2 * length(w)
 
   # Compute epsilon thresholds following Boyd et al.
-  Ax <- c(f, w, w)
+  Ax <- c(Fw, w, w)
   Ax_k_norm <- sqrt(sum(Ax^2))
-  Bz <- c(w, w, w)
+  Bz <- c(f, w, w)
   Bz_k_norm <- sqrt(sum(Bz^2))
   ATy <- rho * c(y, z, u)
   ATy_k_norm <- sqrt(sum(ATy^2))
@@ -160,10 +160,10 @@ admm <- function(F, losses, reg, lam, rho = 50, maxiter = 5000,
   best_objective_value <- Inf
 
   for (k in seq_len(maxiter)) {
-    # Update f block (vectorized)
+    # Updated f block using proper matrix multiplication
     f_updates <- lapply(losses, function(l) {
       idx <- seq(l$start, l$end)
-      Fw <- Matrix::rowSums(F[idx, , drop = FALSE] * rep(w, each = length(idx)))
+      Fw <- drop(as.matrix(F[idx, , drop = FALSE] %*% w))
       if (!is.null(l$lower) || !is.null(l$upper)) {
         l$prox(Fw - y[idx], l$target, 1/rho, l$lower, l$upper)
       } else {
@@ -185,13 +185,15 @@ admm <- function(F, losses, reg, lam, rho = 50, maxiter = 5000,
     w_old <- w
     w <- w_new
 
-    # Dual updates (optimized)
-    Fw <- Matrix::rowSums(F * rep(w, each = m))
+    # Cache Fw after updating w
+    Fw <- drop(as.matrix(F %*% w))
+
+    # Dual updates using the cached Fw
     y <- f - Fw + y
     z <- z + (w_tilde - w)
     u <- u + (w_bar - w)
 
-    # Check convergence
+    # Check convergence, passing the cached Fw
     norms <- compute_norms_and_epsilons(
       f = f,
       w = w,
@@ -202,7 +204,8 @@ admm <- function(F, losses, reg, lam, rho = 50, maxiter = 5000,
       F = F,
       rho = rho,
       eps_abs = eps_abs,
-      eps_rel = eps_rel
+      eps_rel = eps_rel,
+      Fw = Fw
     )
 
     if (verbose && k %% 50 == 0) {
