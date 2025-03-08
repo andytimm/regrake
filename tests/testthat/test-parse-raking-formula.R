@@ -170,3 +170,30 @@ test_that("overlapping constraints are handled appropriately", {
   expect_equal(sort(f$terms[[3]]$variables), c("age", "race"))
   expect_true(!is.null(f$terms[[3]]$interaction))
 })
+
+test_that("n-way interactions are handled correctly", {
+  # 3-way interaction
+  f1 <- parse_raking_formula(~ a:b:c)
+  expect_equal(f1$terms[[1]]$type, "exact")
+  expect_equal(sort(f1$terms[[1]]$variables), c("a", "b", "c"))
+  expect_equal(length(f1$terms[[1]]$interaction), 3)
+
+  # 3-way interaction with constraint
+  f2 <- parse_raking_formula(~ l2(a:b:c))
+  expect_equal(f2$terms[[1]]$type, "l2")
+  expect_equal(sort(f2$terms[[1]]$variables), c("a", "b", "c"))
+  expect_equal(length(f2$terms[[1]]$interaction), 3)
+
+  # 4-way interaction
+  f3 <- parse_raking_formula(~ a:b:c:d)
+  expect_equal(f3$terms[[1]]$type, "exact")
+  expect_equal(sort(f3$terms[[1]]$variables), c("a", "b", "c", "d"))
+  expect_equal(length(f3$terms[[1]]$interaction), 4)
+
+  # Mixed n-way interactions
+  f4 <- parse_raking_formula(~ a:b:c + d:e + f)
+  expect_equal(length(f4$terms), 3)
+  expect_equal(length(f4$terms[[1]]$interaction), 3)  # 3-way
+  expect_equal(length(f4$terms[[2]]$interaction), 2)  # 2-way
+  expect_null(f4$terms[[3]]$interaction)  # main effect
+})

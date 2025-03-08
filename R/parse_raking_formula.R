@@ -20,6 +20,31 @@ NULL
 #'   \item{terms}{List of parsed terms, each with type and variables}
 #'   \item{variables}{Character vector of all required variables}
 #'   \item{interactions}{List of interaction specifications}
+#'
+#' @details
+#' The formula interface supports:
+#' \itemize{
+#'   \item Main effects: \code{~ age + race}
+#'   \item N-way interactions: \code{~ age:race}, \code{~ age:race:education}
+#'   \item Constraint types: \code{exact()}, \code{l2()}, \code{kl()}
+#'   \item Mixed constraints: \code{~ age + l2(age:race)}
+#' }
+#'
+#' When variables appear in both main effects and interactions:
+#' \itemize{
+#'   \item Main effects use exact constraints by default
+#'   \item Interactions can use any constraint type (exact, l2, kl)
+#'   \item A warning is issued to clarify the behavior
+#'   \item Example: \code{~ age + race + l2(age:race)} will use exact constraints for main effects
+#'     and l2 for the interaction
+#' }
+#'
+#' Pure duplicates (same variables with different constraints) are not allowed:
+#' \itemize{
+#'   \item \code{~ age + l2(age)} will error
+#'   \item \code{~ age:race + l2(age:race)} will error
+#' }
+#'
 #' @keywords internal
 parse_raking_formula <- function(formula) {
   # Validate formula
@@ -129,12 +154,33 @@ parse_formula_terms <- function(expr) {
     # Handle constraint functions
     list(create_constraint_term(fun, args[[1]]))
   } else if (fun == ":") {
-    # Handle interactions
-    list(create_interaction_term(args))
+    # Handle interactions by recursively collecting all variables
+    list(create_interaction_term(collect_interaction_vars(expr)))
   } else {
     # Default to exact matching for unknown functions
     warning("Unknown function '", fun, "', defaulting to exact constraint", call. = FALSE)
     list(create_exact_term(args[[1]]))
+  }
+}
+
+#' Recursively collect variables from an interaction expression
+#' @keywords internal
+collect_interaction_vars <- function(expr) {
+  if (!rlang::is_call(expr)) {
+    # Base case: single variable
+    return(list(expr))
+  }
+
+  fun <- rlang::call_name(expr)
+  args <- rlang::call_args(expr)
+
+  if (fun == ":") {
+    # Recursively collect variables from both sides
+    c(collect_interaction_vars(args[[1]]),
+      collect_interaction_vars(args[[2]]))
+  } else {
+    # Non-: call, treat as single term
+    list(expr)
   }
 }
 
@@ -154,12 +200,13 @@ create_exact_term <- function(expr) {
 create_constraint_term <- function(type, expr) {
   # Handle possible interactions within constraint
   if (rlang::is_call(expr, ":")) {
-    args <- rlang::call_args(expr)
-    vars <- unname(unlist(lapply(args, as.character)))
+    # Use collect_interaction_vars for consistent n-way interaction handling
+    vars <- collect_interaction_vars(expr)
+    var_names <- unname(vapply(vars, as.character, character(1)))
     structure(list(
       type = type,
-      variables = vars,  # No names needed, just the vector
-      interaction = args,
+      variables = var_names,
+      interaction = vars,
       term_id = create_term_id(type, expr)
     ), class = "raking_term")
   } else {
@@ -178,13 +225,14 @@ create_constraint_term <- function(type, expr) {
 
 #' Create a term specification for interactions
 #' @keywords internal
-create_interaction_term <- function(args) {
-  vars <- unname(unlist(lapply(args, as.character)))  # Simplified variable extraction
+create_interaction_term <- function(vars) {
+  # vars is now a list of expressions representing individual variables
+  var_names <- unname(vapply(vars, as.character, character(1)))
   structure(list(
     type = "exact",  # Interactions default to exact matching
-    variables = vars,  # No names needed, just the vector
-    interaction = args,
-    term_id = create_term_id("exact", rlang::call2(":", !!!args))
+    variables = var_names,  # No names needed, just the vector
+    interaction = vars,
+    term_id = create_term_id("exact", rlang::call2(":", !!!vars))
   ), class = "raking_term")
 }
 
@@ -368,8 +416,7 @@ validate_variable <- function(name, var) {
 #'
 #' @details
 #' This feature is currently a placeholder for future expansion. In the future, it
-#' will support syntax like `exact(~ race) | bounds(0.1, 5.0)` to specify additional
-#' constraints or parameters that apply to the entire formula.
+#' will support syntax like `exact(x + y) | weight(w)
 #'
 #' @param formula A raking formula or term
 #' @return A list of additions or NULL
