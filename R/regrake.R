@@ -136,8 +136,25 @@ validate_inputs <- function(formula, population_data, pop_type, pop_weights, bou
 
 # Helper to create regularizer object from string specification
 create_regularizer <- function(regularizer) {
-  # TODO: Implement regularizer creation
-  stop("Not implemented")
+  # Validate regularizer type
+  regularizer <- match.arg(
+    regularizer,
+    choices = c("entropy", "zero", "kl", "boolean"),
+    several.ok = FALSE
+  )
+
+  # TODO: Implement regularizers
+  # entropy: -sum(w * log(w))  [default]
+  # zero: no regularization
+  # kl: KL divergence from initial weights
+  # boolean: boolean/discrete regularization for subset selection
+
+  # For now, error with clear message
+  stop(
+    "Regularizer '", regularizer, "' not yet implemented\n",
+    "Available regularizers will be: entropy, zero, kl, boolean",
+    call. = FALSE
+  )
 }
 
 # Helper to process solution and compute diagnostics
