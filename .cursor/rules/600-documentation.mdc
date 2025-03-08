@@ -1,0 +1,43 @@
+---
+description: for documentation in R
+globs: 
+alwaysApply: false
+---
+
+# Function Documentation
+- Use roxygen2 for all exported functions
+- Document internal functions with clear purpose comments
+- Include comprehensive examples for all exported functions
+- Document all parameters and return values
+- Use markdown in roxygen2 documentation
+- Link to related functions using @seealso
+- Group related functions using @family
+- Use @describeIn for documenting multiple functions in one block
+
+# Error Messages
+- Write clear, actionable error messages
+- Include context in error messages using rlang::abort
+- Use {glue} syntax for variable interpolation
+- Include error class for programmatic handling
+- Add "i" bullets for additional context/suggestions
+
+# Code Comments
+- Comment non-obvious algorithmic choices
+- Document mathematical formulas and references
+- Avoid redundant comments that just restate code
+- Use TODO/FIXME tags sparingly and with clear next steps
+- Document assumptions and edge cases
+
+# Package Documentation
+- Maintain comprehensive README.md
+- Include package-level documentation (@docType package)
+- Document all datasets thoroughly
+- Keep vignettes focused and task-oriented
+- Include references to academic papers/methods
+
+# Style
+- Follow tidyverse style guide
+- Use consistent capitalization in messages
+- Write documentation in complete sentences
+- Use active voice in documentation
+- Keep line length under 80 characters for documentation

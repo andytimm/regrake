@@ -1,0 +1,23 @@
+---
+description: Guidance on developing R packages
+globs: 
+alwaysApply: false
+---
+ # Package Guidelines
+- Follow existing package conventions if present
+- Keep exported functions focused and well-documented
+- Use internal functions (prefixed with .) for implementation details
+
+# Testing
+- Framework: testthat
+- Coverage requirements:
+  - Common cases
+  - Edge cases
+
+# Documentation
+- Tool: roxygen2
+- Scope: All package documentation must use roxygen2
+
+# Dependencies
+- Policy: Consider each dependency carefully
+- Rationale: Every package increases complexity and potential fragility

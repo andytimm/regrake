@@ -1,0 +1,14 @@
+---
+description: guidance for handling error conditions in R functions
+globs: 
+alwaysApply: false
+---
+ # Validation Tools
+- Input validation: assertthat, rlang::abort
+- Argument matching: rlang::arg_match()
+
+# Validation Principles
+- Implement informative error messages
+- Prefer type-stable functions
+- Validate inputs early in functions
+- Handle errors at appropriate level of abstraction

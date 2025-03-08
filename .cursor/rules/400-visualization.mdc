@@ -1,0 +1,12 @@
+---
+description: useful for visualization tasks
+globs: 
+alwaysApply: false
+---
+ # Visualization Standards
+- Primary tool: ggplot2
+- Scope: All static visualization
+
+# Best Practices
+- Create consistent theme settings for projects
+- Consider color blindness in palette choices

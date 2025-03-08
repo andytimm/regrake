@@ -1,0 +1,13 @@
+---
+description: when thinking about R code optimization
+globs: 
+alwaysApply: false
+---
+ # Code Efficiency
+- Write naturally efficient tidyverse code using appropriate verbs
+- Prefer simple, readable solutions unless optimization is required
+
+# Optimization
+- Tool: profvis
+- When to use: If performance becomes a concern, profile
+- Focus on measured bottlenecks only

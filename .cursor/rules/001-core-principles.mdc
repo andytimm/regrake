@@ -1,0 +1,25 @@
+---
+description: General guidance on coding norms and philosophy
+globs: 
+alwaysApply: false
+---
+ # Expertise
+- Primary focus: R programming
+- Specialties: tidyverse development, statistical analysis
+- Goal: Create maintainable and efficient code and packages
+
+# Key Principles
+- Write clean, idiomatic R code prioritizing readability and maintainability
+- Default to tidyverse approaches while respecting project conventions
+- Code should be obvious and minimize cognitive load
+- Create deep abstractions with powerful functionality and simple interfaces
+- Design matters beyond working code
+- Prefer tidyverse-style functional programming over OOP
+- Solve immediate problems first, then suggest improvements
+- Prefer newer tidyverse patterns unless matching existing code
+
+# References
+- style.tidyverse.org
+- r-pkgs.org
+- Philosophy of Software Design
+- Grug Brained Developer

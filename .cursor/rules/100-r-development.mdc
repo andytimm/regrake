@@ -1,0 +1,19 @@
+---
+description: useful general advice for working in R
+globs: 
+alwaysApply: false
+---
+ # Data Analysis Workflow
+- Begin with obvious, cautious data analysis before modeling
+- Emphasize reproducibility of analysis
+- Document questions and assumptions in markdown or comments
+
+# Code Style
+- Detect and follow existing project style conventions
+- Use meaningful, consistent variable names
+- Document non-obvious code choices
+- Default to modern tidyverse approaches unless project differs
+
+# Dependencies
+- Policy: Consider each dependency carefully
+- Rationale: Every package increases complexity and potential fragility
