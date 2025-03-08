@@ -32,9 +32,91 @@ regrake <- function(data,
                    verbose = FALSE,
                    ...) {
 
-  # Input validation
+  # Early input validation
   pop_type <- match.arg(pop_type)
+  validate_inputs(formula, population_data, pop_type, pop_weights, bounds)
 
+  # Step 1: Parse formula into specification
+  # This step determines what variables and interactions we need
+  # and what type of constraints they represent
+  formula_spec <- parse_raking_formula(formula)
+  if (verbose) {
+    cat("Formula parsed with", length(formula_spec$terms), "raking terms\n")
+  }
+
+  # Step 2: Process population data based on formula requirements
+  # This step computes target values for each term in the formula
+  # handling different population data formats consistently
+  target_values <- compute_target_values(
+    population_data = population_data,
+    formula_spec = formula_spec,
+    pop_type = pop_type,
+    pop_weights = pop_weights
+  )
+  if (verbose) {
+    cat("Population data processed, targets computed\n")
+  }
+
+  # Step 3: Build design matrix and losses for ADMM
+  # This creates the inputs needed for the ADMM solver:
+  # - design matrix (F)
+  # - loss functions with their targets
+  admm_inputs <- construct_admm_inputs(
+    data = data,
+    formula_spec = formula_spec,
+    target_values = target_values
+  )
+  if (verbose) {
+    cat("Design matrix constructed with", nrow(admm_inputs$design_matrix), "constraints\n")
+  }
+
+  # Step 4: Set up solver parameters
+  ctrl <- list(
+    maxiter = 5000,
+    rho = 50,
+    eps_rel = 1e-5,
+    eps_abs = 1e-5
+  )
+  ctrl[names(control)] <- control
+
+  # Step 5: Call solver
+  if (verbose) start_time <- proc.time()
+
+  solution <- admm(
+    F = admm_inputs$design_matrix,
+    losses = admm_inputs$losses,
+    regularizer = create_regularizer(regularizer),
+    lambda = lambda,
+    bounds = bounds,
+    control = ctrl,
+    verbose = verbose
+  )
+
+  if (verbose) {
+    end_time <- proc.time()
+    cat(sprintf("ADMM took %.3f seconds\n",
+                (end_time - start_time)["elapsed"]))
+  }
+
+  # Step 6: Process results and compute diagnostics
+  results <- process_admm_results(solution, admm_inputs, verbose)
+
+  # Return results with appropriate class for methods dispatch
+  structure(
+    list(
+      data = data,
+      weights = results$weights,
+      achieved = results$achieved,
+      solution = solution,
+      diagnostics = results$diagnostics,
+      call = match.call()  # Store call for reproducibility
+    ),
+    class = "regrake"
+  )
+}
+
+# Helper function for input validation
+validate_inputs <- function(formula, population_data, pop_type, pop_weights, bounds) {
   if (is.null(formula)) {
     stop("Formula must be specified. For direct solver access, use admm() instead.")
   }
@@ -50,88 +132,18 @@ regrake <- function(data,
   if (length(bounds) != 2 || bounds[1] >= bounds[2] || bounds[1] <= 0) {
     stop("bounds must be a vector of length 2 with 0 < min < max")
   }
+}
 
-  # Parse formula and compute targets
-  parsed <- parse_raking_formula(
-    formula = formula,
-    data = data,
-    population_data = population_data,
-    pop_type = pop_type,
-    pop_weights = pop_weights
-  )
+# Helper to create regularizer object from string specification
+create_regularizer <- function(regularizer) {
+  # TODO: Implement regularizer creation
+  stop("Not implemented")
+}
 
-  F <- parsed$design_matrix
-  losses <- parsed$losses
-
-  # Handle missing values
-  na_idx <- which(is.na(F), arr.ind = TRUE)
-  if (length(na_idx) > 0) {
-    desired <- unlist(lapply(losses, function(l) l$targets))
-    for (i in unique(na_idx[,1])) {
-      cols <- na_idx[na_idx[,1] == i, 2]
-      F[i, cols] <- desired[i]
-    }
-  }
-
-  # Validate dimensions
-  total_targets <- sum(sapply(losses, function(l) length(l$targets)))
-  if (nrow(F) > total_targets) {
-    warning("A loss is not defined for all columns. Check inputs carefully.")
-  }
-  if (nrow(F) < total_targets) {
-    warning("More losses specified than columns. Check inputs carefully.")
-  }
-
-  # Set up solver control parameters
-  ctrl <- list(
-    maxiter = 5000,
-    rho = 50,
-    eps_rel = 1e-5,
-    eps_abs = 1e-5
-  )
-  ctrl[names(control)] <- control
-
-  # Call solver
-  if (verbose) start_time <- proc.time()
-
-  solution <- admm(
-    F = F,
-    losses = losses,
-    regularizer = regularizer,
-    lambda = lambda,
-    bounds = bounds,
-    control = ctrl,
-    verbose = verbose
-  )
-
-  if (verbose) {
-    end_time <- proc.time()
-    cat(sprintf("ADMM took %.3f seconds\n",
-                (end_time - start_time)["elapsed"]))
-  }
-
-  # Calculate achieved margins
-  means <- as.vector(F %*% solution$weights)
-  achieved <- split_by_losses(means, losses)
-
-  if (verbose) {
-    # Calculate max percent difference
-    targets <- unlist(lapply(losses, function(l) l$targets))
-    max_diff <- max_pct_diff(achieved, targets)
-    cat(sprintf("Largest percent difference between desired and achieved: %.2f%%\n",
-                max_diff))
-  }
-
-  # Return results with sample data and weights
-  structure(
-    list(
-      data = data,
-      weights = solution$weights,
-      achieved = achieved,
-      solution = solution
-    ),
-    class = "regrake"
-  )
+# Helper to process solution and compute diagnostics
+process_admm_results <- function(solution, admm_inputs, verbose) {
+  # TODO: Implement solution processing
+  stop("Not implemented")
 }
 
 # Helper to calculate max percent difference
