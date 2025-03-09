@@ -135,7 +135,7 @@ validate_inputs <- function(formula, population_data, pop_type, pop_weights, bou
 }
 
 # Helper to create regularizer object from string specification
-create_regularizer <- function(regularizer) {
+create_regularizer <- function(regularizer, prior = NULL, limit = NULL) {
   # Validate regularizer type
   regularizer <- match.arg(
     regularizer,
@@ -143,17 +143,26 @@ create_regularizer <- function(regularizer) {
     several.ok = FALSE
   )
 
-  # TODO: Implement regularizers
-  # entropy: -sum(w * log(w))  [default]
-  # zero: no regularization
-  # kl: KL divergence from initial weights
-  # boolean: boolean/discrete regularization for subset selection
-
-  # For now, error with clear message
-  stop(
-    "Regularizer '", regularizer, "' not yet implemented\n",
-    "Available regularizers will be: entropy, zero, kl, boolean",
-    call. = FALSE
+  # Create regularizer object based on type
+  switch(regularizer,
+    "zero" = list(
+      fn = zero_regularizer,
+      prox = prox_equality_reg  # zero regularizer uses equality prox
+    ),
+    "entropy" = list(
+      fn = function(w, lambda) entropy_regularizer(w, lambda, limit),
+      prox = function(w, lambda) prox_kl_reg(w, lambda, prior = NULL, limit = limit)
+    ),
+    "kl" = {
+      if (is.null(prior)) {
+        stop("Prior weights must be provided for KL regularization")
+      }
+      list(
+        fn = function(w, lambda) kl_regularizer(w, lambda, prior, limit),
+        prox = function(w, lambda) prox_kl_reg(w, lambda, prior = prior, limit = limit)
+      )
+    },
+    "boolean" = stop("Boolean regularization not yet implemented")
   )
 }
 
