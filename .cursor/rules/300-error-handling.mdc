@@ -1,9 +1,14 @@
 ---
-description: guidance for handling error conditions in R functions
+description: Standards for error handling and input validation in R
 globs: 
 alwaysApply: false
 ---
- # Validation Tools
+---
+name: Error Handling and Validation
+description: Standards for error handling and input validation in R
+---
+
+# Validation Tools
 - Input validation: assertthat, rlang::abort
 - Argument matching: rlang::arg_match()
 

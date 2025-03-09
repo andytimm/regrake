@@ -1,9 +1,8 @@
 ---
-description: for documentation in R
+description: Standards for code documentation and inline comments in R
 globs: 
 alwaysApply: false
 ---
-
 # Function Documentation
 - Use roxygen2 for all exported functions
 - Document internal functions with clear purpose comments
