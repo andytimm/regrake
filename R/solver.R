@@ -93,12 +93,12 @@ compute_norms_and_epsilons <- function(f, w, w_old, y, z, u, F, rho, eps_abs, ep
 #'   \item{fn}{Regularization function}
 #'   \item{prox}{Proximal operator}
 #' @param lam Regularization strength parameter
-#' @param rho ADMM penalty parameter (default 50)
-#' @param maxiter Maximum iterations (default 5000)
-#' @param warm_start List of initial values for variables (optional)
+#' @param control List of control parameters:
+#'   \item{rho}{ADMM penalty parameter (default 50)}
+#'   \item{maxiter}{Maximum iterations (default 5000)}
+#'   \item{eps_abs}{Absolute convergence tolerance (default 1e-5)}
+#'   \item{eps_rel}{Relative convergence tolerance (default 1e-5)}
 #' @param verbose Print convergence progress (default FALSE)
-#' @param eps_abs Absolute convergence tolerance (default 1e-5)
-#' @param eps_rel Relative convergence tolerance (default 1e-5)
 #' @return List containing:
 #'   \item{f}{Final f vector}
 #'   \item{w}{Final weights}
@@ -107,9 +107,16 @@ compute_norms_and_epsilons <- function(f, w, w_old, y, z, u, F, rho, eps_abs, ep
 #'   \item{y,z,u}{Final dual variables}
 #'   \item{w_best}{Best solution found (w_bar or w_tilde for boolean regularizer)}
 #' @export
-admm <- function(F, losses, reg, lam, rho = 50, maxiter = 5000,
-                warm_start = list(), verbose = FALSE,
-                eps_abs = 1e-5, eps_rel = 1e-5) {
+admm <- function(F, losses, reg, lam, control = list(), verbose = FALSE) {
+  # Set defaults for control parameters
+  ctrl <- list(
+    rho = 50,
+    maxiter = 5000,
+    eps_abs = 1e-5,
+    eps_rel = 1e-5
+  )
+  ctrl[names(control)] <- control  # Override defaults with user values
+
   # Convert F to sparse matrix first
   if (!inherits(F, "Matrix")) {
     F <- Matrix::Matrix(F, sparse = TRUE)
@@ -122,13 +129,13 @@ admm <- function(F, losses, reg, lam, rho = 50, maxiter = 5000,
   rhs <- numeric(n + m)
 
   # Initialize warm start values
-  f <- if (is.null(warm_start$f)) Matrix::rowMeans(F) else warm_start$f
-  w <- if (is.null(warm_start$w)) rep(1/n, n) else warm_start$w
-  w_bar <- if (is.null(warm_start$w_bar)) rep(1/n, n) else warm_start$w_bar
-  w_tilde <- if (is.null(warm_start$w_tilde)) rep(1/n, n) else warm_start$w_tilde
-  y <- if (is.null(warm_start$y)) rep(0, m) else warm_start$y
-  z <- if (is.null(warm_start$z)) rep(0, n) else warm_start$z
-  u <- if (is.null(warm_start$u)) rep(0, n) else warm_start$u
+  f <- Matrix::rowMeans(F)
+  w <- rep(1/n, n)
+  w_bar <- rep(1/n, n)
+  w_tilde <- rep(1/n, n)
+  y <- rep(0, m)
+  z <- rep(0, n)
+  u <- rep(0, n)
 
   # Cache matrix operations
   # Note: This is a key difference from the Python implementation which uses QDLDL.
@@ -159,21 +166,21 @@ admm <- function(F, losses, reg, lam, rho = 50, maxiter = 5000,
   w_best <- NULL
   best_objective_value <- Inf
 
-  for (k in seq_len(maxiter)) {
+  for (k in seq_len(ctrl$maxiter)) {
     # Updated f block using proper matrix multiplication
     f_updates <- lapply(losses, function(l) {
       idx <- seq(l$start, l$end)
       Fw <- drop(as.matrix(F[idx, , drop = FALSE] %*% w))
       if (!is.null(l$lower) || !is.null(l$upper)) {
-        l$prox(Fw - y[idx], l$target, 1/rho, l$lower, l$upper)
+        l$prox(Fw - y[idx], l$target, 1/ctrl$rho, l$lower, l$upper)
       } else {
-        l$prox(Fw - y[idx], l$target, 1/rho)
+        l$prox(Fw - y[idx], l$target, 1/ctrl$rho)
       }
     })
     f <- do.call(c, f_updates)
 
     # Update w_tilde and w_bar
-    w_tilde <- reg$prox(w - z, lam/rho)
+    w_tilde <- reg$prox(w - z, lam/ctrl$rho)
     w_bar <- projection_simplex(w - u)
 
     # Solve for w_new using cached factorization
@@ -202,15 +209,15 @@ admm <- function(F, losses, reg, lam, rho = 50, maxiter = 5000,
       z = z,
       u = u,
       F = F,
-      rho = rho,
-      eps_abs = eps_abs,
-      eps_rel = eps_rel,
+      rho = ctrl$rho,
+      eps_abs = ctrl$eps_abs,
+      eps_rel = ctrl$eps_rel,
       Fw = Fw
     )
 
     if (verbose && k %% 50 == 0) {
       message(sprintf("It %03d / %03d | %8.5e | %8.5e",
-                     k, maxiter,
+                     k, ctrl$maxiter,
                      norms$r_norm/norms$eps_pri,
                      norms$s_norm/norms$eps_dual))
     }

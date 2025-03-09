@@ -419,9 +419,9 @@ test_that("Solver performance scales with sparsity levels", {
       prox = function(w, lam) prox_kl_reg(w, lam, tau = 50/lam)
     )
 
-    # Time the solver
+    # Time the solver with control list
     start_time <- proc.time()
-    sol <- admm(F, losses, reg, lam = 1, maxiter = 100)
+    sol <- admm(F, losses, reg, lam = 1, control = list(maxiter = 100))
     times <- (proc.time() - start_time)[3]
 
     results[[i]] <- list(

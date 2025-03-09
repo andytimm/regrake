@@ -10,6 +10,7 @@
 #'   \item{terms}{List of parsed terms, each with type and variables}
 #'   \item{variables}{Character vector of all required variables}
 #'   \item{interactions}{List of interaction specifications}
+#'   \item{formula}{The original formula object}
 #'
 #' @details
 #' The formula interface supports:
@@ -76,7 +77,8 @@ parse_raking_formula <- function(formula) {
   structure(list(
     terms = terms,
     variables = variables,
-    interactions = interactions[!vapply(interactions, is.null, logical(1))]
+    interactions = interactions[!vapply(interactions, is.null, logical(1))],
+    formula = formula  # Include the original formula
   ), class = "raking_formula")
 }
 

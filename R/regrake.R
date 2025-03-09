@@ -85,9 +85,8 @@ regrake <- function(data,
   solution <- admm(
     F = admm_inputs$design_matrix,
     losses = admm_inputs$losses,
-    regularizer = create_regularizer(regularizer),
-    lambda = lambda,
-    bounds = bounds,
+    reg = create_regularizer(regularizer),
+    lam = lambda,
     control = ctrl,
     verbose = verbose
   )
@@ -168,8 +167,44 @@ create_regularizer <- function(regularizer, prior = NULL, limit = NULL) {
 
 # Helper to process solution and compute diagnostics
 process_admm_results <- function(solution, admm_inputs, verbose) {
-  # TODO: Implement solution processing
-  stop("Not implemented")
+  # Extract best weights from solution and scale to sum to sample size
+  weights <- solution$w_best
+  n <- length(weights)
+  weights <- weights * n  # Scale up to sum to sample size
+
+  # Calculate achieved values using design matrix
+  achieved_values <- drop(as.matrix(admm_inputs$design_matrix %*% weights))
+
+  # Split achieved values by loss functions to match structure
+  achieved <- split_by_losses(achieved_values, admm_inputs$losses)
+
+  # Extract targets in the same order as achieved values
+  targets <- unlist(lapply(admm_inputs$losses, function(l) l$target))
+
+  # Compute diagnostics
+  diagnostics <- list(
+    # Weight properties
+    weight_range = range(weights),
+    weight_mean = mean(weights),
+    weight_sd = sd(weights),
+
+    # Margin matching quality
+    max_abs_diff = max(abs(achieved_values/n - targets)),  # Compare proportions
+    max_pct_diff = max_pct_diff(achieved_values/n, targets)  # Compare proportions
+  )
+
+  if (verbose) {
+    cat("\nDiagnostics:\n")
+    cat(sprintf("Weight range: [%.3f, %.3f]\n", diagnostics$weight_range[1], diagnostics$weight_range[2]))
+    cat(sprintf("Maximum absolute difference in margins: %.2e\n", diagnostics$max_abs_diff))
+    cat(sprintf("Maximum percent difference in margins: %.2f%%\n", diagnostics$max_pct_diff))
+  }
+
+  list(
+    weights = weights,
+    achieved = achieved,
+    diagnostics = diagnostics
+  )
 }
 
 # Helper to calculate max percent difference

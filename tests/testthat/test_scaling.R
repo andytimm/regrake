@@ -6,8 +6,8 @@ test_that("Solver performance scales with problem size", {
   ns <- c(1000, 10000, 100000)
   results <- list()
 
-  for (n in ns) {
-
+  for (i in seq_along(ns)) {
+    n <- ns[i]
     # Create simulated data similar to the README example
     set.seed(605)
     age <- runif(n, 20, 30)
@@ -19,8 +19,8 @@ test_that("Solver performance scales with problem size", {
 
     # Normalize ALL features
     F_norm <- F
-    for (i in 1:3) {
-      F_norm[i,] <- (F[i,] - mean(F[i,])) / sd(F[i,])
+    for (j in 1:3) {
+      F_norm[j,] <- (F[j,] - mean(F[j,])) / sd(F[j,])
     }
 
     losses <- list(
@@ -49,10 +49,12 @@ test_that("Solver performance scales with problem size", {
     start_time <- proc.time()
     tryCatch({
       sol <- admm(F_norm, losses, reg, lam = 0.01,
-                  eps_abs = 1e-5,
-                  eps_rel = 1e-5,
-                  rho = 50,
-                  maxiter = 5000,
+                  control = list(
+                    eps_abs = 1e-5,
+                    eps_rel = 1e-5,
+                    rho = 50,
+                    maxiter = 5000
+                  ),
                   verbose = TRUE)
       elapsed <- (proc.time() - start_time)[3]
 
@@ -66,7 +68,7 @@ test_that("Solver performance scales with problem size", {
 
       targets <- c(mean(age), mean(sex), mean(height))
 
-      results[[as.character(n)]] <- list(
+      results[[i]] <- list(
         n = n,
         time = elapsed,
         final_values = Fw,
@@ -74,27 +76,31 @@ test_that("Solver performance scales with problem size", {
         status = "success"
       )
 
+      message(sprintf("%10d %12.2f s", n, elapsed))
+
     }, error = function(e) {
-      results[[as.character(n)]] <- list(
-        n = n,
-        time = (proc.time() - start_time)[3],
-        error = e$message,
-        status = "failed"
-      )
       message(sprintf("Failed for n=%d: %s", n, e$message))
+      results[[i]] <- list(
+        n = n,
+        status = "error",
+        error = e$message
+      )
     })
   }
 
-  # Print results
-  for (i in seq_along(ns)) {
-    r <- results[[as.character(ns[i])]]
-    if (r$status == "success") {
-      message(sprintf("%10d %12.2f s", ns[i], r$time))
-    } else {
-      message(sprintf("%10d %12s", ns[i], "FAILED"))
-    }
-  }
+  # Check that we have results for all problem sizes
+  expect_equal(length(results), length(ns))
 
-  # Verify test completed without errors
-  expect_true(TRUE, "Scaling test completed successfully")
+  # Check that at least one problem size succeeded
+  successes <- which(sapply(results, function(r) r$status == "success"))
+  expect_true(length(successes) > 0)
+
+  # For successful runs, check scaling behavior
+  success_times <- sapply(results[successes], function(r) r$time)
+  if (length(success_times) > 1) {
+    # Compute empirical scaling factor
+    scaling <- diff(log(success_times)) / diff(log(ns[successes]))
+    # Should scale better than quadratic
+    expect_true(all(scaling < 2.5))
+  }
 })
