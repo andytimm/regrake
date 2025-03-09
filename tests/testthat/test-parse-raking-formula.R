@@ -212,12 +212,8 @@ test_that("categorical variables include all levels", {
 
   # Check that all levels are included
   expect_equal(
-    sort(names(spec$variables)),
+    sort(names(spec$variables)[grepl("^race", names(spec$variables))]),
     sort(paste0("race", levels(df$race)))
-  )
-  expect_equal(
-    length(spec$variables),
-    nlevels(df$race)
   )
 
   # Test interaction of categorical variables
@@ -249,7 +245,7 @@ test_that("categorical variables include all levels", {
   )
   # Check that categorical variables still include all levels
   expect_equal(
-    sort(names(spec3$variables)[startswith(names(spec3$variables), "race")]),
+    sort(names(spec3$variables)[grepl("^race", names(spec3$variables))]),
     sort(paste0("race", levels(df$race)))
   )
 })

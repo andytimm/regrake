@@ -1,9 +1,9 @@
 ---
-description: useful for visualization tasks
+description: Guidelines for data visualization in R
 globs: 
 alwaysApply: false
 ---
- # Visualization Standards
+# Visualization Standards
 - Primary tool: ggplot2
 - Scope: All static visualization
 
