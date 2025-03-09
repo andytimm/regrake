@@ -197,3 +197,59 @@ test_that("n-way interactions are handled correctly", {
   expect_equal(length(f4$terms[[2]]$interaction), 2)  # 2-way
   expect_null(f4$terms[[3]]$interaction)  # main effect
 })
+
+test_that("categorical variables include all levels", {
+  # Create test data with categorical variables
+  df <- data.frame(
+    race = factor(c("white", "black", "hispanic")),
+    age = factor(c("18-34", "35-54", "55+")),
+    income = c(50000, 75000, 100000)
+  )
+
+  # Test single categorical variable
+  term <- raking_term(~ race, type = "exact")
+  spec <- process_term(term, df)
+
+  # Check that all levels are included
+  expect_equal(
+    sort(names(spec$variables)),
+    sort(paste0("race", levels(df$race)))
+  )
+  expect_equal(
+    length(spec$variables),
+    nlevels(df$race)
+  )
+
+  # Test interaction of categorical variables
+  term2 <- raking_term(~ race:age, type = "exact")
+  spec2 <- process_term(term2, df)
+
+  # Check that all variables and their levels are tracked
+  expect_equal(
+    sort(names(spec2$original_variables)),
+    sort(c("race", "age"))
+  )
+  expect_equal(
+    spec2$original_variables$race$levels,
+    levels(df$race)
+  )
+  expect_equal(
+    spec2$original_variables$age$levels,
+    levels(df$age)
+  )
+
+  # Test mix of categorical and continuous
+  term3 <- raking_term(~ race + income, type = "exact")
+  spec3 <- process_term(term3, df)
+
+  # Check that continuous variables are handled correctly
+  expect_equal(
+    spec3$original_variables$income$type,
+    "continuous"
+  )
+  # Check that categorical variables still include all levels
+  expect_equal(
+    sort(names(spec3$variables)[startswith(names(spec3$variables), "race")]),
+    sort(paste0("race", levels(df$race)))
+  )
+})

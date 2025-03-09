@@ -1,19 +1,9 @@
-#' @title Internal functions for the component interface
+#' Parse a raking formula
 #'
 #' @description
-#' This file contains internal functions for the component interface of the regrake package.
-#' Most users should use the formula-first interface with \code{regrake()} instead.
-#'
-#' The component interface requires explicit creation of constraint terms using
-#' \code{exact()}, \code{l2()}, and \code{kl()} functions, which are then combined
-#' with the \code{+} operator.
-#'
-#' @seealso \code{\link{regrake}} for the recommended formula-first interface.
-#' @name component_interface
-#' @keywords internal
-NULL
-
-#' Parse a raking formula into its component terms
+#' Parses a formula that specifies raking constraints. The formula interface provides
+#' a natural R-like syntax for specifying both main effects and interactions, with
+#' optional constraint types for each term.
 #'
 #' @param formula A formula specifying raking constraints (e.g., ~ race + l2(age:educ))
 #' @return A list containing:
@@ -28,6 +18,13 @@ NULL
 #'   \item N-way interactions: \code{~ age:race}, \code{~ age:race:education}
 #'   \item Constraint types: \code{exact()}, \code{l2()}, \code{kl()}
 #'   \item Mixed constraints: \code{~ age + l2(age:race)}
+#' }
+#'
+#' For categorical variables:
+#' \itemize{
+#'   \item All levels are preserved (no reference level encoding)
+#'   \item This matches typical raking interfaces where margins are specified for all categories
+#'   \item Supports linearly dependent constraints in the underlying solver
 #' }
 #'
 #' When variables appear in both main effects and interactions:
@@ -573,26 +570,24 @@ process_term <- function(term, data) {
       }
 
       levels <- levels(data[[var]])
-      ref_level <- levels[1]  # Always use first level as reference
 
       original_vars[[var]] <- list(
         type = "categorical",
-        levels = levels,
-        reference = ref_level
+        levels = levels
       )
 
-      # Create indicators for all levels except reference
-      for (level in levels[-1]) {
+      # Create indicators for all levels (no reference level)
+      for (level in levels) {
         var_name <- paste0(var, level)
         var_specs[[var_name]] <- list(
           type = "indicator",
           parent = var,
-          level = level,
-          reference = ref_level
+          level = level
         )
         specs[[var_name]] <- TRUE
       }
-    } else if (is.numeric(data[[var]])) {
+    } else {
+      # Continuous variable
       var_specs[[var]] <- list(type = "continuous")
       original_vars[[var]] <- list(type = "continuous")
       specs[[var]] <- TRUE
