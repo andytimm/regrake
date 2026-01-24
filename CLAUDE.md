@@ -62,6 +62,15 @@ devtools::test()        # Run tests (265 pass, 1 flaky perf test)
 devtools::check()       # Full R CMD check
 ```
 
+## Windows Environment Note
+
+This project is developed on Windows with Git Bash (MINGW64). Multi-line `Rscript -e` commands cause segfaults due to newline handling issues between bash and Windows R.
+
+**Workarounds:**
+- Use semicolons: `Rscript -e "x <- 1; y <- 2; print(x+y)"`
+- Use multiple -e flags: `Rscript -e "x <- 1" -e "print(x)"`
+- Write to a temp .R file for complex scripts
+
 ## Key Design Decisions
 
 - Formula interface inspired by brms (composable with `+`)
