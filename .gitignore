@@ -20,3 +20,4 @@ Thumbs.db
 # Benchmark test outputs (regenerated, not tracked)
 benchmarks/test_cases/
 ai_context/rsw_original
+.claude/settings.local.json
