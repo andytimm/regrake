@@ -228,3 +228,52 @@ test_that("construct_admm_inputs errors on unknown term type", {
     "Unknown term type: unknown"
   )
 })
+
+test_that("construct_admm_inputs handles mixed exact and l2 loss types", {
+  # This test covers the bug where ~ exact(sex) + l2(age) would fail
+  # because model.frame with the original formula created columns named
+
+  # "exact(sex)" and "l2(age)" instead of "sex" and "age"
+  data <- data.frame(
+    sex = factor(c("M", "F", "M", "F", "M")),
+    age = factor(c("young", "old", "young", "old", "young"))
+  )
+
+  # Simulate what parse_raking_formula returns for ~ exact(sex) + l2(age)
+  formula_spec <- list(
+    formula = ~ exact(sex) + l2(age),  # The wrapped formula
+    terms = list(
+      list(
+        type = "exact",
+        variables = "sex",  # Variables are unwrapped
+        interaction = NULL
+      ),
+      list(
+        type = "l2",
+        variables = "age",  # Variables are unwrapped
+        interaction = NULL
+      )
+    )
+  )
+
+  target_values <- list(
+    targets = list(
+      exact_sex = c(M = 0.5, F = 0.5),
+      l2_age = c(young = 0.6, old = 0.4)
+    )
+  )
+
+  # Should not error - this was the original bug
+  result <- construct_admm_inputs(data, formula_spec, target_values)
+
+  # Verify structure
+  expect_type(result, "list")
+  expect_named(result, c("design_matrix", "losses"))
+
+  # Verify loss functions are correct for each term
+  expect_equal(result$losses[[1]]$fn, equality_loss)
+  expect_equal(result$losses[[2]]$fn, least_squares_loss)
+
+  # Verify design matrix dimensions (2 sex levels + 2 age levels = 4 rows, 5 samples)
+  expect_equal(dim(result$design_matrix), c(4, 5))
+})

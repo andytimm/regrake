@@ -110,8 +110,11 @@ construct_admm_inputs <- function(data, formula_spec, target_values) {
   )
 
   # Create model frame from sample data, converting characters to factors
-  # Use the formula from formula_spec
-  mf <- model.frame(formula_spec$formula, data = data)
+  # Build a clean formula from variable names (without exact/l2/kl wrappers)
+  # to ensure column names match what we expect in term$variables
+  all_vars <- unique(unlist(lapply(formula_spec$terms, function(t) t$variables)))
+  clean_formula <- as.formula(paste("~", paste(all_vars, collapse = " + ")))
+  mf <- model.frame(clean_formula, data = data)
 
   # Convert any character columns to factors
   char_cols <- vapply(mf, is.character, logical(1))

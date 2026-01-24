@@ -52,9 +52,7 @@ data + formula_spec + target_values → construct_admm_inputs() → design_matri
 - "Proportions" format for population targets
 
 **Known Bugs:**
-1. **L2 in formulas broken**: `~ exact(sex) + l2(age)` fails because `construct_admm_inputs` uses the raw formula for `model.frame()`, resulting in column names like `"exact(sex)"` instead of `"sex"`. Fix: build clean formula from `formula_spec$variables`.
-
-2. **Continuous variables not supported**: `process_raw_data()` skips numeric columns. Need to extend target computation to handle means for continuous variables.
+1. **Continuous variables not supported**: `process_raw_data()` skips numeric columns. Need to extend target computation to handle means for continuous variables.
 
 ## Building & Testing
 
