@@ -431,6 +431,69 @@ def generate_different_lambdas():
         print(f"Generated: {name}")
 
 
+def generate_high_constraints(n_constraints):
+    """Test case: High constraint count (many categorical variables)."""
+    np.random.seed(51 + n_constraints)  # Different seed for each
+    n = 2000
+
+    # Generate multiple categorical variables to reach target constraint count
+    # Each binary variable contributes 2 constraints, each 3-level contributes 3, etc.
+    # Mix of binary and 3-level variables to hit approximately n_constraints
+    n_binary = n_constraints // 3  # 2 constraints each
+    n_ternary = (n_constraints - 2 * n_binary) // 3  # 3 constraints each
+
+    # Adjust to get close to target
+    actual_constraints = 2 * n_binary + 3 * n_ternary
+
+    F_rows = []
+    targets_list = []
+    losses_spec = []
+
+    # Generate binary variables
+    for i in range(n_binary):
+        p = 0.3 + (i % 5) * 0.1  # Vary proportions
+        var = np.random.choice([0, 1], size=n, p=[p, 1-p])
+        row0 = np.zeros(n)
+        row1 = np.zeros(n)
+        row0[var == 0] = 1
+        row1[var == 1] = 1
+        F_rows.extend([row0, row1])
+        targets_list.extend([0.5, 0.5])
+
+    # Generate ternary variables
+    for i in range(n_ternary):
+        p1, p2 = 0.3 + (i % 3) * 0.1, 0.3 + ((i + 1) % 3) * 0.1
+        p3 = 1 - p1 - p2
+        var = np.random.choice([0, 1, 2], size=n, p=[p1, p2, p3])
+        for level in range(3):
+            row = np.zeros(n)
+            row[var == level] = 1
+            F_rows.append(row)
+        targets_list.extend([0.33, 0.33, 0.34])
+
+    F = np.array(F_rows)
+    targets = np.array(targets_list)
+
+    losses_spec = [{"type": "equality", "target": targets.tolist()}]
+    regularizer_spec = {"type": "entropy", "limit": None}
+    lam = 0.1  # Lower lambda since hard constraints with many variables
+
+    results = {}
+    if HAS_RSWJAX:
+        losses = [EqualityLoss(targets)]
+        regularizer = EntropyRegularizer()
+        results["rswjax"] = run_rswjax(F, losses, regularizer, lam)
+
+    if HAS_ORIGINAL_RSW:
+        orig_losses = [OrigEqualityLoss(targets)]
+        orig_regularizer = OrigEntropyRegularizer()
+        results["rsw_original"] = run_original_rsw(F, orig_losses, orig_regularizer, lam)
+
+    name = f"10_high_constraints_{actual_constraints}"
+    save_test_case(name, F, losses_spec, regularizer_spec, lam, results)
+    print(f"Generated: {name} (n={n}, m={actual_constraints})")
+
+
 def generate_100k_scale():
     """Test case 09: 100k samples to test scaling."""
     np.random.seed(50)
@@ -490,6 +553,11 @@ if __name__ == "__main__":
     generate_larger_scale()
     generate_interaction()
     generate_different_lambdas()
+
+    # High constraint tests (many variables, moderate sample size)
+    print("\nGenerating high-constraint tests...")
+    generate_high_constraints(50)
+    generate_high_constraints(100)
 
     if args.include_100k:
         print("\nGenerating 100K test (this may take a while)...")
