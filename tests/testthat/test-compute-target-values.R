@@ -6,20 +6,20 @@ test_that("compute_target_values handles basic validation", {
   )
   expect_error(
     compute_target_values(pop_data, parse_raking_formula(~ race)),
-    "must contain columns: variable, level, proportion"
+    "must contain columns: variable, level, target"
   )
 
-  # Proportions not summing to 1
+  # Targets not summing to 1
   pop_data <- data.frame(
     variable = rep("race", 2),
     level = c("white", "black"),
-    proportion = c(0.7, 0.7),  # Sums to 1.4
+    target = c(0.7, 0.7),  # Sums to 1.4
     stringsAsFactors = FALSE
   )
 
   expect_error(
     compute_target_values(pop_data, parse_raking_formula(~ race)),
-    "Proportions for variable 'race' do not sum to 1"
+    "Targets for variable 'race' do not sum to 1"
   )
 })
 
@@ -38,7 +38,7 @@ test_that("compute_target_values handles joint distributions correctly", {
       "white:young", "white:old",
       "black:young", "black:old"
     ),
-    proportion = c(
+    target = c(
       0.6, 0.4,    # race marginals
       0.3, 0.7,    # age marginals
       0.2, 0.4,    # white x age groups
@@ -60,7 +60,7 @@ test_that("compute_target_values handles joint distributions correctly", {
   expect_named(result, c("targets", "variables"))
   expect_named(result$targets, c("exact_race", "exact_age", "exact_race:age"))
 
-  # Test that main effect proportions match
+  # Test that main effect targets match
   expect_equal(
     unname(result$targets$exact_race),
     c(0.6, 0.4)
@@ -70,7 +70,7 @@ test_that("compute_target_values handles joint distributions correctly", {
     c(0.3, 0.7)
   )
 
-  # Test that joint distribution proportions match and sum to 1
+  # Test that joint distribution targets match and sum to 1
   expect_equal(
     length(result$targets$`exact_race:age`),
     4  # 2x2 joint distribution
@@ -96,18 +96,18 @@ test_that("autumn format handles edge cases", {
   pop_data <- data.frame(
     variable = "empty_var",
     level = "level1"
-    # Missing proportion column
+    # Missing target column
   )
   expect_error(
     compute_target_values(pop_data, parse_raking_formula(~ empty_var)),
-    "must contain columns: variable, level, proportion"
+    "must contain columns: variable, level, target"
   )
 
-  # Small proportions
+  # Small targets
   pop_data <- data.frame(
     variable = rep("small_var", 3),
     level = c("a", "b", "c"),
-    proportion = c(0.999999, 0.000001, 0)  # Very small but valid proportions
+    target = c(0.999999, 0.000001, 0)  # Very small but valid targets
   )
   result <- compute_target_values(pop_data, parse_raking_formula(~ small_var))
   expect_equal(sum(result$targets$exact_small_var), 1)
@@ -116,7 +116,7 @@ test_that("autumn format handles edge cases", {
   pop_data <- data.frame(
     variable = rep(c("with space", "with.dot", "with/slash"), each = 1),
     level = c("level 1", "level.2", "level/3"),
-    proportion = c(1, 1, 1)
+    target = c(1, 1, 1)
   )
   expect_error(
     compute_target_values(pop_data, parse_raking_formula(~ `with space` + `with.dot` + `with/slash`)),
@@ -125,22 +125,22 @@ test_that("autumn format handles edge cases", {
 })
 
 test_that("autumn format validates input correctly", {
-  # Proportions not summing to 1
+  # Targets not summing to 1
   pop_data <- data.frame(
     variable = rep("var", 2),
     level = c("a", "b"),
-    proportion = c(0.7, 0.7)  # Sums to 1.4
+    target = c(0.7, 0.7)  # Sums to 1.4
   )
   expect_error(
     compute_target_values(pop_data, parse_raking_formula(~ var)),
-    "Proportions for variable 'var' do not sum to 1"
+    "Targets for variable 'var' do not sum to 1"
   )
 
   # Duplicate variable-level combinations
   pop_data <- data.frame(
     variable = rep("var", 3),
     level = c("a", "b", "b"),  # Duplicate level
-    proportion = c(0.5, 0.25, 0.25)
+    target = c(0.5, 0.25, 0.25)
   )
   expect_error(
     compute_target_values(pop_data, parse_raking_formula(~ var)),
@@ -151,7 +151,7 @@ test_that("autumn format validates input correctly", {
   pop_data <- data.frame(
     variable = 1,  # Should be character
     level = "a",
-    proportion = "0.5"  # Should be numeric
+    target = "0.5"  # Should be numeric
   )
   expect_error(
     compute_target_values(pop_data, parse_raking_formula(~ var)),
@@ -174,11 +174,11 @@ test_that("autumn format handles complex interactions", {
       "a1:b1:c1", "a1:b1:c2", "a1:b2:c1", "a1:b2:c2",
       "a2:b1:c1", "a2:b1:c2", "a2:b2:c1", "a2:b2:c2"
     ),
-    proportion = c(
-      0.6, 0.4,  # a proportions
-      0.3, 0.7,  # b proportions
-      0.5, 0.5,  # c proportions
-      # 3-way proportions
+    target = c(
+      0.6, 0.4,  # a targets
+      0.3, 0.7,  # b targets
+      0.5, 0.5,  # c targets
+      # 3-way targets
       0.1, 0.1, 0.2, 0.2, 0.1, 0.1, 0.1, 0.1
     )
   )
@@ -214,11 +214,11 @@ test_that("autumn format handles complex interactions", {
       "x1:y1", "x1:y2", "x2:y1", "x2:y2",  # x:y levels
       paste0("x", rep(1:2, each=4), ":y", rep(1:2, each=2), ":z", 1:2)  # x:y:z levels
     ),
-    proportion = c(
-      0.5, 0.5,  # x proportions
-      0.5, 0.5,  # y proportions
-      0.25, 0.25, 0.25, 0.25,  # x:y proportions
-      rep(0.125, 8)  # x:y:z proportions
+    target = c(
+      0.5, 0.5,  # x targets
+      0.5, 0.5,  # y targets
+      0.25, 0.25, 0.25, 0.25,  # x:y targets
+      rep(0.125, 8)  # x:y:z targets
     )
   )
 

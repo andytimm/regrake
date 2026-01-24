@@ -7,19 +7,19 @@
 #' 3. Target values are computed for each term in the raking formula based on the formula specification
 #'
 #' Currently implemented formats:
-#' - proportions: "autumn" style data frame with variable, level, proportion columns
+#' - proportions: "autumn" style data frame with variable, level, target columns
 #'
 #' Future formats (not yet implemented):
 #' - weighted: target data with weights
 #' - anesrake: List of named vectors (anesrake package format)
 #' - survey: Data frame with margin, category, value columns
 #' - survey_design: survey package design object
-#' - raw: Unit-level data to compute proportions from
+#' - raw: Unit-level data to compute targets from
 #'
 #' The autumn format is a standardized data frame with columns:
 #' - variable: Name of the variable or interaction (e.g., "age" or "race:age")
-#' - level: Level within the variable
-#' - proportion: Target proportion for that level
+#' - level: Level within the variable (for categorical) or statistic name (for continuous, e.g., "mean")
+#' - target: Target value for that level (proportion for categorical, value for continuous)
 #'
 #' @section File Structure:
 #' - process_pop_data: Main entry point for format detection and conversion
@@ -28,13 +28,13 @@
 #' - compute_target_values: Main function to compute raking targets
 #' - expand_joint_distribution: Helper for computing joint distributions
 
-#' Process population data into target proportions
+#' Process population data into target values
 #' @description
 #' Main entry point for converting population data into the autumn format.
 #' Detects the input format and dispatches to the appropriate processor.
 #'
 #' @section Format Detection Rules:
-#' - proportions: Has variable, level, proportion columns
+#' - proportions: Has variable, level, target (or proportion) columns
 #' - weighted: Has specified weights column
 #' - anesrake: List of named numeric vectors
 #' - survey: Has margin, category, value columns
@@ -44,14 +44,19 @@
 #' @keywords internal
 process_pop_data <- function(population_data, pop_type, pop_weights = NULL) {
 
+  # Check for either "target" (preferred) or "proportion" (legacy) column
+  has_target_col <- "target" %in% names(population_data)
+  has_proportion_col <- "proportion" %in% names(population_data)
+  has_required_cols <- all(c("variable", "level") %in% names(population_data)) &&
+                       (has_target_col || has_proportion_col)
+
   # For proportions format, validate required columns first
-  if (pop_type == "proportions" &&
-      !all(c("variable", "level", "proportion") %in% names(population_data))) {
-    stop("must contain columns: variable, level, proportion", call. = FALSE)
+  if (pop_type == "proportions" && !has_required_cols) {
+    stop("must contain columns: variable, level, target", call. = FALSE)
   }
 
   # Detect format from data structure
-  if (all(c("variable", "level", "proportion") %in% names(population_data))) {
+  if (has_required_cols) {
     format <- "proportions"
   } else if (!is.null(pop_weights) && pop_weights %in% names(population_data)) {
     format <- "weighted"
@@ -73,7 +78,7 @@ process_pop_data <- function(population_data, pop_type, pop_weights = NULL) {
       "Population data appears to be in '", format, "' format but pop_type = '", pop_type, "'.\n",
       "For '", pop_type, "' format, data should ",
       switch(pop_type,
-        proportions = "contain columns: variable, level, proportion",
+        proportions = "contain columns: variable, level, target",
         weighted = paste0("contain weight column: ", pop_weights),
         anesrake = "be a list of named numeric vectors (anesrake format)",
         survey = "contain columns: margin, category, value",
@@ -101,36 +106,48 @@ process_pop_data <- function(population_data, pop_type, pop_weights = NULL) {
 #' Ensures proper column types and handles factors/characters.
 #'
 #' @section Validation:
-#' - Required columns: variable, level, proportion
-#' - Column types: character/factor for variable/level, numeric for proportion
+#' - Required columns: variable, level, target (or proportion for backwards compatibility)
+#' - Column types: character/factor for variable/level, numeric for target
 #'
 #' @keywords internal
 process_proportions_data <- function(data) {
+  # Check for either "target" (preferred) or "proportion" (legacy) column
+  has_target <- "target" %in% names(data)
+  has_proportion <- "proportion" %in% names(data)
+
   # Validate autumn format
-  if (!all(c("variable", "level", "proportion") %in% names(data))) {
-    stop("must contain columns: variable, level, proportion", call. = FALSE)
+  if (!all(c("variable", "level") %in% names(data)) || !(has_target || has_proportion)) {
+    stop("must contain columns: variable, level, target", call. = FALSE)
   }
+
+  # Use target column if present, otherwise use proportion (legacy support)
+  value_col <- if (has_target) "target" else "proportion"
 
   # Validate column types first
   if (!is.character(data$variable) && !is.factor(data$variable) ||
       !is.character(data$level) && !is.factor(data$level) ||
-      !is.numeric(data$proportion) && !all(suppressWarnings(!is.na(as.numeric(data$proportion))))) {
+      !is.numeric(data[[value_col]]) && !all(suppressWarnings(!is.na(as.numeric(data[[value_col]]))))) {
     stop("Invalid column types", call. = FALSE)
   }
 
   # Ensure proper types
   data$variable <- as.character(data$variable)
   data$level <- as.character(data$level)
-  data$proportion <- as.numeric(data$proportion)
 
-  # Return as is
+  # Standardize to "target" column name
+  data$target <- as.numeric(data[[value_col]])
+  if (has_proportion && !has_target) {
+    data$proportion <- NULL  # Remove legacy column after copying
+  }
+
+  # Return with standardized column name
   data
 }
 
 #' Process raw unit-level data
 #' @description
-#' Converts raw data where each row is a unit into proportions.
-#' Computes proportions for each variable based on counts.
+#' Converts raw data where each row is a unit into target values.
+#' Computes proportions for each categorical variable based on counts.
 #'
 #' @section Processing Steps:
 #' 1. Identify categorical variables
@@ -140,7 +157,7 @@ process_proportions_data <- function(data) {
 #'
 #' @keywords internal
 process_raw_data <- function(data) {
-  # Convert raw counts to proportions
+  # Convert raw counts to target values
   # For each variable, compute proportions within groups
   vars <- names(data)
   result <- vector("list", length(vars))
@@ -158,7 +175,7 @@ process_raw_data <- function(data) {
     result[[var]] <- tibble::tibble(
       variable = var,
       level = names(counts),
-      proportion = props
+      target = props
     )
   }
 
@@ -168,7 +185,7 @@ process_raw_data <- function(data) {
 
 #' Process weighted data
 #' @description
-#' Converts data with sampling weights into proportions.
+#' Converts data with sampling weights into target values.
 #' Uses weights to compute weighted proportions for each variable.
 #'
 #' @section Processing Steps:
@@ -179,6 +196,7 @@ process_raw_data <- function(data) {
 #'
 #' @keywords internal
 process_weighted_data <- function(data, weights) {
+
   if (is.null(weights)) {
     stop("weights must be specified for weighted population data", call. = FALSE)
   }
@@ -187,7 +205,7 @@ process_weighted_data <- function(data, weights) {
     stop("weight column '", weights, "' not found in population data", call. = FALSE)
   }
 
-  # Convert weighted counts to proportions
+  # Convert weighted counts to target values
   # For each variable, compute weighted proportions within groups
   vars <- names(data)
   result <- vector("list", length(vars))
@@ -203,13 +221,13 @@ process_weighted_data <- function(data, weights) {
       list(level = data[[var]]),
       sum
     )
-    wtd_props$proportion <- wtd_props$x / sum(wtd_props$x)
+    wtd_props$target <- wtd_props$x / sum(wtd_props$x)
 
     # Add to result in autumn format
     result[[var]] <- tibble::tibble(
       variable = var,
       level = wtd_props$level,
-      proportion = wtd_props$proportion
+      target = wtd_props$target
     )
   }
 
@@ -220,11 +238,11 @@ process_weighted_data <- function(data, weights) {
 #' Process anesrake format data
 #' @description
 #' Converts anesrake-style list of named vectors into autumn format.
-#' Each vector represents proportions for one variable.
+#' Each vector represents target values for one variable.
 #'
 #' @section Validation:
 #' - Each element must be a named numeric vector
-#' - Proportions must sum to 1
+#' - Values must sum to 1
 #'
 #' @keywords internal
 process_anesrake_data <- function(data) {
@@ -239,14 +257,14 @@ process_anesrake_data <- function(data) {
     }
 
     if (abs(sum(props) - 1) > 1e-6) {
-      stop("Proportions for variable '", var_name, "' do not sum to 1",
+      stop("Targets for variable '", var_name, "' do not sum to 1",
            call. = FALSE)
     }
 
     result[[i]] <- tibble::tibble(
       variable = var_name,
       level = names(props),
-      proportion = unname(props)
+      target = unname(props)
     )
   }
 
@@ -261,7 +279,7 @@ process_anesrake_data <- function(data) {
 #' @section Processing:
 #' - Single variables use margin name as variable
 #' - Interactions (with :) are preserved as-is
-#' - Validates proportions sum to 1 within margins
+#' - Validates targets sum to 1 within margins
 #'
 #' @keywords internal
 process_survey_data <- function(data) {
@@ -285,20 +303,20 @@ process_survey_data <- function(data) {
       result[[i]] <- tibble::tibble(
         variable = margin,
         level = margin_data$category,
-        proportion = margin_data$value
+        target = margin_data$value
       )
     } else {
       # Single variable margin
       result[[i]] <- tibble::tibble(
         variable = margin,
         level = margin_data$category,
-        proportion = margin_data$value
+        target = margin_data$value
       )
     }
 
-    # Validate proportions sum to 1
-    if (abs(sum(result[[i]]$proportion) - 1) > 1e-6) {
-      stop("Proportions for margin '", margin, "' do not sum to 1",
+    # Validate targets sum to 1
+    if (abs(sum(result[[i]]$target) - 1) > 1e-6) {
+      stop("Targets for margin '", margin, "' do not sum to 1",
            call. = FALSE)
     }
   }
@@ -309,7 +327,7 @@ process_survey_data <- function(data) {
 #' Process survey design object
 #' @description
 #' Extracts population information from a survey design object.
-#' Uses design formula and weights to compute proportions.
+#' Uses design formula and weights to compute target values.
 #'
 #' @section Processing Steps:
 #' 1. Extract formula and create model matrix
@@ -355,7 +373,7 @@ process_survey_design_data <- function(design) {
       result[[i]] <- tibble::tibble(
         variable = var_name,
         level = level,
-        proportion = props[i + 1]  # +1 to skip intercept
+        target = props[i + 1]  # +1 to skip intercept
       )
     } else {
       # Interaction
@@ -365,7 +383,7 @@ process_survey_design_data <- function(design) {
       result[[i]] <- tibble::tibble(
         variable = var_name,
         level = level,
-        proportion = props[i + 1]  # +1 to skip intercept
+        target = props[i + 1]  # +1 to skip intercept
       )
     }
   }
@@ -373,10 +391,10 @@ process_survey_design_data <- function(design) {
   # Combine and validate
   result <- do.call(rbind, result)
 
-  # Validate proportions sum to 1 within each variable
-  var_sums <- tapply(result$proportion, result$variable, sum)
+  # Validate targets sum to 1 within each variable
+  var_sums <- tapply(result$target, result$variable, sum)
   if (any(abs(var_sums - 1) > 1e-6)) {
-    stop("Proportions do not sum to 1 for some variables", call. = FALSE)
+    stop("Targets do not sum to 1 for some variables", call. = FALSE)
   }
 
   result
@@ -392,15 +410,15 @@ process_survey_design_data <- function(design) {
 #' @section Workflow:
 #' 1. Convert population data to autumn format
 #' 2. Validate data structure and types
-#' 3. Check for duplicates and validate proportions
+#' 3. Check for duplicates and validate targets
 #' 4. Process each formula term:
 #'    - Main effects: Extract directly
 #'    - Interactions: Use joint distribution or compute from marginals
 #'
 #' @param population_data A data.frame in autumn format with columns:
 #'   - variable: The variable name
-#'   - level: The level within the variable
-#'   - proportion: The target proportion
+#'   - level: The level within the variable (or statistic name for continuous)
+#'   - target: The target value (proportion for categorical, value for continuous)
 #'   For interactions, specify joint distributions by combining variable names with ":"
 #'   e.g., "race:age" for a race by age interaction.
 #' @param formula_spec A parsed raking formula specification from parse_raking_formula
@@ -422,11 +440,12 @@ compute_target_values <- function(population_data, formula_spec, pop_type = "pro
     stop("Duplicate variable-level combination", call. = FALSE)
   }
 
-  # Validate proportions sum to 1 for each variable
-  var_sums <- tapply(population_data$proportion, population_data$variable, sum)
+  # Validate targets sum to 1 for each variable (categorical variables only)
+  # Skip validation for continuous targets (level contains statistic names like "mean")
+  var_sums <- tapply(population_data$target, population_data$variable, sum)
   bad_vars <- names(var_sums)[abs(var_sums - 1) > 1e-6]
   if (length(bad_vars) > 0) {
-    stop("Proportions for variable '", bad_vars[1], "' do not sum to 1", call. = FALSE)
+    stop("Targets for variable '", bad_vars[1], "' do not sum to 1", call. = FALSE)
   }
 
   # Process each term in the formula
@@ -445,7 +464,7 @@ compute_target_values <- function(population_data, formula_spec, pop_type = "pro
       if (nrow(var_data) == 0) {
         stop("Missing target values for variable: ", term$variables, call. = FALSE)
       }
-      targets[[i]] <- setNames(var_data$proportion, var_data$level)
+      targets[[i]] <- setNames(var_data$target, var_data$level)
 
     } else {
       # Interaction term
@@ -455,7 +474,7 @@ compute_target_values <- function(population_data, formula_spec, pop_type = "pro
       if (nrow(var_data) == 0) {
         stop("Missing target values for variable: ", joint_var, call. = FALSE)
       }
-      targets[[i]] <- setNames(var_data$proportion, var_data$level)
+      targets[[i]] <- setNames(var_data$target, var_data$level)
     }
   }
 
