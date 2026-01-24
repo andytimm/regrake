@@ -167,17 +167,17 @@ admm <- function(F, losses, reg, lam, control = list(), verbose = FALSE) {
   best_objective_value <- Inf
 
   for (k in seq_len(ctrl$maxiter)) {
-    # Updated f block using proper matrix multiplication
-    f_updates <- lapply(losses, function(l) {
+    # Updated f block - fill in place to avoid allocation
+    for (i in seq_along(losses)) {
+      l <- losses[[i]]
       idx <- seq(l$start, l$end)
       Fw <- drop(as.matrix(F[idx, , drop = FALSE] %*% w))
       if (!is.null(l$lower) || !is.null(l$upper)) {
-        l$prox(Fw - y[idx], l$target, 1/ctrl$rho, l$lower, l$upper)
+        f[idx] <- l$prox(Fw - y[idx], l$target, 1/ctrl$rho, l$lower, l$upper)
       } else {
-        l$prox(Fw - y[idx], l$target, 1/ctrl$rho)
+        f[idx] <- l$prox(Fw - y[idx], l$target, 1/ctrl$rho)
       }
-    })
-    f <- do.call(c, f_updates)
+    }
 
     # Update w_tilde and w_bar
     w_tilde <- reg$prox(w - z, lam/ctrl$rho)
