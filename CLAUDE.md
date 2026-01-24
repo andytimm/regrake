@@ -10,7 +10,7 @@ An R package for regularized survey raking based on Barratt et al. (2021) "Optim
 R/                      # Package source
   regrake.R             # Main user-facing function
   solver.R              # ADMM solver implementation
-  parse_raking_formula.R # Formula parsing (~ exact(x) + l2(y))
+  parse_raking_formula.R # Formula parsing (~ rr_exact(x) + rr_l2(y))
   compute_target_values.R # Convert population data to targets
   construct_admm_inputs.R # Build design matrix and losses for ADMM
   losses.R              # Loss functions (equality, l2, kl, inequality)
@@ -46,7 +46,7 @@ data + formula_spec + target_values → construct_admm_inputs() → design_matri
 
 **Working:**
 - ADMM solver (core optimization)
-- Formula parsing for `exact()`, `l2()`, and interactions
+- Formula parsing for `rr_exact()`, `rr_l2()`, and interactions
 - Basic categorical variable raking
 - Entropy and zero regularizers
 - "Proportions" format for population targets
@@ -155,7 +155,7 @@ For typical survey raking problems (< 10K samples, reasonable constraint counts)
 
 **Medium priority (user experience):**
 3. **Polish `regrake()` end-to-end** - Robust error messages, input validation
-4. **Formula interface for continuous** - e.g., `~ exact(sex) + l2(age_mean)`
+4. **Formula interface for continuous** - e.g., `~ rr_exact(sex) + rr_mean(age)`
 
 **Lower priority (ecosystem):**
 5. **Documentation/vignettes** - Real survey weighting workflow examples
@@ -182,5 +182,5 @@ devtools::test(filter = "solver")
 devtools::test(filter = "e2e")
 
 # Check a specific function
-parse_raking_formula(~ exact(sex) + l2(age))
+parse_raking_formula(~ rr_exact(sex) + rr_l2(age))
 ```

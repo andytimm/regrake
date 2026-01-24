@@ -17,8 +17,8 @@
 #' \itemize{
 #'   \item Main effects: \code{~ age + race}
 #'   \item N-way interactions: \code{~ age:race}, \code{~ age:race:education}
-#'   \item Constraint types: \code{exact()}, \code{l2()}, \code{kl()}
-#'   \item Mixed constraints: \code{~ age + l2(age:race)}
+#'   \item Constraint types: \code{rr_exact()}, \code{rr_l2()}, \code{rr_kl()}
+#'   \item Mixed constraints: \code{~ age + rr_l2(age:race)}
 #' }
 #'
 #' For categorical variables:
@@ -33,14 +33,14 @@
 #'   \item Main effects use exact constraints by default
 #'   \item Interactions can use any constraint type (exact, l2, kl)
 #'   \item A warning is issued to clarify the behavior
-#'   \item Example: \code{~ age + race + l2(age:race)} will use exact constraints for main effects
+#'   \item Example: \code{~ age + race + rr_l2(age:race)} will use exact constraints for main effects
 #'     and l2 for the interaction
 #' }
 #'
 #' Pure duplicates (same variables with different constraints) are not allowed:
 #' \itemize{
-#'   \item \code{~ age + l2(age)} will error
-#'   \item \code{~ age:race + l2(age:race)} will error
+#'   \item \code{~ age + rr_l2(age)} will error
+#'   \item \code{~ age:race + rr_l2(age:race)} will error
 #' }
 #'
 #' @keywords internal
@@ -123,10 +123,10 @@ validate_overlapping_constraints <- function(terms) {
     if (!is.null(term$interaction)) {
       overlap <- intersect(term$variables, names(main_effect_vars))
       if (length(overlap) > 0) {
-        warning("Variables in ", term$type, "(",
+        warning(paste0("Variables in rr_", term$type, "(",
                 paste(vapply(term$interaction, deparse, character(1)), collapse = ":"),
                 ") also appear as main effects. Using exact constraints for main effects and ",
-                term$type, " constraint for the interaction term",
+                "rr_", term$type, " constraint for the interaction term"),
                 call. = FALSE)
       }
     }
@@ -149,9 +149,10 @@ parse_formula_terms <- function(expr) {
     # Combine terms from both sides of +
     c(parse_formula_terms(args[[1]]),
       parse_formula_terms(args[[2]]))
-  } else if (fun %in% c("l2", "kl", "exact")) {
-    # Handle constraint functions
-    list(create_constraint_term(fun, args[[1]]))
+  } else if (fun %in% c("rr_l2", "rr_kl", "rr_exact")) {
+    # Handle constraint functions - strip rr_ prefix for internal type
+    internal_type <- sub("^rr_", "", fun)
+    list(create_constraint_term(internal_type, args[[1]]))
   } else if (fun == ":") {
     # Handle interactions by recursively collecting all variables
     list(create_interaction_term(collect_interaction_vars(expr)))
@@ -252,7 +253,7 @@ create_term_id <- function(type, expr) {
 #' @param ... Additional arguments passed to other methods
 #' @return Invisibly returns the object
 #' @examples
-#' formula <- exact(~ race) + l2(~ age:educ)
+#' formula <- rr_exact(~ race) + rr_l2(~ age:educ)
 #' print(formula)
 #' @export
 print.raking_formula <- function(x, ...) {
@@ -272,19 +273,19 @@ print.raking_formula <- function(x, ...) {
 }
 
 #' @export
-l2 <- function(x) {
+rr_l2 <- function(x) {
   # When used in formula context, return unevaluated
   x
 }
 
 #' @export
-kl <- function(x) {
+rr_kl <- function(x) {
   # When used in formula context, return unevaluated
   x
 }
 
 #' @export
-exact <- function(x) {
+rr_exact <- function(x) {
   # When used in formula context, return unevaluated
   x
 }
@@ -323,7 +324,7 @@ validate_inputs <- function(formula, data) {
     } else if (inherits(formula, "raking_formula") || inherits(formula, "rakingformula")) {
       formula
     } else {
-      stop("Formula must be created with exact(), l2(), kl(), or combinations thereof",
+      stop("Formula must be created with rr_exact(), rr_l2(), rr_kl(), or combinations thereof",
            call. = FALSE)
     }
 
@@ -457,8 +458,8 @@ extract_additions <- function(formula) {
 #' raking_term(~ race + age, type = "exact")
 #'
 #' # Typically used via wrapper functions
-#' exact(~ race + age)
-#' l2(~ race:educ)
+#' rr_exact(~ race + age)
+#' rr_l2(~ race:educ)
 #' @export
 raking_term <- function(formula, type = c("exact", "l2", "kl"), ...) {
   type <- match.arg(type)
@@ -515,13 +516,13 @@ raking_term <- function(formula, type = c("exact", "l2", "kl"), ...) {
 #'
 #' # Formula-first interface (recommended alternative)
 #' # regrake(~ race + age, data=df)
-#' # regrake(~ race + l2(age), data=df)
+#' # regrake(~ race + rr_l2(age), data=df)
 #' @export
 rf <- function(formula, ...) {
   args <- list(...)
 
   if (length(args) == 0) {
-    return(exact(formula))
+    return(rr_exact(formula))
   }
 
   # If type is specified directly
@@ -532,12 +533,15 @@ rf <- function(formula, ...) {
     # Validate type
     type <- match.arg(type, choices = c("exact", "l2", "kl"))
 
+    # Map to rr_ prefixed function
+    rr_type <- paste0("rr_", type)
+
     # Call the appropriate constructor
-    return(do.call(type, c(list(formula), args)))
+    return(do.call(rr_type, c(list(formula), args)))
   }
 
   # Default to exact
-  exact(formula, ...)
+  rr_exact(formula, ...)
 }
 
 #' Process a raking term
@@ -621,7 +625,7 @@ process_term <- function(term, data) {
 #' @param ... Additional arguments passed to other methods
 #' @return Invisibly returns the object
 #' @examples
-#' term <- exact(~ race + age)
+#' term <- rr_exact(~ race + age)
 #' print(term)
 #' @export
 print.raking_term <- function(x, ...) {
@@ -648,7 +652,7 @@ print.raking_term <- function(x, ...) {
 #'   race = factor(c("white", "black", "hispanic")),
 #'   age = c(25, 35, 45)
 #' )
-#' spec <- parse_raking_formula(exact(~ race) + l2(~ age), df)
+#' spec <- parse_raking_formula(rr_exact(~ race) + rr_l2(~ age), df)
 #' print(spec)
 #' @export
 print.raking_spec <- function(x, ...) {

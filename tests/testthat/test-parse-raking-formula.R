@@ -16,17 +16,17 @@ test_that("basic formula parsing works", {
 
 test_that("constraint functions are parsed correctly", {
   # Test l2 constraint
-  f1 <- parse_raking_formula(~ l2(age))
+  f1 <- parse_raking_formula(~ rr_l2(age))
   expect_equal(f1$terms[[1]]$type, "l2")
   expect_equal(f1$terms[[1]]$variables, "age")
 
   # Test kl constraint
-  f2 <- parse_raking_formula(~ kl(income))
+  f2 <- parse_raking_formula(~ rr_kl(income))
   expect_equal(f2$terms[[1]]$type, "kl")
   expect_equal(f2$terms[[1]]$variables, "income")
 
   # Test exact constraint
-  f3 <- parse_raking_formula(~ exact(education))
+  f3 <- parse_raking_formula(~ rr_exact(education))
   expect_equal(f3$terms[[1]]$type, "exact")
   expect_equal(f3$terms[[1]]$variables, "education")
 })
@@ -39,7 +39,7 @@ test_that("interactions are handled correctly", {
   expect_equal(length(f1$terms[[1]]$interaction), 2)
 
   # Interaction within constraint
-  f2 <- parse_raking_formula(~ l2(race:age))
+  f2 <- parse_raking_formula(~ rr_l2(race:age))
   expect_equal(f2$terms[[1]]$type, "l2")
   expect_equal(sort(f2$terms[[1]]$variables), c("age", "race"))
   expect_equal(length(f2$terms[[1]]$interaction), 2)
@@ -51,7 +51,7 @@ test_that("interactions are handled correctly", {
 })
 
 test_that("complex formulas are parsed correctly", {
-  f <- parse_raking_formula(~ race + l2(age:education) + kl(income) + state:region)
+  f <- parse_raking_formula(~ race + rr_l2(age:education) + rr_kl(income) + state:region)
 
   expect_equal(length(f$terms), 4)
   expect_equal(f$terms[[1]]$type, "exact")
@@ -69,7 +69,7 @@ test_that("term IDs are unique", {
   # Now expect a warning for overlapping variables
   expect_warning(
     f <- parse_raking_formula(~ race + age + race:age),
-    "Variables in exact\\(race:age\\) also appear as main effects. Using exact constraints for main effects and exact constraint for the interaction term"
+    "Variables in rr_exact\\(race:age\\) also appear as main effects. Using exact constraints for main effects and rr_exact constraint for the interaction term"
   )
   ids <- vapply(f$terms, function(t) t$term_id, character(1))
   expect_equal(length(unique(ids)), 3)
@@ -93,7 +93,7 @@ test_that("error conditions and edge cases are handled appropriately", {
   expect_equal(f$terms[[1]]$variables, "age")
 
   # Nested functions
-  f2 <- parse_raking_formula(~ l2(exact(age)))
+  f2 <- parse_raking_formula(~ rr_l2(rr_exact(age)))
   expect_equal(f2$terms[[1]]$type, "l2")
   expect_equal(f2$terms[[1]]$variables, "age")
 
@@ -104,7 +104,7 @@ test_that("error conditions and edge cases are handled appropriately", {
 })
 
 test_that("print method works correctly", {
-  f <- parse_raking_formula(~ race + l2(age:education) + kl(income))
+  f <- parse_raking_formula(~ race + rr_l2(age:education) + rr_kl(income))
   expect_output(print(f), "Raking Formula Specification:")
   expect_output(print(f), "Variables:")
   expect_output(print(f), "Terms:")
@@ -118,9 +118,9 @@ test_that("formula environment is preserved", {
 
 test_that("mixed constraints with overlapping variables work correctly", {
   expect_warning(
-    {f <- parse_raking_formula(~ age + race + l2(age:race))
+    {f <- parse_raking_formula(~ age + race + rr_l2(age:race))
      f},
-    "Variables in l2\\(age:race\\) also appear as main effects. Using exact constraints for main effects and l2 constraint for the interaction term"
+    "Variables in rr_l2\\(age:race\\) also appear as main effects. Using exact constraints for main effects and rr_l2 constraint for the interaction term"
   )
 
   # Should have 3 terms
@@ -144,18 +144,18 @@ test_that("mixed constraints with overlapping variables work correctly", {
 test_that("overlapping constraints are handled appropriately", {
   # Pure duplicates should error
   expect_error(
-    parse_raking_formula(~ age + l2(age)),
+    parse_raking_formula(~ age + rr_l2(age)),
     "Variable 'age' appears multiple times with different constraints"
   )
   expect_error(
-    parse_raking_formula(~ race:age + l2(race:age)),
+    parse_raking_formula(~ race:age + rr_l2(race:age)),
     "Interaction 'race:age' appears multiple times with different constraints"
   )
 
   # Partial overlaps should warn but use the appropriate versions
   expect_warning(
-    f <- parse_raking_formula(~ age + race + l2(age:race)),
-    "Variables in l2\\(age:race\\) also appear as main effects. Using exact constraints for main effects and l2 constraint for the interaction term"
+    f <- parse_raking_formula(~ age + race + rr_l2(age:race)),
+    "Variables in rr_l2\\(age:race\\) also appear as main effects. Using exact constraints for main effects and rr_l2 constraint for the interaction term"
   )
 
   # Check that we kept the earlier main effects
@@ -179,7 +179,7 @@ test_that("n-way interactions are handled correctly", {
   expect_equal(length(f1$terms[[1]]$interaction), 3)
 
   # 3-way interaction with constraint
-  f2 <- parse_raking_formula(~ l2(a:b:c))
+  f2 <- parse_raking_formula(~ rr_l2(a:b:c))
   expect_equal(f2$terms[[1]]$type, "l2")
   expect_equal(sort(f2$terms[[1]]$variables), c("a", "b", "c"))
   expect_equal(length(f2$terms[[1]]$interaction), 3)

@@ -49,7 +49,7 @@ test_that("compute_target_values handles joint distributions correctly", {
   # Create formula specification with warning
   expect_warning(
     formula_spec <- parse_raking_formula(~ race + age + race:age),
-    "Variables in exact\\(race:age\\) also appear as main effects"
+    "Variables in rr_exact\\(race:age\\) also appear as main effects"
   )
 
   # Compute target values
@@ -87,7 +87,7 @@ test_that("compute_target_values handles joint distributions correctly", {
       compute_target_values(pop_data_no_joint, parse_raking_formula(~ race + age + race:age)),
       "Missing target values for variable: race:age"
     ),
-    "Variables in exact\\(race:age\\) also appear as main effects"
+    "Variables in rr_exact\\(race:age\\) also appear as main effects"
   )
 })
 
@@ -185,7 +185,7 @@ test_that("autumn format handles complex interactions", {
 
   expect_warning(
     formula_spec <- parse_raking_formula(~ a + b + c + a:b:c),
-    "Variables in exact\\(a:b:c\\) also appear as main effects"
+    "Variables in rr_exact\\(a:b:c\\) also appear as main effects"
   )
   result <- compute_target_values(pop_data, formula_spec)
   expect_named(result$targets, c("exact_a", "exact_b", "exact_c", "exact_a:b:c"))
@@ -198,7 +198,7 @@ test_that("autumn format handles complex interactions", {
       compute_target_values(pop_data_no_joint, parse_raking_formula(~ a + b + c + a:b:c)),
       "Missing target values for variable: a:b:c"
     ),
-    "Variables in exact\\(a:b:c\\) also appear as main effects"
+    "Variables in rr_exact\\(a:b:c\\) also appear as main effects"
   )
 
   # Overlapping variables
@@ -226,9 +226,9 @@ test_that("autumn format handles complex interactions", {
   expect_warning(
     expect_warning(
       formula_spec <- parse_raking_formula(~ x + y + x:y + x:y:z),
-      "Variables in exact\\(x:y:z\\) also appear as main effects"
+      "Variables in rr_exact\\(x:y:z\\) also appear as main effects"
     ),
-    "Variables in exact\\(x:y\\) also appear as main effects"
+    "Variables in rr_exact\\(x:y\\) also appear as main effects"
   )
 
   result <- compute_target_values(pop_data, formula_spec)

@@ -230,18 +230,17 @@ test_that("construct_admm_inputs errors on unknown term type", {
 })
 
 test_that("construct_admm_inputs handles mixed exact and l2 loss types", {
-  # This test covers the bug where ~ exact(sex) + l2(age) would fail
+  # This test covers the bug where ~ rr_exact(sex) + rr_l2(age) would fail
   # because model.frame with the original formula created columns named
-
-  # "exact(sex)" and "l2(age)" instead of "sex" and "age"
+  # "rr_exact(sex)" and "rr_l2(age)" instead of "sex" and "age"
   data <- data.frame(
     sex = factor(c("M", "F", "M", "F", "M")),
     age = factor(c("young", "old", "young", "old", "young"))
   )
 
-  # Simulate what parse_raking_formula returns for ~ exact(sex) + l2(age)
+  # Simulate what parse_raking_formula returns for ~ rr_exact(sex) + rr_l2(age)
   formula_spec <- list(
-    formula = ~ exact(sex) + l2(age),  # The wrapped formula
+    formula = ~ rr_exact(sex) + rr_l2(age),  # The wrapped formula
     terms = list(
       list(
         type = "exact",

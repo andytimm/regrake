@@ -20,7 +20,7 @@
 #   )
 #
 #   # Set up raking formula with exact matching for sex and l2 for continuous vars
-#   formula <- ~ exact(sex) + l2(age) + l2(height)
+#   formula <- ~ rr_exact(sex) + rr_l2(age) + rr_l2(height)
 #
 #   # Run regrake
 #   result <- regrake(
