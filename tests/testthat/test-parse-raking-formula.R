@@ -29,6 +29,36 @@ test_that("constraint functions are parsed correctly", {
   f3 <- parse_raking_formula(~ rr_exact(education))
   expect_equal(f3$terms[[1]]$type, "exact")
   expect_equal(f3$terms[[1]]$variables, "education")
+
+  # Test mean constraint (for continuous variables)
+  f4 <- parse_raking_formula(~ rr_mean(income))
+  expect_equal(f4$terms[[1]]$type, "exact")  # rr_mean maps to exact internally
+  expect_equal(f4$terms[[1]]$variables, "income")
+})
+
+test_that("rr_mean() works for continuous variables", {
+  # rr_mean should work like rr_exact but is specifically for continuous variables
+  # It maps to "exact" type internally
+
+  # Single continuous variable
+  f1 <- parse_raking_formula(~ rr_mean(age))
+  expect_equal(f1$terms[[1]]$type, "exact")
+  expect_equal(f1$terms[[1]]$variables, "age")
+  expect_null(f1$terms[[1]]$interaction)
+
+  # Multiple continuous variables
+  f2 <- parse_raking_formula(~ rr_mean(age) + rr_mean(income))
+  expect_equal(length(f2$terms), 2)
+  expect_equal(f2$terms[[1]]$type, "exact")
+  expect_equal(f2$terms[[2]]$type, "exact")
+
+  # Mix of categorical (rr_exact) and continuous (rr_mean)
+  f3 <- parse_raking_formula(~ rr_exact(sex) + rr_mean(age))
+  expect_equal(length(f3$terms), 2)
+  expect_equal(f3$terms[[1]]$type, "exact")
+  expect_equal(f3$terms[[1]]$variables, "sex")
+  expect_equal(f3$terms[[2]]$type, "exact")
+  expect_equal(f3$terms[[2]]$variables, "age")
 })
 
 test_that("interactions are handled correctly", {

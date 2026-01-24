@@ -140,34 +140,51 @@ construct_admm_inputs <- function(data, formula_spec, target_values) {
     }
     targets <- target_values$targets[[target_key]]
 
-    # Create model matrix for this term
-    # For interactions, combine variables with : in formula
-    term_formula <- if (is.null(term$interaction)) {
-      as.formula(paste("~", term$variables))
+    # Check if this is a continuous variable (single variable, numeric in data)
+    is_continuous <- is.null(term$interaction) &&
+                     length(term$variables) == 1 &&
+                     is.numeric(mf[[term$variables]])
+
+    if (is_continuous) {
+      # Continuous variable: design matrix row contains actual values
+      # F row = [x1, x2, ..., xn] where xi is the value for sample i
+      # Constraint: sum(wi * xi) = target (e.g., weighted mean)
+      values <- mf[[term$variables]]
+      design_blocks[[term_idx]] <- Matrix::Matrix(
+        matrix(values, nrow = 1), sparse = TRUE
+      )
     } else {
-      as.formula(paste("~", paste(term$variables, collapse = ":")))
+      # Categorical variable: create indicator matrix
+
+      # Create model matrix for this term
+      # For interactions, combine variables with : in formula
+      term_formula <- if (is.null(term$interaction)) {
+        as.formula(paste("~", term$variables))
+      } else {
+        as.formula(paste("~", paste(term$variables, collapse = ":")))
+      }
+
+      # Create subset of model frame with only needed variables
+      needed_vars <- if (is.null(term$interaction)) term$variables else term$variables
+      mf_subset <- mf[, needed_vars, drop = FALSE]
+
+      # Create model matrix with all levels (no reference level)
+      mm <- model.matrix(term_formula, mf_subset,
+                        contrasts.arg = lapply(mf_subset[sapply(mf_subset, is.factor)],
+                                             contrasts, contrasts = FALSE))
+      # Remove intercept
+      mm <- mm[, -1, drop = FALSE]
+
+      # Convert to sparse matrix with correct dimensions
+      # Each row is a constraint (level), each column is a sample
+      nonzero <- which(mm != 0, arr.ind = TRUE)
+      design_blocks[[term_idx]] <- Matrix::sparseMatrix(
+        i = nonzero[, 2],           # constraint/level index
+        j = nonzero[, 1],           # sample index
+        x = rep(1, nrow(nonzero)),  # all 1s for indicator matrix
+        dims = c(ncol(mm), nrow(mm))  # transpose dimensions
+      )
     }
-
-    # Create subset of model frame with only needed variables
-    needed_vars <- if (is.null(term$interaction)) term$variables else term$variables
-    mf_subset <- mf[, needed_vars, drop = FALSE]
-
-    # Create model matrix with all levels (no reference level)
-    mm <- model.matrix(term_formula, mf_subset,
-                      contrasts.arg = lapply(mf_subset[sapply(mf_subset, is.factor)],
-                                           contrasts, contrasts = FALSE))
-    # Remove intercept
-    mm <- mm[, -1, drop = FALSE]
-
-    # Convert to sparse matrix with correct dimensions
-    # Each row is a constraint (level), each column is a sample
-    nonzero <- which(mm != 0, arr.ind = TRUE)
-    design_blocks[[term_idx]] <- Matrix::sparseMatrix(
-      i = nonzero[, 2],           # constraint/level index
-      j = nonzero[, 1],           # sample index
-      x = rep(1, nrow(nonzero)),  # all 1s for indicator matrix
-      dims = c(ncol(mm), nrow(mm))  # transpose dimensions
-    )
 
     # Create loss function based on term type
     if (!term$type %in% names(loss_types)) {

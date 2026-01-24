@@ -147,12 +147,12 @@ process_proportions_data <- function(data) {
 #' Process raw unit-level data
 #' @description
 #' Converts raw data where each row is a unit into target values.
-#' Computes proportions for each categorical variable based on counts.
+#' Computes proportions for categorical variables and means for continuous.
 #'
 #' @section Processing Steps:
-#' 1. Identify categorical variables
-#' 2. Compute counts for each level
-#' 3. Convert to proportions
+#' 1. Identify variable types (categorical vs continuous)
+#' 2. Categorical: compute counts and convert to proportions
+#' 3. Continuous: compute mean (level = "mean")
 #' 4. Format in autumn format
 #'
 #' @keywords internal
@@ -164,19 +164,25 @@ process_raw_data <- function(data) {
   names(result) <- vars
 
   for (var in vars) {
-    # Skip any metadata columns
-    if (!is.factor(data[[var]]) && !is.character(data[[var]])) next
+    if (is.numeric(data[[var]])) {
+      # Continuous variable: compute mean
+      result[[var]] <- tibble::tibble(
+        variable = var,
+        level = "mean",
+        target = mean(data[[var]], na.rm = TRUE)
+      )
+    } else if (is.factor(data[[var]]) || is.character(data[[var]])) {
+      # Categorical variable: compute proportions
+      counts <- table(data[[var]])
+      props <- as.numeric(counts) / sum(counts)
 
-    # Compute counts and convert to proportions
-    counts <- table(data[[var]])
-    props <- as.numeric(counts) / sum(counts)
-
-    # Add to result in autumn format
-    result[[var]] <- tibble::tibble(
-      variable = var,
-      level = names(counts),
-      target = props
-    )
+      result[[var]] <- tibble::tibble(
+        variable = var,
+        level = names(counts),
+        target = props
+      )
+    }
+    # Skip other types (e.g., dates, complex)
   }
 
   # Combine all results
@@ -186,13 +192,15 @@ process_raw_data <- function(data) {
 #' Process weighted data
 #' @description
 #' Converts data with sampling weights into target values.
-#' Uses weights to compute weighted proportions for each variable.
+#' Uses weights to compute weighted proportions for categorical variables
+#' and weighted means for continuous variables.
 #'
 #' @section Processing Steps:
 #' 1. Validate weight column exists
-#' 2. Identify categorical variables
-#' 3. Compute weighted proportions
-#' 4. Format in autumn format
+#' 2. Identify variable types (categorical vs continuous)
+#' 3. Categorical: compute weighted proportions
+#' 4. Continuous: compute weighted mean (level = "mean")
+#' 5. Format in autumn format
 #'
 #' @keywords internal
 process_weighted_data <- function(data, weights) {
@@ -210,25 +218,36 @@ process_weighted_data <- function(data, weights) {
   vars <- names(data)
   result <- vector("list", length(vars))
   names(result) <- vars
+  wts <- data[[weights]]
 
   for (var in vars) {
-    # Skip weight column and any metadata
-    if (var == weights || (!is.factor(data[[var]]) && !is.character(data[[var]]))) next
+    # Skip weight column
+    if (var == weights) next
 
-    # Compute weighted proportions
-    wtd_props <- stats::aggregate(
-      data[[weights]],
-      list(level = data[[var]]),
-      sum
-    )
-    wtd_props$target <- wtd_props$x / sum(wtd_props$x)
+    if (is.numeric(data[[var]])) {
+      # Continuous variable: compute weighted mean
+      wtd_mean <- sum(data[[var]] * wts) / sum(wts)
+      result[[var]] <- tibble::tibble(
+        variable = var,
+        level = "mean",
+        target = wtd_mean
+      )
+    } else if (is.factor(data[[var]]) || is.character(data[[var]])) {
+      # Categorical variable: compute weighted proportions
+      wtd_props <- stats::aggregate(
+        wts,
+        list(level = data[[var]]),
+        sum
+      )
+      wtd_props$target <- wtd_props$x / sum(wtd_props$x)
 
-    # Add to result in autumn format
-    result[[var]] <- tibble::tibble(
-      variable = var,
-      level = wtd_props$level,
-      target = wtd_props$target
-    )
+      result[[var]] <- tibble::tibble(
+        variable = var,
+        level = wtd_props$level,
+        target = wtd_props$target
+      )
+    }
+    # Skip other types
   }
 
   # Combine all results
@@ -441,11 +460,24 @@ compute_target_values <- function(population_data, formula_spec, pop_type = "pro
   }
 
   # Validate targets sum to 1 for each variable (categorical variables only)
-  # Skip validation for continuous targets (level contains statistic names like "mean")
-  var_sums <- tapply(population_data$target, population_data$variable, sum)
-  bad_vars <- names(var_sums)[abs(var_sums - 1) > 1e-6]
-  if (length(bad_vars) > 0) {
-    stop("Targets for variable '", bad_vars[1], "' do not sum to 1", call. = FALSE)
+  # Skip validation for continuous targets (level contains statistic names like "mean", "var", etc.)
+  continuous_stat_levels <- c("mean", "var", "sd", "median", "min", "max",
+                               "q10", "q25", "q50", "q75", "q90")
+
+  # Identify which variables are continuous (have statistic-like levels)
+  is_continuous_var <- tapply(population_data$level, population_data$variable, function(lvls) {
+    all(lvls %in% continuous_stat_levels)
+  })
+
+  # Only validate categorical variables (those not identified as continuous)
+  categorical_vars <- names(is_continuous_var)[!is_continuous_var]
+  if (length(categorical_vars) > 0) {
+    cat_data <- population_data[population_data$variable %in% categorical_vars, ]
+    var_sums <- tapply(cat_data$target, cat_data$variable, sum)
+    bad_vars <- names(var_sums)[abs(var_sums - 1) > 1e-6]
+    if (length(bad_vars) > 0) {
+      stop("Targets for variable '", bad_vars[1], "' do not sum to 1", call. = FALSE)
+    }
   }
 
   # Process each term in the formula

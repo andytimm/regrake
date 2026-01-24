@@ -159,6 +159,73 @@ test_that("autumn format validates input correctly", {
   )
 })
 
+test_that("process_raw_data computes means for continuous variables", {
+  # Raw data with both categorical and continuous variables
+  raw_data <- data.frame(
+    sex = c("M", "F", "M", "F", "M"),
+    age = c(25, 35, 45, 30, 40),
+    income = c(50000, 75000, 45000, 80000, 55000)
+  )
+
+  # Use process_pop_data with raw type (which calls process_raw_data)
+  result <- process_pop_data(raw_data, "raw", NULL)
+
+  # Should have rows for categorical levels AND continuous means
+  expect_true("sex" %in% result$variable)
+  expect_true("age" %in% result$variable)
+  expect_true("income" %in% result$variable)
+
+  # Categorical (sex) should have proportions summing to 1
+  sex_rows <- result[result$variable == "sex", ]
+  expect_equal(nrow(sex_rows), 2)  # M and F
+  expect_equal(sum(sex_rows$target), 1)
+
+  # Continuous (age, income) should have single row with level = "mean"
+  age_rows <- result[result$variable == "age", ]
+  expect_equal(nrow(age_rows), 1)
+  expect_equal(age_rows$level, "mean")
+  expect_equal(age_rows$target, mean(raw_data$age))
+
+  income_rows <- result[result$variable == "income", ]
+  expect_equal(nrow(income_rows), 1)
+  expect_equal(income_rows$level, "mean")
+  expect_equal(income_rows$target, mean(raw_data$income))
+})
+
+test_that("validation skips sums-to-1 check for continuous variables", {
+  # Population data with continuous variable (target doesn't sum to 1)
+  pop_data <- data.frame(
+    variable = c("sex", "sex", "age"),
+    level = c("M", "F", "mean"),
+    target = c(0.49, 0.51, 35.5)  # age target is a mean, not a proportion
+  )
+
+  formula_spec <- parse_raking_formula(~ sex + age)
+
+  # Should not error - continuous variables should be exempt from sums-to-1 validation
+  expect_error(
+    compute_target_values(pop_data, formula_spec),
+    NA
+  )
+})
+
+test_that("validation still catches categorical variables not summing to 1", {
+  # Population data with categorical variable that doesn't sum to 1
+  pop_data <- data.frame(
+    variable = c("sex", "sex", "age"),
+    level = c("M", "F", "mean"),
+    target = c(0.4, 0.4, 35.5)  # sex sums to 0.8, not 1
+  )
+
+  formula_spec <- parse_raking_formula(~ sex + age)
+
+  # Should error because sex targets don't sum to 1
+  expect_error(
+    compute_target_values(pop_data, formula_spec),
+    "Targets for variable 'sex' do not sum to 1"
+  )
+})
+
 test_that("autumn format handles complex interactions", {
   # N-way interactions
   pop_data <- data.frame(

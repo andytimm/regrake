@@ -276,3 +276,94 @@ test_that("construct_admm_inputs handles mixed exact and l2 loss types", {
   # Verify design matrix dimensions (2 sex levels + 2 age levels = 4 rows, 5 samples)
   expect_equal(dim(result$design_matrix), c(4, 5))
 })
+
+test_that("construct_admm_inputs handles continuous variables", {
+  # Test that numeric variables get actual values in design matrix, not indicators
+  data <- data.frame(
+    sex = factor(c("M", "F", "M", "F", "M")),
+    income = c(50000, 75000, 45000, 80000, 55000)  # Continuous
+  )
+
+  formula_spec <- list(
+    formula = ~ sex + income,
+    terms = list(
+      list(
+        type = "exact",
+        variables = "sex",
+        interaction = NULL
+      ),
+      list(
+        type = "exact",
+        variables = "income",
+        interaction = NULL
+      )
+    )
+  )
+
+  target_values <- list(
+    targets = list(
+      exact_sex = c(M = 0.5, F = 0.5),
+      exact_income = c(mean = 60000)  # Target mean income
+    )
+  )
+
+  result <- construct_admm_inputs(data, formula_spec, target_values)
+
+  # Verify structure
+  expect_type(result, "list")
+  expect_named(result, c("design_matrix", "losses"))
+
+  # Verify design matrix dimensions (2 sex levels + 1 income row = 3 rows, 5 samples)
+  expect_equal(dim(result$design_matrix), c(3, 5))
+
+  # The income row should contain actual values, not 0/1 indicators
+  # Row 3 (income) should be [50000, 75000, 45000, 80000, 55000]
+  income_row <- as.vector(result$design_matrix[3, ])
+  expect_equal(income_row, c(50000, 75000, 45000, 80000, 55000))
+
+  # The sex rows should still be indicators
+  expect_equal(as.vector(result$design_matrix[1, ]), c(0, 1, 0, 1, 0))  # F
+  expect_equal(as.vector(result$design_matrix[2, ]), c(1, 0, 1, 0, 1))  # M
+})
+
+test_that("construct_admm_inputs handles continuous-only formula", {
+  # Test case with only continuous variables
+  data <- data.frame(
+    age = c(25, 35, 45, 30, 40),
+    income = c(50000, 75000, 45000, 80000, 55000)
+  )
+
+  formula_spec <- list(
+    formula = ~ age + income,
+    terms = list(
+      list(
+        type = "exact",
+        variables = "age",
+        interaction = NULL
+      ),
+      list(
+        type = "exact",
+        variables = "income",
+        interaction = NULL
+      )
+    )
+  )
+
+  target_values <- list(
+    targets = list(
+      exact_age = c(mean = 35),
+      exact_income = c(mean = 60000)
+    )
+  )
+
+  result <- construct_admm_inputs(data, formula_spec, target_values)
+
+  # Design matrix should have 2 rows (one per continuous variable)
+  expect_equal(dim(result$design_matrix), c(2, 5))
+
+  # Row 1 (age) should contain actual ages
+  expect_equal(as.vector(result$design_matrix[1, ]), c(25, 35, 45, 30, 40))
+
+  # Row 2 (income) should contain actual incomes
+  expect_equal(as.vector(result$design_matrix[2, ]), c(50000, 75000, 45000, 80000, 55000))
+})

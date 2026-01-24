@@ -149,9 +149,10 @@ parse_formula_terms <- function(expr) {
     # Combine terms from both sides of +
     c(parse_formula_terms(args[[1]]),
       parse_formula_terms(args[[2]]))
-  } else if (fun %in% c("rr_l2", "rr_kl", "rr_exact")) {
-    # Handle constraint functions - strip rr_ prefix for internal type
-    internal_type <- sub("^rr_", "", fun)
+  } else if (fun %in% c("rr_l2", "rr_kl", "rr_exact", "rr_mean")) {
+    # Handle constraint functions
+    # rr_mean maps to exact constraint (for continuous variables)
+    internal_type <- if (fun == "rr_mean") "exact" else sub("^rr_", "", fun)
     list(create_constraint_term(internal_type, args[[1]]))
   } else if (fun == ":") {
     # Handle interactions by recursively collecting all variables
@@ -287,6 +288,13 @@ rr_kl <- function(x) {
 #' @export
 rr_exact <- function(x) {
   # When used in formula context, return unevaluated
+  x
+}
+
+#' @export
+rr_mean <- function(x) {
+  # When used in formula context, return unevaluated
+  # rr_mean is specifically for continuous variables - matches mean exactly
   x
 }
 
