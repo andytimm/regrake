@@ -1,3 +1,6 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
 ^ai_context$
+^benchmarks$
+^CLAUDE\.md$
+^\.claude$

@@ -16,3 +16,6 @@ Thumbs.db
 
 # ai tools
 # ai_context/
+
+# Benchmark test outputs (regenerated, not tracked)
+benchmarks/test_cases/
