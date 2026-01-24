@@ -8,6 +8,7 @@ Usage:
 
 import os
 import json
+import time
 import numpy as np
 import pandas as pd
 from pathlib import Path
@@ -67,27 +68,39 @@ def save_test_case(name, F, losses_spec, regularizer_spec, lam, results):
             np.savetxt(case_dir / f"weights_{impl_name}.csv", result["weights"], delimiter=",")
             np.savetxt(case_dir / f"achieved_{impl_name}.csv", result["achieved"], delimiter=",")
 
+    # Save timing information
+    timing = {}
+    for impl_name, result in results.items():
+        if result is not None and "time" in result:
+            timing[f"{impl_name}_time"] = result["time"]
+    if timing:
+        with open(case_dir / "timing.json", "w") as f:
+            json.dump(timing, f, indent=2)
+
 
 def run_rswjax(F, losses, regularizer, lam):
-    """Run rswjax solver and return results."""
+    """Run rswjax solver and return results with timing."""
     if not HAS_RSWJAX:
         return None
 
     # Create a dummy dataframe (rswjax expects this interface)
     df = pd.DataFrame(F.T)
 
-    # Run solver
+    # Run solver with timing
+    start = time.perf_counter()
     w, achieved, sol = rsw(df, funs=None, losses=losses, regularizer=regularizer,
                            lam=lam, verbose=False, maxiter=5000, eps_abs=1e-6, eps_rel=1e-6)
+    elapsed = time.perf_counter() - start
 
     return {
         "weights": np.array(w),
-        "achieved": np.concatenate(achieved)
+        "achieved": np.concatenate(achieved),
+        "time": elapsed
     }
 
 
 def run_original_rsw(F, losses, regularizer, lam):
-    """Run original rsw solver and return results."""
+    """Run original rsw solver and return results with timing."""
     if not HAS_ORIGINAL_RSW:
         return None
 
@@ -96,13 +109,16 @@ def run_original_rsw(F, losses, regularizer, lam):
     # Convert to sparse matrix (original rsw expects this)
     F_sparse = sparse.csr_matrix(F)
 
-    # Run solver
+    # Run solver with timing
+    start = time.perf_counter()
     sol = orig_admm(F_sparse, losses, regularizer, lam,
                     verbose=False, maxiter=5000, eps_abs=1e-6, eps_rel=1e-6)
+    elapsed = time.perf_counter() - start
 
     return {
         "weights": np.array(sol["w_best"]),
-        "achieved": F @ sol["w_best"]
+        "achieved": F @ sol["w_best"],
+        "time": elapsed
     }
 
 
