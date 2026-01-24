@@ -43,24 +43,26 @@ compute_norms_and_epsilons <- function(f, w, w_old, y, z, u, F, rho, eps_abs, ep
   if (is.null(Fw)) {
     Fw <- drop(as.matrix(F %*% w))
   }
-  # Dual residual using differences from the previous iteration
-  s <- rho * c(Fw - f, w - w_old, w - w_old)
-  s_norm <- sqrt(sum(s^2))
 
-  # Primal residual (only f - Fw block matters)
-  r <- c(f - Fw, rep(0, length(w)), rep(0, length(w)))
-  r_norm <- sqrt(sum(r^2))
+  # Compute differences once
+  diff_fw <- Fw - f
+  diff_w <- w - w_old
+
+  # Dual residual: ||rho * [Fw-f, w-w_old, w-w_old]||
+  # Compute directly without concatenation
+  s_norm <- rho * sqrt(sum(diff_fw^2) + 2 * sum(diff_w^2))
+
+  # Primal residual: ||[f-Fw, 0, 0]|| - zeros don't contribute
+  r_norm <- sqrt(sum(diff_fw^2))
 
   # Total number of residual components
-  p <- nrow(F) + 2 * length(w)
+  p <- length(f) + 2 * length(w)
 
-  # Compute epsilon thresholds following Boyd et al.
-  Ax <- c(Fw, w, w)
-  Ax_k_norm <- sqrt(sum(Ax^2))
-  Bz <- c(f, w, w)
-  Bz_k_norm <- sqrt(sum(Bz^2))
-  ATy <- rho * c(y, z, u)
-  ATy_k_norm <- sqrt(sum(ATy^2))
+  # Compute norms directly without concatenation
+  w_sq_sum <- sum(w^2)
+  Ax_k_norm <- sqrt(sum(Fw^2) + 2 * w_sq_sum)  # ||[Fw, w, w]||
+  Bz_k_norm <- sqrt(sum(f^2) + 2 * w_sq_sum)   # ||[f, w, w]||
+  ATy_k_norm <- rho * sqrt(sum(y^2) + sum(z^2) + sum(u^2))  # ||rho * [y, z, u]||
 
   eps_pri <- sqrt(p) * eps_abs + eps_rel * max(Ax_k_norm, Bz_k_norm)
   eps_dual <- sqrt(p) * eps_abs + eps_rel * ATy_k_norm
