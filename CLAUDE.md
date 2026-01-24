@@ -119,27 +119,47 @@ python generate_test_cases.py --include-100k
 
 Benchmark results comparing R solver to Python implementations (January 2025):
 
-| Problem Size | R       | JAX (rswjax) | Original (rsw) | Notes                    |
-|-------------|---------|--------------|----------------|--------------------------|
-| 1K samples  | ~0.06s  | ~0.19s       | ~0.14s         | R wins (no JIT overhead) |
-| 10K samples | ~0.4s   | ~0.13s       | ~1.7s          | JAX JIT pays off         |
-| 100K samples| slow    | ~4.3s        | ~170s          | JAX scales best          |
+| Scenario | n | m | R | JAX | Original | R/JAX |
+|----------|---|---|-----|------|----------|-------|
+| Small problems | 1K | 2-8 | ~0.15-0.20s | ~0.5-0.7s | ~0.06-0.1s | **0.3-0.4x** |
+| Medium scale | 10K | 10 | ~2.2s | ~1.2s | ~6s | 1.8x |
+| High constraints | 2K | 50 | ~0.5s | ~0.9s | ~0.7s | **0.5x** |
+| High constraints | 2K | 99 | ~9.6s | ~13.6s | ~8.4s | **0.7x** |
 
 **Key findings:**
 - **R beats JAX on small problems** (~1K samples): No JIT warm-up overhead
-- **R beats Original at scale**: The original Python implementation has O(n²) scaling issues
-- **JAX wins at scale** (10K+): JIT compilation amortizes well
+- **R beats JAX on high-constraint problems**: R handles "wide" problems well
+- **R beats Original at scale**: Original rsw has O(n²) scaling issues
+- **JAX wins on large-n problems** (10K+): JIT compilation amortizes well
 
-**Where R time goes:**
-- Pre-factorized KKT matrix (same approach as Python - good)
-- Main bottleneck: `as.matrix()` conversions in the ADMM loop (lines ~173, 196 of solver.R)
-- Potential optimization: sparse slicing without dense conversion
+**Optimizations applied:**
+- Pre-allocate f vector in ADMM loop (~25% improvement on 10K)
+- Compute norms directly without vector concatenation (~3-14% improvement)
+
+**What didn't help:**
+- Consolidating mat-vec products (row-sliced sparse mat-vec is already efficient)
+- `as.numeric()` vs `drop(as.matrix())` (made things slower)
+- Lazy convergence checking (minimal benefit after norm optimization)
 
 **What's not easily portable from JAX:**
 - JIT compilation
 - JAX-specific ops (`lax.top_k`, `stop_gradient`)
 
-For typical survey raking problems (< 10K samples), the R solver is competitive with or faster than JAX.
+For typical survey raking problems (< 10K samples, reasonable constraint counts), the R solver is competitive with or faster than JAX.
+
+## Future Priorities
+
+**High priority (core functionality):**
+1. **Continuous variables** - `process_raw_data()` skips numeric columns. Need mean-matching for continuous features (age, income, etc.)
+2. **Complete loss/regularizer parity** - KL loss, inequality loss, KL regularizer need testing against Python
+
+**Medium priority (user experience):**
+3. **Polish `regrake()` end-to-end** - Robust error messages, input validation
+4. **Formula interface for continuous** - e.g., `~ exact(sex) + l2(age_mean)`
+
+**Lower priority (ecosystem):**
+5. **Documentation/vignettes** - Real survey weighting workflow examples
+6. **CRAN prep** - If that's a goal
 
 ## Adding New Features
 
