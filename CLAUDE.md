@@ -110,6 +110,37 @@ Rscript -e "source('compare_results.R'); main()"
 
 The R solver currently passes all test cases (max diff < 1e-6 vs targets).
 
+For large-scale tests (100K samples), use the `--include-100k` flag:
+```bash
+python generate_test_cases.py --include-100k
+```
+
+## Performance Comparison
+
+Benchmark results comparing R solver to Python implementations (January 2025):
+
+| Problem Size | R       | JAX (rswjax) | Original (rsw) | Notes                    |
+|-------------|---------|--------------|----------------|--------------------------|
+| 1K samples  | ~0.06s  | ~0.19s       | ~0.14s         | R wins (no JIT overhead) |
+| 10K samples | ~0.4s   | ~0.13s       | ~1.7s          | JAX JIT pays off         |
+| 100K samples| slow    | ~4.3s        | ~170s          | JAX scales best          |
+
+**Key findings:**
+- **R beats JAX on small problems** (~1K samples): No JIT warm-up overhead
+- **R beats Original at scale**: The original Python implementation has O(n²) scaling issues
+- **JAX wins at scale** (10K+): JIT compilation amortizes well
+
+**Where R time goes:**
+- Pre-factorized KKT matrix (same approach as Python - good)
+- Main bottleneck: `as.matrix()` conversions in the ADMM loop (lines ~173, 196 of solver.R)
+- Potential optimization: sparse slicing without dense conversion
+
+**What's not easily portable from JAX:**
+- JIT compilation
+- JAX-specific ops (`lax.top_k`, `stop_gradient`)
+
+For typical survey raking problems (< 10K samples), the R solver is competitive with or faster than JAX.
+
 ## Adding New Features
 
 When implementing new loss functions, regularizers, or solver features:

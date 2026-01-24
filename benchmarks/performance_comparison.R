@@ -66,17 +66,20 @@ benchmark_test_case <- function(case_name) {
   r_time <- median(times)
 
   # Try to load Python timing if available
-  python_time <- NA
+  rswjax_time <- NA
+  rsw_orig_time <- NA
   timing_file <- file.path(case_dir, "timing.json")
   if (file.exists(timing_file)) {
     timing <- jsonlite::fromJSON(timing_file)
-    python_time <- timing$rswjax_time
+    rswjax_time <- timing$rswjax_time
+    rsw_orig_time <- timing$rsw_original_time
   }
 
   list(
     case = case_name,
     r_time = r_time,
-    python_time = python_time,
+    rswjax_time = rswjax_time,
+    rsw_orig_time = rsw_orig_time,
     n_samples = ncol(F),
     n_constraints = nrow(F)
   )
@@ -150,9 +153,11 @@ main <- function() {
     if (!is.null(result)) {
       results[[case_name]] <- result
       cat(sprintf(" R: %.3fs", result$r_time))
-      if (!is.na(result$python_time)) {
-        ratio <- result$r_time / result$python_time
-        cat(sprintf(" | Python: %.3fs | Ratio: %.2fx", result$python_time, ratio))
+      if (!is.na(result$rswjax_time)) {
+        cat(sprintf(" | JAX: %.3fs", result$rswjax_time))
+      }
+      if (!is.na(result$rsw_orig_time)) {
+        cat(sprintf(" | Orig: %.3fs", result$rsw_orig_time))
       }
       cat("\n")
     }
@@ -162,15 +167,17 @@ main <- function() {
   cat("\n")
   cat("Summary Table\n")
   cat("=============\n")
-  cat(sprintf("%-25s %10s %10s %12s %8s %10s\n",
-              "Test Case", "Samples", "Constrs", "R Time (s)", "Py (s)", "R/Py"))
-  cat(paste(rep("-", 77), collapse = ""), "\n")
+  cat(sprintf("%-22s %8s %6s %8s %8s %8s %8s %8s\n",
+              "Test Case", "Samples", "Cstrs", "R (s)", "JAX (s)", "Orig (s)", "R/JAX", "R/Orig"))
+  cat(paste(rep("-", 90), collapse = ""), "\n")
 
   for (r in results) {
-    py_str <- if (is.na(r$python_time)) "N/A" else sprintf("%.3f", r$python_time)
-    ratio_str <- if (is.na(r$python_time)) "N/A" else sprintf("%.2fx", r$r_time / r$python_time)
-    cat(sprintf("%-25s %10d %10d %12.3f %8s %10s\n",
-                r$case, r$n_samples, r$n_constraints, r$r_time, py_str, ratio_str))
+    jax_str <- if (is.na(r$rswjax_time)) "N/A" else sprintf("%.3f", r$rswjax_time)
+    orig_str <- if (is.na(r$rsw_orig_time)) "N/A" else sprintf("%.3f", r$rsw_orig_time)
+    r_jax_str <- if (is.na(r$rswjax_time)) "N/A" else sprintf("%.2fx", r$r_time / r$rswjax_time)
+    r_orig_str <- if (is.na(r$rsw_orig_time)) "N/A" else sprintf("%.2fx", r$r_time / r$rsw_orig_time)
+    cat(sprintf("%-22s %8d %6d %8.3f %8s %8s %8s %8s\n",
+                r$case, r$n_samples, r$n_constraints, r$r_time, jax_str, orig_str, r_jax_str, r_orig_str))
   }
 
   # Overall summary
@@ -180,11 +187,20 @@ main <- function() {
     cat(sprintf("R solver: min=%.3fs, median=%.3fs, max=%.3fs\n",
                 min(r_times), median(r_times), max(r_times)))
 
-    py_times <- sapply(results, function(x) x$python_time)
-    if (any(!is.na(py_times))) {
-      valid <- !is.na(py_times)
-      ratios <- r_times[valid] / py_times[valid]
-      cat(sprintf("R/Python ratio: min=%.2fx, median=%.2fx, max=%.2fx\n",
+    jax_times <- sapply(results, function(x) x$rswjax_time)
+    orig_times <- sapply(results, function(x) x$rsw_orig_time)
+
+    if (any(!is.na(jax_times))) {
+      valid <- !is.na(jax_times)
+      ratios <- r_times[valid] / jax_times[valid]
+      cat(sprintf("R/JAX ratio: min=%.2fx, median=%.2fx, max=%.2fx\n",
+                  min(ratios), median(ratios), max(ratios)))
+    }
+
+    if (any(!is.na(orig_times))) {
+      valid <- !is.na(orig_times)
+      ratios <- r_times[valid] / orig_times[valid]
+      cat(sprintf("R/Original ratio: min=%.2fx, median=%.2fx, max=%.2fx\n",
                   min(ratios), median(ratios), max(ratios)))
     }
   }

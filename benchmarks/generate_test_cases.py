@@ -431,7 +431,52 @@ def generate_different_lambdas():
         print(f"Generated: {name}")
 
 
+def generate_100k_scale():
+    """Test case 09: 100k samples to test scaling."""
+    np.random.seed(50)
+    n = 100000
+
+    # 3 binary variables (simple problem, just testing scale)
+    vars_data = []
+    for i in range(3):
+        p = 0.4 + i * 0.1
+        vars_data.append(np.random.choice([0, 1], size=n, p=[p, 1-p]))
+
+    # Design matrix: 6 rows (2 indicators per variable)
+    F = np.zeros((6, n))
+    for i, var in enumerate(vars_data):
+        F[2*i, var == 0] = 1
+        F[2*i + 1, var == 1] = 1
+
+    # All targets 50/50
+    targets = np.array([0.5, 0.5] * 3)
+
+    losses_spec = [{"type": "equality", "target": targets.tolist()}]
+    regularizer_spec = {"type": "entropy", "limit": None}
+    lam = 1.0
+
+    results = {}
+    if HAS_RSWJAX:
+        losses = [EqualityLoss(targets)]
+        regularizer = EntropyRegularizer()
+        results["rswjax"] = run_rswjax(F, losses, regularizer, lam)
+
+    if HAS_ORIGINAL_RSW:
+        orig_losses = [OrigEqualityLoss(targets)]
+        orig_regularizer = OrigEntropyRegularizer()
+        results["rsw_original"] = run_original_rsw(F, orig_losses, orig_regularizer, lam)
+
+    save_test_case("09_100k_scale", F, losses_spec, regularizer_spec, lam, results)
+    print("Generated: 09_100k_scale")
+
+
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="Generate test cases for R vs Python comparison")
+    parser.add_argument("--include-100k", action="store_true",
+                        help="Include 100K sample test (slow, especially for original rsw)")
+    args = parser.parse_args()
+
     print("Generating test cases...")
     print(f"rswjax available: {HAS_RSWJAX}")
     print(f"original rsw available: {HAS_ORIGINAL_RSW}")
@@ -445,5 +490,11 @@ if __name__ == "__main__":
     generate_larger_scale()
     generate_interaction()
     generate_different_lambdas()
+
+    if args.include_100k:
+        print("\nGenerating 100K test (this may take a while)...")
+        generate_100k_scale()
+    else:
+        print("\nSkipping 100K test (use --include-100k to enable)")
 
     print("\nDone! Test cases saved to test_cases/")
