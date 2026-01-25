@@ -801,7 +801,7 @@ This gives us explicit control over the bias-variance tradeoff!
 #| echo: false
 #| output: true
 #| fig-height: 4
-# Show how different lambda values affect weight distribution
+# Show how different lambda values affect weight distribution and vote margin
 lambdas <- c(0.1, 1, 10, 100)
 lambda_results <- lapply(lambdas, function(lam) {
   result <- regrake(
@@ -818,13 +818,22 @@ lambda_results <- lapply(lambdas, function(lam) {
     regularizer = "entropy",
     lambda = lam
   )
-  tibble(weight = result$weights, lambda = paste0("λ = ", lam))  # Already sums to n
+  # Compute vote margin for this lambda
+  design <- svydesign(ids = ~1, data = pew, weights = result$weights)
+  margin <- svycontrast(svymean(~recode_vote_2016, design, na.rm = TRUE),
+                        vote_contrast)
+  margin_pct <- sprintf("%.1f%%", as.numeric(margin) * 100)
+
+  tibble(weight = result$weights,
+         lambda = paste0("λ = ", lam, ", margin = ", margin_pct))
 })
 
 bind_rows(lambda_results) %>%
+  mutate(lambda = factor(lambda, levels = unique(lambda))) %>%
   ggplot(aes(x = weight, fill = lambda)) +
-  geom_density(alpha = 0.5) +
+  geom_density(alpha = 0.7) +
   facet_wrap(~lambda, scales = "free_y") +
+  scale_fill_viridis_d(option = "D") +
   labs(x = "Weight", y = "Density",
        title = "Weight distributions across different λ values") +
   theme(legend.position = "none")
