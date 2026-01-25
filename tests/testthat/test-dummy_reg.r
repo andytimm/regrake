@@ -6,7 +6,9 @@ test_that("dummy regularizer identity works", {
   # Create a dummy reg that does nothing. Notice the prox takes exactly 2 parameters.
   dummy_reg <- list(
     fn = function(x) x,
-    prox = function(w, lam) { w }
+    prox = function(w, lam) {
+      w
+    }
   )
 
   # Check that calling dummy_reg$prox returns its first argument.
@@ -19,14 +21,15 @@ test_that("ADMM converges with dummy regularizer", {
   # Create a dummy reg that does nothing. Notice the prox takes exactly 2 parameters.
   dummy_reg <- list(
     fn = function(x) x,
-    prox = function(w, lam) { w }
+    prox = function(w, lam) {
+      w
+    }
   )
 
   # Check that calling dummy_reg$prox returns its first argument.
   x <- rnorm(10)
   lam <- 1
   expect_equal(dummy_reg$prox(x, lam), x)
-
 
   # A simple problem to test ADMM
   n <- 20
@@ -40,7 +43,7 @@ test_that("ADMM converges with dummy regularizer", {
     list(
       fn = least_squares_loss,
       target = fdes,
-      prox = prox_least_squares  # For a loss, this is OK; its interface is fixed in the solver f-update.
+      prox = prox_least_squares # For a loss, this is OK; its interface is fixed in the solver f-update.
     )
   )
 
@@ -48,8 +51,18 @@ test_that("ADMM converges with dummy regularizer", {
   sol <- admm(F, losses, dummy_reg, lam = 1, verbose = FALSE)
 
   # Check convergence criteria using compute_norms_and_epsilons.
-  norms <- compute_norms_and_epsilons(sol$f, sol$w, sol$w, sol$y, sol$z, sol$u,
-                                       F, rho = 50, eps_abs = 1e-5, eps_rel = 1e-5)
+  norms <- compute_norms_and_epsilons(
+    sol$f,
+    sol$w,
+    sol$w,
+    sol$y,
+    sol$z,
+    sol$u,
+    F,
+    rho = 50,
+    eps_abs = 1e-5,
+    eps_rel = 1e-5
+  )
   expect_true(norms$r_norm <= norms$eps_pri)
   expect_true(norms$s_norm <= norms$eps_dual)
 

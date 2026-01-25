@@ -35,7 +35,7 @@ test_that("least squares loss matches optimization solution", {
   # Optimization solution using CVXR
   library(CVXR)
   x <- Variable(m)
-  objective <- Minimize(sum((x - fdes)^2))  # Squared error for L2
+  objective <- Minimize(sum((x - fdes)^2)) # Squared error for L2
   problem <- Problem(objective)
   result <- CVXR::solve(problem)
   opt_x <- as.vector(result$getValue(x))
@@ -99,8 +99,8 @@ test_that("kl_loss handles edge cases correctly", {
   result <- kl_loss(x, target)
 
   expect_equal(length(result), 3)
-  expect_true(is.infinite(result[2]))  # x = 0
-  expect_true(is.infinite(result[3]))  # target = 0
+  expect_true(is.infinite(result[2])) # x = 0
+  expect_true(is.infinite(result[3])) # target = 0
   expect_false(is.infinite(result[1])) # both positive
 })
 
@@ -128,7 +128,7 @@ test_that("equality prox matches optimization solution", {
   # CVXR solution
   library(CVXR)
   fhat <- CVXR::Variable(m)
-  objective <- CVXR::Minimize((1/rho) * CVXR::sum_squares(fhat - f))
+  objective <- CVXR::Minimize((1 / rho) * CVXR::sum_squares(fhat - f))
   constraints <- list(fhat == fdes)
   prob <- CVXR::Problem(objective, constraints)
   result <- CVXR::solve(prob)
@@ -149,8 +149,11 @@ test_that("least squares prox matches optimization solution", {
   # CVXR solution
   library(CVXR)
   fhat <- CVXR::Variable(m)
-  objective <- CVXR::Minimize(0.5 * CVXR::sum_squares(fhat - fdes) +
-                       1/(2 * rho) * CVXR::sum_squares(fhat - f))
+  objective <- CVXR::Minimize(
+    0.5 *
+      CVXR::sum_squares(fhat - fdes) +
+      1 / (2 * rho) * CVXR::sum_squares(fhat - f)
+  )
   prob <- CVXR::Problem(objective)
   result <- CVXR::solve(prob)
 
@@ -172,7 +175,7 @@ test_that("inequality prox matches optimization solution", {
   # CVXR solution
   library(CVXR)
   fhat <- CVXR::Variable(m)
-  objective <- CVXR::Minimize((1/rho) * CVXR::sum_squares(fhat - f))
+  objective <- CVXR::Minimize((1 / rho) * CVXR::sum_squares(fhat - f))
   constraints <- list(lower <= fhat - fdes, fhat - fdes <= upper)
   prob <- CVXR::Problem(objective, constraints)
   result <- CVXR::solve(prob)
@@ -185,9 +188,9 @@ test_that("kl prox matches optimization solution", {
   m <- 10
   # Use positive values and normalize
   f <- abs(rnorm(m)) + 0.1
-  f <- f/sum(f)
+  f <- f / sum(f)
   fdes <- abs(rnorm(m)) + 0.1
-  fdes <- fdes/sum(fdes)
+  fdes <- fdes / sum(fdes)
   rho <- 1
 
   # Our prox
@@ -197,9 +200,12 @@ test_that("kl prox matches optimization solution", {
   library(CVXR)
   fhat <- CVXR::Variable(m, nonneg = TRUE)
   # Match Python test formulation
-  objective <- CVXR::Minimize(0.5 * (-CVXR::sum_entries(CVXR::entr(fhat)) -
-                                    CVXR::sum_entries(fhat * log(fdes))) +
-                       1/(2 * rho) * CVXR::sum_squares(fhat - f))
+  objective <- CVXR::Minimize(
+    0.5 *
+      (-CVXR::sum_entries(CVXR::entr(fhat)) -
+        CVXR::sum_entries(fhat * log(fdes))) +
+      1 / (2 * rho) * CVXR::sum_squares(fhat - f)
+  )
   prob <- CVXR::Problem(objective)
   result <- CVXR::solve(prob, solver = "ECOS")
 
@@ -234,7 +240,7 @@ test_that("weighted least squares loss matches optimization solution", {
   m <- 10
   f <- rnorm(m)
   fdes <- rnorm(m)
-  diag_weight <- abs(rnorm(m)) + 0.1  # Positive weights
+  diag_weight <- abs(rnorm(m)) + 0.1 # Positive weights
 
   # Direct loss calculation
   direct_loss <- sum(least_squares_loss(f, fdes, diag_weight))
@@ -248,7 +254,11 @@ test_that("weighted least squares loss matches optimization solution", {
   opt_x <- as.vector(result$getValue(x))
 
   expect_equal(opt_x, fdes, tolerance = 1e-5)
-  expect_equal(sum(least_squares_loss(opt_x, fdes, diag_weight)), 0, tolerance = 1e-5)
+  expect_equal(
+    sum(least_squares_loss(opt_x, fdes, diag_weight)),
+    0,
+    tolerance = 1e-5
+  )
 })
 
 test_that("weighted least squares prox matches optimization solution", {
@@ -256,8 +266,8 @@ test_that("weighted least squares prox matches optimization solution", {
   m <- 10
   f <- rnorm(m)
   fdes <- rnorm(m)
-  tau <- 1  # lam in Python
-  diag_weight <- abs(rnorm(m)) + 0.1  # Positive weights
+  tau <- 1 # lam in Python
+  diag_weight <- abs(rnorm(m)) + 0.1 # Positive weights
 
   # Our prox with weighting
   prox_result <- prox_least_squares(f, fdes, tau, diag_weight)
@@ -266,8 +276,9 @@ test_that("weighted least squares prox matches optimization solution", {
   library(CVXR)
   fhat <- CVXR::Variable(m)
   objective <- CVXR::Minimize(
-    0.5 * CVXR::sum_squares(diag_weight * (fhat - fdes)) +
-    1/(2 * tau) * CVXR::sum_squares(fhat - f)
+    0.5 *
+      CVXR::sum_squares(diag_weight * (fhat - fdes)) +
+      1 / (2 * tau) * CVXR::sum_squares(fhat - f)
   )
   prob <- CVXR::Problem(objective)
   result <- CVXR::solve(prob)

@@ -24,20 +24,21 @@
 #'   \item{achieved}{The achieved margins}
 #'   \item{solution}{Full solution details from solver}
 #' @export
-regrake <- function(data,
-                   formula,
-                   population_data,
-                   pop_type = c("raw", "weighted", "proportions"),
-                   pop_weights = NULL,
-                   regularizer = "entropy",
-                   lambda = 1,
-                   k = NULL,
-                   bounds = c(0.1, 10),
-                   normalize = TRUE,
-                   control = list(),
-                   verbose = FALSE,
-                   ...) {
-
+regrake <- function(
+  data,
+  formula,
+  population_data,
+  pop_type = c("raw", "weighted", "proportions"),
+  pop_weights = NULL,
+  regularizer = "entropy",
+  lambda = 1,
+  k = NULL,
+  bounds = c(0.1, 10),
+  normalize = TRUE,
+  control = list(),
+  verbose = FALSE,
+  ...
+) {
   # Early input validation
   pop_type <- match.arg(pop_type)
   validate_inputs(formula, population_data, pop_type, pop_weights, bounds)
@@ -74,7 +75,11 @@ regrake <- function(data,
     normalize = normalize
   )
   if (verbose) {
-    cat("Design matrix constructed with", nrow(admm_inputs$design_matrix), "constraints\n")
+    cat(
+      "Design matrix constructed with",
+      nrow(admm_inputs$design_matrix),
+      "constraints\n"
+    )
   }
 
   # Step 4: Set up solver parameters
@@ -87,7 +92,9 @@ regrake <- function(data,
   ctrl[names(control)] <- control
 
   # Step 5: Call solver
-  if (verbose) start_time <- proc.time()
+  if (verbose) {
+    start_time <- proc.time()
+  }
 
   solution <- admm(
     F = admm_inputs$design_matrix,
@@ -100,8 +107,7 @@ regrake <- function(data,
 
   if (verbose) {
     end_time <- proc.time()
-    cat(sprintf("ADMM took %.3f seconds\n",
-                (end_time - start_time)["elapsed"]))
+    cat(sprintf("ADMM took %.3f seconds\n", (end_time - start_time)["elapsed"]))
   }
 
   # Step 6: Process results and compute diagnostics
@@ -115,16 +121,24 @@ regrake <- function(data,
       achieved = results$achieved,
       solution = solution,
       diagnostics = results$diagnostics,
-      call = match.call()  # Store call for reproducibility
+      call = match.call() # Store call for reproducibility
     ),
     class = "regrake"
   )
 }
 
 # Helper function for input validation
-validate_inputs <- function(formula, population_data, pop_type, pop_weights, bounds) {
+validate_inputs <- function(
+  formula,
+  population_data,
+  pop_type,
+  pop_weights,
+  bounds
+) {
   if (is.null(formula)) {
-    stop("Formula must be specified. For direct solver access, use admm() instead.")
+    stop(
+      "Formula must be specified. For direct solver access, use admm() instead."
+    )
   }
 
   if (is.null(population_data)) {
@@ -141,7 +155,12 @@ validate_inputs <- function(formula, population_data, pop_type, pop_weights, bou
 }
 
 # Helper to create regularizer object from string specification
-create_regularizer <- function(regularizer, prior = NULL, limit = NULL, k = NULL) {
+create_regularizer <- function(
+  regularizer,
+  prior = NULL,
+  limit = NULL,
+  k = NULL
+) {
   # Validate regularizer type
   regularizer <- match.arg(
     regularizer,
@@ -150,14 +169,17 @@ create_regularizer <- function(regularizer, prior = NULL, limit = NULL, k = NULL
   )
 
   # Create regularizer object based on type
-  switch(regularizer,
+  switch(
+    regularizer,
     "zero" = list(
       fn = zero_regularizer,
-      prox = prox_equality_reg  # zero regularizer uses equality prox
+      prox = prox_equality_reg # zero regularizer uses equality prox
     ),
     "entropy" = list(
       fn = function(w, lambda) entropy_regularizer(w, lambda, limit),
-      prox = function(w, lambda) prox_kl_reg(w, lambda, prior = NULL, limit = limit)
+      prox = function(w, lambda) {
+        prox_kl_reg(w, lambda, prior = NULL, limit = limit)
+      }
     ),
     "kl" = {
       if (is.null(prior)) {
@@ -165,12 +187,16 @@ create_regularizer <- function(regularizer, prior = NULL, limit = NULL, k = NULL
       }
       list(
         fn = function(w, lambda) kl_regularizer(w, lambda, prior, limit),
-        prox = function(w, lambda) prox_kl_reg(w, lambda, prior = prior, limit = limit)
+        prox = function(w, lambda) {
+          prox_kl_reg(w, lambda, prior = prior, limit = limit)
+        }
       )
     },
     "boolean" = {
       if (is.null(k)) {
-        stop("k (number of samples to select) must be provided for boolean regularization")
+        stop(
+          "k (number of samples to select) must be provided for boolean regularization"
+        )
       }
       reg <- list(
         fn = function(w, lambda) prox_boolean_reg(w, lambda, k),
@@ -183,11 +209,16 @@ create_regularizer <- function(regularizer, prior = NULL, limit = NULL, k = NULL
 }
 
 # Helper to process solution and compute diagnostics
-process_admm_results <- function(solution, admm_inputs, verbose, normalize = TRUE) {
+process_admm_results <- function(
+  solution,
+  admm_inputs,
+  verbose,
+  normalize = TRUE
+) {
   # Extract best weights from solution and scale to sum to sample size
   weights <- solution$w_best
   n <- length(weights)
-  weights <- weights * n  # Scale up to sum to sample size
+  weights <- weights * n # Scale up to sum to sample size
 
   # Calculate achieved values using design matrix
   achieved_values <- drop(as.matrix(admm_inputs$design_matrix %*% weights))
@@ -219,15 +250,25 @@ process_admm_results <- function(solution, admm_inputs, verbose, normalize = TRU
     weight_sd = sd(weights),
 
     # Margin matching quality
-    max_abs_diff = max(abs(achieved_values/n - targets)),  # Compare proportions
-    max_pct_diff = max_pct_diff(achieved_values/n, targets)  # Compare proportions
+    max_abs_diff = max(abs(achieved_values / n - targets)), # Compare proportions
+    max_pct_diff = max_pct_diff(achieved_values / n, targets) # Compare proportions
   )
 
   if (verbose) {
     cat("\nDiagnostics:\n")
-    cat(sprintf("Weight range: [%.3f, %.3f]\n", diagnostics$weight_range[1], diagnostics$weight_range[2]))
-    cat(sprintf("Maximum absolute difference in margins: %.2e\n", diagnostics$max_abs_diff))
-    cat(sprintf("Maximum percent difference in margins: %.2f%%\n", diagnostics$max_pct_diff))
+    cat(sprintf(
+      "Weight range: [%.3f, %.3f]\n",
+      diagnostics$weight_range[1],
+      diagnostics$weight_range[2]
+    ))
+    cat(sprintf(
+      "Maximum absolute difference in margins: %.2e\n",
+      diagnostics$max_abs_diff
+    ))
+    cat(sprintf(
+      "Maximum percent difference in margins: %.2f%%\n",
+      diagnostics$max_pct_diff
+    ))
   }
 
   list(

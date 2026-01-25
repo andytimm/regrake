@@ -4,7 +4,7 @@ test_that("projection_simplex maintains sum constraint", {
   set.seed(605)
   n <- 1000
   v <- rnorm(n)
-  z <- 1.5  # test non-unit sum constraint
+  z <- 1.5 # test non-unit sum constraint
 
   result <- projection_simplex(v, z)
 
@@ -33,14 +33,14 @@ test_that("projection_simplex handles edge cases", {
 
 test_that("compute_norms_and_epsilons basic functionality", {
   # Setup test data
-  n <- 5  # number of samples
-  m <- 3  # number of constraints
+  n <- 5 # number of samples
+  m <- 3 # number of constraints
   set.seed(42)
 
   # Create test inputs
   F <- matrix(rnorm(m * n), nrow = m)
   w <- runif(n)
-  w <- w / sum(w)  # normalize to sum to 1
+  w <- w / sum(w) # normalize to sum to 1
   w_old <- runif(n)
   w_old <- w_old / sum(w_old)
   f <- rnorm(m)
@@ -52,7 +52,18 @@ test_that("compute_norms_and_epsilons basic functionality", {
   eps_rel <- 1e-5
 
   # Compute norms and epsilons
-  result <- compute_norms_and_epsilons(f, w, w_old, y, z, u, F, rho, eps_abs, eps_rel)
+  result <- compute_norms_and_epsilons(
+    f,
+    w,
+    w_old,
+    y,
+    z,
+    u,
+    F,
+    rho,
+    eps_abs,
+    eps_rel
+  )
 
   # Test structure
   expect_type(result, "list")
@@ -77,10 +88,11 @@ test_that("compute_norms_and_epsilons basic functionality", {
   Ax_k_norm <- sqrt(sum(c(Fw, w, w)^2))
   Bz_k_norm <- sqrt(sum(c(f, w, w)^2))
   ATy_k_norm <- sqrt(sum((rho * c(y, z, u))^2))
-  expect_equal(result$eps_pri,
-              sqrt(p) * eps_abs + eps_rel * max(Ax_k_norm, Bz_k_norm))
-  expect_equal(result$eps_dual,
-              sqrt(p) * eps_abs + eps_rel * ATy_k_norm)
+  expect_equal(
+    result$eps_pri,
+    sqrt(p) * eps_abs + eps_rel * max(Ax_k_norm, Bz_k_norm)
+  )
+  expect_equal(result$eps_dual, sqrt(p) * eps_abs + eps_rel * ATy_k_norm)
 })
 
 test_that("compute_norms_and_epsilons handles edge cases", {
@@ -103,18 +115,18 @@ test_that("compute_norms_and_epsilons handles edge cases", {
 
   expect_equal(zero_result$s_norm, 0)
   expect_equal(zero_result$r_norm, 0)
-  expect_true(zero_result$eps_pri > 0)  # Should still be positive due to eps_abs
+  expect_true(zero_result$eps_pri > 0) # Should still be positive due to eps_abs
   expect_true(zero_result$eps_dual > 0)
 
   # Test with sparse matrix input
-  sparse_F <- Matrix::Matrix(matrix(c(1,0,0,1), nrow=2), sparse=TRUE)
+  sparse_F <- Matrix::Matrix(matrix(c(1, 0, 0, 1), nrow = 2), sparse = TRUE)
   sparse_result <- compute_norms_and_epsilons(
-    f = c(1,1),
-    w = c(1,1),
-    w_old = c(0,0),
-    y = c(0,0),
-    z = c(0,0),
-    u = c(0,0),
+    f = c(1, 1),
+    w = c(1, 1),
+    w_old = c(0, 0),
+    y = c(0, 0),
+    z = c(0, 0),
+    u = c(0, 0),
     F = sparse_F,
     rho = 1,
     eps_abs = 1e-5,
@@ -143,17 +155,31 @@ test_that("compute_norms_and_epsilons is invariant to scaling (F fixed)", {
   eps_rel_val <- 1e-5
 
   base_result <- compute_norms_and_epsilons(
-    f, w, w_old, y, z, u, F, rho = 1,
-    eps_abs = eps_abs_val, eps_rel = eps_rel_val
+    f,
+    w,
+    w_old,
+    y,
+    z,
+    u,
+    F,
+    rho = 1,
+    eps_abs = eps_abs_val,
+    eps_rel = eps_rel_val
   )
 
   # Scale only the vectors by alpha (F is fixed)
   alpha <- 2
   scaled_result <- compute_norms_and_epsilons(
-    alpha * f, alpha * w, alpha * w_old,
-    alpha * y, alpha * z, alpha * u,
-    F, rho = 1,
-    eps_abs = eps_abs_val, eps_rel = eps_rel_val
+    alpha * f,
+    alpha * w,
+    alpha * w_old,
+    alpha * y,
+    alpha * z,
+    alpha * u,
+    F,
+    rho = 1,
+    eps_abs = eps_abs_val,
+    eps_rel = eps_rel_val
   )
 
   p <- nrow(F) + 2 * length(w)
@@ -162,11 +188,23 @@ test_that("compute_norms_and_epsilons is invariant to scaling (F fixed)", {
   #   base: eps_pri = sqrt(p)*eps_abs + eps_rel * R
   #   scaled: eps_pri = sqrt(p)*eps_abs + eps_rel * (α * R)
   # So expected scaled_eps_pri = sqrt(p)*eps_abs + α*(base_eps_pri - sqrt(p)*eps_abs)
-  expected_eps_pri <- sqrt(p) * eps_abs_val + alpha * (base_result$eps_pri - sqrt(p) * eps_abs_val)
-  expected_eps_dual <- sqrt(p) * eps_abs_val + alpha * (base_result$eps_dual - sqrt(p) * eps_abs_val)
+  expected_eps_pri <- sqrt(p) *
+    eps_abs_val +
+    alpha * (base_result$eps_pri - sqrt(p) * eps_abs_val)
+  expected_eps_dual <- sqrt(p) *
+    eps_abs_val +
+    alpha * (base_result$eps_dual - sqrt(p) * eps_abs_val)
 
-  expect_equal(scaled_result$r_norm, alpha * base_result$r_norm, tolerance = 1e-10)
-  expect_equal(scaled_result$s_norm, alpha * base_result$s_norm, tolerance = 1e-10)
+  expect_equal(
+    scaled_result$r_norm,
+    alpha * base_result$r_norm,
+    tolerance = 1e-10
+  )
+  expect_equal(
+    scaled_result$s_norm,
+    alpha * base_result$s_norm,
+    tolerance = 1e-10
+  )
   expect_equal(scaled_result$eps_pri, expected_eps_pri, tolerance = 1e-10)
   expect_equal(scaled_result$eps_dual, expected_eps_dual, tolerance = 1e-10)
 })
@@ -201,7 +239,7 @@ test_that("ADMM solver basic convergence", {
   )
   reg <- list(
     fn = kl_loss,
-    prox = function(w, lam) prox_kl_reg(w, lam, tau = rho/lam)
+    prox = function(w, lam) prox_kl_reg(w, lam, tau = rho / lam)
   )
 
   # Run solver
@@ -217,14 +255,16 @@ test_that("ADMM solver basic convergence", {
   }
 
   # Compute ADMM objective value using the same formulation.
-  admm_obj <- 0.5 * sum((F[1:(m %/% 2), , drop = FALSE] %*% sol$w_best - fdes1)^2) +
-              numeric_entropy(sol$w_best)
+  admm_obj <- 0.5 *
+    sum((F[1:(m %/% 2), , drop = FALSE] %*% sol$w_best - fdes1)^2) +
+    numeric_entropy(sol$w_best)
 
   # Solve equivalent problem with CVXR using sum_entries()
   library(CVXR)
   w <- Variable(n)
-  obj <- 0.5 * sum_squares(F[1:(m %/% 2), , drop = FALSE] %*% w - fdes1) -
-         sum_entries(entr(w))
+  obj <- 0.5 *
+    sum_squares(F[1:(m %/% 2), , drop = FALSE] %*% w - fdes1) -
+    sum_entries(entr(w))
   constraints <- list(
     sum_entries(w) == 1,
     w >= 0,
@@ -254,7 +294,7 @@ test_that("ADMM solver handles edge cases", {
   )
   reg <- list(
     fn = kl_loss,
-    prox = function(w, lam) prox_kl_reg(w, lam, tau = rho/lam)
+    prox = function(w, lam) prox_kl_reg(w, lam, tau = rho / lam)
   )
 
   sol_zero <- admm(F_zero, losses, reg, lam = 1, verbose = FALSE)
@@ -263,7 +303,7 @@ test_that("ADMM solver handles edge cases", {
 
   # Test 2: Nearly singular matrix
   F_sing <- Matrix::Matrix(1, nrow = m, ncol = n, sparse = TRUE)
-  F_sing[1,] <- F_sing[1,] + 1e-10 * rnorm(n)  # Small perturbation
+  F_sing[1, ] <- F_sing[1, ] + 1e-10 * rnorm(n) # Small perturbation
 
   sol_sing <- admm(F_sing, losses, reg, lam = 1, verbose = FALSE)
   expect_true(all(sol_sing$w_best >= 0))
@@ -286,7 +326,9 @@ test_that("ADMM solver converges with different regularizers", {
 
   # Test different regularizers
   regs <- list(
-    list(fn = kl_loss, prox = function(w, lam) prox_kl_reg(w, lam, tau = rho/lam)),
+    list(fn = kl_loss, prox = function(w, lam) {
+      prox_kl_reg(w, lam, tau = rho / lam)
+    }),
     list(fn = equality_regularizer, prox = prox_equality_reg),
     list(fn = sum_squares_regularizer, prox = prox_sum_squares_reg)
   )
@@ -298,8 +340,16 @@ test_that("ADMM solver converges with different regularizers", {
 
     # Check convergence
     norms <- compute_norms_and_epsilons(
-      sol$f, sol$w, sol$w, sol$y, sol$z, sol$u,
-      F, rho = 50, eps_abs = 1e-5, eps_rel = 1e-5
+      sol$f,
+      sol$w,
+      sol$w,
+      sol$y,
+      sol$z,
+      sol$u,
+      F,
+      rho = 50,
+      eps_abs = 1e-5,
+      eps_rel = 1e-5
     )
     expect_true(norms$r_norm <= norms$eps_pri)
     expect_true(norms$s_norm <= norms$eps_dual)
@@ -320,8 +370,8 @@ test_that("Cholesky solver handles different matrix structures", {
 
   # Create block structured matrix to test permutation
   F_block <- Matrix::Matrix(0, m, n, sparse = TRUE)
-  F_block[1:(m/2), (n/2+1):n] <- Matrix::rsparsematrix(m/2, n/2, 0.1)
-  F_block[(m/2+1):m, 1:(n/2)] <- Matrix::rsparsematrix(m/2, n/2, 0.1)
+  F_block[1:(m / 2), (n / 2 + 1):n] <- Matrix::rsparsematrix(m / 2, n / 2, 0.1)
+  F_block[(m / 2 + 1):m, 1:(n / 2)] <- Matrix::rsparsematrix(m / 2, n / 2, 0.1)
 
   # Run solver with block matrix
   losses <- list(list(
@@ -331,7 +381,7 @@ test_that("Cholesky solver handles different matrix structures", {
   ))
   reg <- list(
     fn = kl_loss,
-    prox = function(w, lam) prox_kl_reg(w, lam, tau = 50/lam)
+    prox = function(w, lam) prox_kl_reg(w, lam, tau = 50 / lam)
   )
 
   sol_block <- admm(F_block, losses, reg, lam = 1)
@@ -347,7 +397,7 @@ test_that("Cholesky solver is stable with different condition numbers", {
   # Fixed matrix creation to ensure dimensions match
   create_matrix <- function(cond_num) {
     # Create square matrix first then truncate
-    X <- matrix(rnorm(n*n), n, n)
+    X <- matrix(rnorm(n * n), n, n)
     # SVD decomposition
     svd_res <- svd(X)
     # Create desired singular values - use more moderate range
@@ -357,12 +407,12 @@ test_that("Cholesky solver is stable with different condition numbers", {
     # Reconstruct with controlled condition number
     X_cond <- svd_res$u %*% diag(s) %*% t(svd_res$v)
     # Take first m rows to get desired dimensions
-    F <- Matrix::Matrix(X_cond[1:m,], sparse = TRUE)
+    F <- Matrix::Matrix(X_cond[1:m, ], sparse = TRUE)
     return(F)
   }
 
   # Test matrices with more moderate condition numbers
-  cond_numbers <- c(1e2, 1e4, 1e6)  # reduced from previous values
+  cond_numbers <- c(1e2, 1e4, 1e6) # reduced from previous values
   for (cond in cond_numbers) {
     F <- create_matrix(cond)
     losses <- list(list(
@@ -372,7 +422,7 @@ test_that("Cholesky solver is stable with different condition numbers", {
     ))
     reg <- list(
       fn = kl_loss,
-      prox = function(w, lam) prox_kl_reg(w, lam, tau = 50/lam)
+      prox = function(w, lam) prox_kl_reg(w, lam, tau = 50 / lam)
     )
 
     # Run solver with error checking
@@ -388,8 +438,16 @@ test_that("Cholesky solver is stable with different condition numbers", {
 
     # Check convergence
     norms <- compute_norms_and_epsilons(
-      sol$f, sol$w, sol$w, sol$y, sol$z, sol$u,
-      F, rho = 50, eps_abs = 1e-5, eps_rel = 1e-5
+      sol$f,
+      sol$w,
+      sol$w,
+      sol$y,
+      sol$z,
+      sol$u,
+      F,
+      rho = 50,
+      eps_abs = 1e-5,
+      eps_rel = 1e-5
     )
     expect_false(any(is.na(norms$r_norm)))
     expect_false(any(is.na(norms$s_norm)))
@@ -416,7 +474,7 @@ test_that("Solver performance scales with sparsity levels", {
     ))
     reg <- list(
       fn = kl_loss,
-      prox = function(w, lam) prox_kl_reg(w, lam, tau = 50/lam)
+      prox = function(w, lam) prox_kl_reg(w, lam, tau = 50 / lam)
     )
 
     # Time the solver with control list
@@ -439,8 +497,8 @@ test_that("Solver performance scales with sparsity levels", {
   # Instead of checking timing (which can be unreliable),
   # verify that we can solve problems at different sparsity levels
   for (r in results) {
-    expect_true(r$time > 0)  # Ensure timing is positive
-    expect_equal(r$nnz, round(r$density * m * n), tolerance = 10)  # Verify density
+    expect_true(r$time > 0) # Ensure timing is positive
+    expect_equal(r$nnz, round(r$density * m * n), tolerance = 10) # Verify density
   }
 })
 
@@ -451,7 +509,7 @@ test_that("Solver handles regularization fallback gracefully", {
 
   # Create nearly singular matrix
   F <- Matrix::Matrix(1, m, n, sparse = TRUE)
-  F[1,] <- F[1,] + 1e-10 * rnorm(n)
+  F[1, ] <- F[1, ] + 1e-10 * rnorm(n)
 
   losses <- list(list(
     fn = least_squares_loss,
@@ -460,7 +518,7 @@ test_that("Solver handles regularization fallback gracefully", {
   ))
   reg <- list(
     fn = kl_loss,
-    prox = function(w, lam) prox_kl_reg(w, lam, tau = 50/lam)
+    prox = function(w, lam) prox_kl_reg(w, lam, tau = 50 / lam)
   )
 
   # Should complete without error due to damping

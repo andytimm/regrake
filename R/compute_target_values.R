@@ -43,12 +43,13 @@
 #'
 #' @keywords internal
 process_pop_data <- function(population_data, pop_type, pop_weights = NULL) {
-
   # Check for either "target" (preferred) or "proportion" (legacy) column
   has_target_col <- "target" %in% names(population_data)
   has_proportion_col <- "proportion" %in% names(population_data)
-  has_required_cols <- all(c("variable", "level") %in% names(population_data)) &&
-                       (has_target_col || has_proportion_col)
+  has_required_cols <- all(
+    c("variable", "level") %in% names(population_data)
+  ) &&
+    (has_target_col || has_proportion_col)
 
   # For proportions format, validate required columns first
   if (pop_type == "proportions" && !has_required_cols) {
@@ -60,11 +61,16 @@ process_pop_data <- function(population_data, pop_type, pop_weights = NULL) {
     format <- "proportions"
   } else if (!is.null(pop_weights) && pop_weights %in% names(population_data)) {
     format <- "weighted"
-  } else if (is.list(population_data) && !is.data.frame(population_data) &&
-             all(vapply(population_data, is.numeric, logical(1)))) {
+  } else if (
+    is.list(population_data) &&
+      !is.data.frame(population_data) &&
+      all(vapply(population_data, is.numeric, logical(1)))
+  ) {
     format <- "anesrake"
-  } else if (is.data.frame(population_data) &&
-             all(c("margin", "category", "value") %in% names(population_data))) {
+  } else if (
+    is.data.frame(population_data) &&
+      all(c("margin", "category", "value") %in% names(population_data))
+  ) {
     format <- "survey"
   } else if (inherits(population_data, "survey.design")) {
     format <- "survey_design"
@@ -75,9 +81,16 @@ process_pop_data <- function(population_data, pop_type, pop_weights = NULL) {
   # Validate against requested type
   if (format != pop_type) {
     stop(
-      "Population data appears to be in '", format, "' format but pop_type = '", pop_type, "'.\n",
-      "For '", pop_type, "' format, data should ",
-      switch(pop_type,
+      "Population data appears to be in '",
+      format,
+      "' format but pop_type = '",
+      pop_type,
+      "'.\n",
+      "For '",
+      pop_type,
+      "' format, data should ",
+      switch(
+        pop_type,
         proportions = "contain columns: variable, level, target",
         weighted = paste0("contain weight column: ", pop_weights),
         anesrake = "be a list of named numeric vectors (anesrake format)",
@@ -90,7 +103,8 @@ process_pop_data <- function(population_data, pop_type, pop_weights = NULL) {
   }
 
   # Process based on format
-  switch(format,
+  switch(
+    format,
     proportions = process_proportions_data(population_data),
     weighted = process_weighted_data(population_data, pop_weights),
     anesrake = process_anesrake_data(population_data),
@@ -116,7 +130,10 @@ process_proportions_data <- function(data) {
   has_proportion <- "proportion" %in% names(data)
 
   # Validate autumn format
-  if (!all(c("variable", "level") %in% names(data)) || !(has_target || has_proportion)) {
+  if (
+    !all(c("variable", "level") %in% names(data)) ||
+      !(has_target || has_proportion)
+  ) {
     stop("must contain columns: variable, level, target", call. = FALSE)
   }
 
@@ -124,9 +141,13 @@ process_proportions_data <- function(data) {
   value_col <- if (has_target) "target" else "proportion"
 
   # Validate column types first
-  if (!is.character(data$variable) && !is.factor(data$variable) ||
+  if (
+    !is.character(data$variable) &&
+      !is.factor(data$variable) ||
       !is.character(data$level) && !is.factor(data$level) ||
-      !is.numeric(data[[value_col]]) && !all(suppressWarnings(!is.na(as.numeric(data[[value_col]]))))) {
+      !is.numeric(data[[value_col]]) &&
+        !all(suppressWarnings(!is.na(as.numeric(data[[value_col]]))))
+  ) {
     stop("Invalid column types", call. = FALSE)
   }
 
@@ -137,7 +158,7 @@ process_proportions_data <- function(data) {
   # Standardize to "target" column name
   data$target <- as.numeric(data[[value_col]])
   if (has_proportion && !has_target) {
-    data$proportion <- NULL  # Remove legacy column after copying
+    data$proportion <- NULL # Remove legacy column after copying
   }
 
   # Return with standardized column name
@@ -204,13 +225,20 @@ process_raw_data <- function(data) {
 #'
 #' @keywords internal
 process_weighted_data <- function(data, weights) {
-
   if (is.null(weights)) {
-    stop("weights must be specified for weighted population data", call. = FALSE)
+    stop(
+      "weights must be specified for weighted population data",
+      call. = FALSE
+    )
   }
 
   if (!weights %in% names(data)) {
-    stop("weight column '", weights, "' not found in population data", call. = FALSE)
+    stop(
+      "weight column '",
+      weights,
+      "' not found in population data",
+      call. = FALSE
+    )
   }
 
   # Convert weighted counts to target values
@@ -222,7 +250,9 @@ process_weighted_data <- function(data, weights) {
 
   for (var in vars) {
     # Skip weight column
-    if (var == weights) next
+    if (var == weights) {
+      next
+    }
 
     if (is.numeric(data[[var]])) {
       # Continuous variable: compute weighted mean
@@ -271,13 +301,19 @@ process_anesrake_data <- function(data) {
     props <- data[[i]]
 
     if (!is.numeric(props) || is.null(names(props))) {
-      stop("Each element in anesrake format must be a named numeric vector",
-           call. = FALSE)
+      stop(
+        "Each element in anesrake format must be a named numeric vector",
+        call. = FALSE
+      )
     }
 
     if (abs(sum(props) - 1) > 1e-6) {
-      stop("Targets for variable '", var_name, "' do not sum to 1",
-           call. = FALSE)
+      stop(
+        "Targets for variable '",
+        var_name,
+        "' do not sum to 1",
+        call. = FALSE
+      )
     }
 
     result[[i]] <- tibble::tibble(
@@ -304,8 +340,10 @@ process_anesrake_data <- function(data) {
 process_survey_data <- function(data) {
   # Validate required columns
   if (!all(c("margin", "category", "value") %in% names(data))) {
-    stop("Survey format requires columns: margin, category, value",
-         call. = FALSE)
+    stop(
+      "Survey format requires columns: margin, category, value",
+      call. = FALSE
+    )
   }
 
   # Check for and handle two-way margins
@@ -335,8 +373,7 @@ process_survey_data <- function(data) {
 
     # Validate targets sum to 1
     if (abs(sum(result[[i]]$target) - 1) > 1e-6) {
-      stop("Targets for margin '", margin, "' do not sum to 1",
-           call. = FALSE)
+      stop("Targets for margin '", margin, "' do not sum to 1", call. = FALSE)
     }
   }
 
@@ -364,9 +401,15 @@ process_survey_design_data <- function(design) {
     modify_if(is.character, as.factor)
 
   # Create model matrix with all levels (no reference level)
-  mm <- model.matrix(formula, mf,
-                    contrasts.arg = lapply(mf[sapply(mf, is.factor)],
-                                         contrasts, contrasts=FALSE))
+  mm <- model.matrix(
+    formula,
+    mf,
+    contrasts.arg = lapply(
+      mf[sapply(mf, is.factor)],
+      contrasts,
+      contrasts = FALSE
+    )
+  )
 
   # Get design weights
   wts <- weights(design)
@@ -386,13 +429,13 @@ process_survey_design_data <- function(design) {
     parts <- parsed[[i]]
     if (length(parts) == 1) {
       # Main effect
-      var_name <- sub("^([^.]+).*", "\\1", parts[1])  # Extract variable name
-      level <- sub("^[^.]+\\.", "", parts[1])  # Extract level
+      var_name <- sub("^([^.]+).*", "\\1", parts[1]) # Extract variable name
+      level <- sub("^[^.]+\\.", "", parts[1]) # Extract level
 
       result[[i]] <- tibble::tibble(
         variable = var_name,
         level = level,
-        target = props[i + 1]  # +1 to skip intercept
+        target = props[i + 1] # +1 to skip intercept
       )
     } else {
       # Interaction
@@ -402,7 +445,7 @@ process_survey_design_data <- function(design) {
       result[[i]] <- tibble::tibble(
         variable = var_name,
         level = level,
-        target = props[i + 1]  # +1 to skip intercept
+        target = props[i + 1] # +1 to skip intercept
       )
     }
   }
@@ -449,7 +492,12 @@ process_survey_design_data <- function(design) {
 #'   - variables: Vector of all variables in the data
 #'
 #' @keywords internal
-compute_target_values <- function(population_data, formula_spec, pop_type = "proportions", pop_weights = NULL) {
+compute_target_values <- function(
+  population_data,
+  formula_spec,
+  pop_type = "proportions",
+  pop_weights = NULL
+) {
   # First convert population data to autumn format regardless of input type
   population_data <- process_pop_data(population_data, pop_type, pop_weights)
 
@@ -461,31 +509,64 @@ compute_target_values <- function(population_data, formula_spec, pop_type = "pro
 
   # Validate targets sum to 1 for each variable (categorical variables only)
   # Skip validation for continuous targets (level contains statistic names like "mean", "var", etc.)
-  continuous_stat_levels <- c("mean", "var", "sd", "median", "min", "max",
-                               "q10", "q25", "q50", "q75", "q90")
+  continuous_stat_levels <- c(
+    "mean",
+    "var",
+    "sd",
+    "median",
+    "min",
+    "max",
+    "q10",
+    "q25",
+    "q50",
+    "q75",
+    "q90"
+  )
 
   # Identify which variables are continuous (have statistic-like levels)
-  is_continuous_var <- tapply(population_data$level, population_data$variable, function(lvls) {
-    all(lvls %in% continuous_stat_levels)
-  })
+  is_continuous_var <- tapply(
+    population_data$level,
+    population_data$variable,
+    function(lvls) {
+      all(lvls %in% continuous_stat_levels)
+    }
+  )
 
   # Only validate categorical variables (those not identified as continuous)
   categorical_vars <- names(is_continuous_var)[!is_continuous_var]
   if (length(categorical_vars) > 0) {
-    cat_data <- population_data[population_data$variable %in% categorical_vars, ]
+    cat_data <- population_data[
+      population_data$variable %in% categorical_vars,
+    ]
     var_sums <- tapply(cat_data$target, cat_data$variable, sum)
     bad_vars <- names(var_sums)[abs(var_sums - 1) > 1e-6]
     if (length(bad_vars) > 0) {
-      stop("Targets for variable '", bad_vars[1], "' do not sum to 1", call. = FALSE)
+      stop(
+        "Targets for variable '",
+        bad_vars[1],
+        "' do not sum to 1",
+        call. = FALSE
+      )
     }
   }
 
   # Process each term in the formula
   targets <- vector("list", length(formula_spec$terms))
-  names(targets) <- vapply(formula_spec$terms, function(t) {
-    paste0(t$type, "_",
-           if (is.null(t$interaction)) t$variables else paste(t$variables, collapse = ":"))
-  }, character(1))
+  names(targets) <- vapply(
+    formula_spec$terms,
+    function(t) {
+      paste0(
+        t$type,
+        "_",
+        if (is.null(t$interaction)) {
+          t$variables
+        } else {
+          paste(t$variables, collapse = ":")
+        }
+      )
+    },
+    character(1)
+  )
 
   for (i in seq_along(formula_spec$terms)) {
     term <- formula_spec$terms[[i]]
@@ -494,10 +575,13 @@ compute_target_values <- function(population_data, formula_spec, pop_type = "pro
       # Main effect
       var_data <- population_data[population_data$variable == term$variables, ]
       if (nrow(var_data) == 0) {
-        stop("Missing target values for variable: ", term$variables, call. = FALSE)
+        stop(
+          "Missing target values for variable: ",
+          term$variables,
+          call. = FALSE
+        )
       }
       targets[[i]] <- setNames(var_data$target, var_data$level)
-
     } else {
       # Interaction term
       joint_var <- paste(term$variables, collapse = ":")

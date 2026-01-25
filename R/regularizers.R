@@ -91,12 +91,12 @@ sum_squares_regularizer <- function(w, lambda) {
 #' @export
 prox_kl_reg <- function(w, lam, tau = 1, prior = NULL, limit = NULL) {
   if (is.null(prior)) {
-    prior <- rep(1/length(w), length(w))
+    prior <- rep(1 / length(w), length(w))
   }
   # Exactly match Python implementation
   what <- lam * Re(lamW::lambertW0(exp((w + lam * log(prior)) / lam - 1) / lam))
   if (!is.null(limit)) {
-    what <- pmin(pmax(what, 1/(limit * length(w))), limit/length(w))
+    what <- pmin(pmax(what, 1 / (limit * length(w))), limit / length(w))
   }
   what
 }

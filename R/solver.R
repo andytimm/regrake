@@ -39,7 +39,19 @@ projection_simplex <- function(v, z = 1) {
 #'   \item{eps_pri}{Primal feasibility threshold}
 #'   \item{eps_dual}{Dual feasibility threshold}
 #' @keywords internal
-compute_norms_and_epsilons <- function(f, w, w_old, y, z, u, F, rho, eps_abs, eps_rel, Fw = NULL) {
+compute_norms_and_epsilons <- function(
+  f,
+  w,
+  w_old,
+  y,
+  z,
+  u,
+  F,
+  rho,
+  eps_abs,
+  eps_rel,
+  Fw = NULL
+) {
   if (is.null(Fw)) {
     Fw <- drop(as.matrix(F %*% w))
   }
@@ -60,9 +72,9 @@ compute_norms_and_epsilons <- function(f, w, w_old, y, z, u, F, rho, eps_abs, ep
 
   # Compute norms directly without concatenation
   w_sq_sum <- sum(w^2)
-  Ax_k_norm <- sqrt(sum(Fw^2) + 2 * w_sq_sum)  # ||[Fw, w, w]||
-  Bz_k_norm <- sqrt(sum(f^2) + 2 * w_sq_sum)   # ||[f, w, w]||
-  ATy_k_norm <- rho * sqrt(sum(y^2) + sum(z^2) + sum(u^2))  # ||rho * [y, z, u]||
+  Ax_k_norm <- sqrt(sum(Fw^2) + 2 * w_sq_sum) # ||[Fw, w, w]||
+  Bz_k_norm <- sqrt(sum(f^2) + 2 * w_sq_sum) # ||[f, w, w]||
+  ATy_k_norm <- rho * sqrt(sum(y^2) + sum(z^2) + sum(u^2)) # ||rho * [y, z, u]||
 
   eps_pri <- sqrt(p) * eps_abs + eps_rel * max(Ax_k_norm, Bz_k_norm)
   eps_dual <- sqrt(p) * eps_abs + eps_rel * ATy_k_norm
@@ -117,7 +129,7 @@ admm <- function(F, losses, reg, lam, control = list(), verbose = FALSE) {
     eps_abs = 1e-5,
     eps_rel = 1e-5
   )
-  ctrl[names(control)] <- control  # Override defaults with user values
+  ctrl[names(control)] <- control # Override defaults with user values
 
   # Convert F to sparse matrix first
   if (!inherits(F, "Matrix")) {
@@ -132,9 +144,9 @@ admm <- function(F, losses, reg, lam, control = list(), verbose = FALSE) {
 
   # Initialize warm start values
   f <- Matrix::rowMeans(F)
-  w <- rep(1/n, n)
-  w_bar <- rep(1/n, n)
-  w_tilde <- rep(1/n, n)
+  w <- rep(1 / n, n)
+  w_bar <- rep(1 / n, n)
+  w_tilde <- rep(1 / n, n)
   y <- rep(0, m)
   z <- rep(0, n)
   u <- rep(0, n)
@@ -163,7 +175,9 @@ admm <- function(F, losses, reg, lam, control = list(), verbose = FALSE) {
     losses[[i]]$end <- ct_cum + losses[[i]]$m
     ct_cum <- ct_cum + losses[[i]]$m
   }
-  if (ct_cum != m) stop("Loss dimensions mismatch")
+  if (ct_cum != m) {
+    stop("Loss dimensions mismatch")
+  }
 
   w_best <- NULL
   best_objective_value <- Inf
@@ -175,20 +189,20 @@ admm <- function(F, losses, reg, lam, control = list(), verbose = FALSE) {
       idx <- seq(l$start, l$end)
       Fw <- drop(as.matrix(F[idx, , drop = FALSE] %*% w))
       if (!is.null(l$lower) || !is.null(l$upper)) {
-        f[idx] <- l$prox(Fw - y[idx], l$target, 1/ctrl$rho, l$lower, l$upper)
+        f[idx] <- l$prox(Fw - y[idx], l$target, 1 / ctrl$rho, l$lower, l$upper)
       } else {
-        f[idx] <- l$prox(Fw - y[idx], l$target, 1/ctrl$rho)
+        f[idx] <- l$prox(Fw - y[idx], l$target, 1 / ctrl$rho)
       }
     }
 
     # Update w_tilde and w_bar
-    w_tilde <- reg$prox(w - z, lam/ctrl$rho)
+    w_tilde <- reg$prox(w - z, lam / ctrl$rho)
     w_bar <- projection_simplex(w - u)
 
     # Solve for w_new using cached factorization
     Ft_fy <- Matrix::crossprod(F, f + y)
     rhs[1:n] <- Ft_fy + w_tilde + z + w_bar + u
-    rhs[(n+1):(n+m)] <- 0
+    rhs[(n + 1):(n + m)] <- 0
     w_new <- Matrix::solve(Q_factor, rhs)[1:n]
 
     w_old <- w
@@ -218,10 +232,13 @@ admm <- function(F, losses, reg, lam, control = list(), verbose = FALSE) {
     )
 
     if (verbose && k %% 50 == 0) {
-      message(sprintf("It %03d / %03d | %8.5e | %8.5e",
-                     k, ctrl$maxiter,
-                     norms$r_norm/norms$eps_pri,
-                     norms$s_norm/norms$eps_dual))
+      message(sprintf(
+        "It %03d / %03d | %8.5e | %8.5e",
+        k,
+        ctrl$maxiter,
+        norms$r_norm / norms$eps_pri,
+        norms$s_norm / norms$eps_dual
+      ))
     }
 
     # Track best solution for boolean regularizer
@@ -235,8 +252,11 @@ admm <- function(F, losses, reg, lam, control = list(), verbose = FALSE) {
       }
       if (objective < best_objective_value) {
         if (verbose) {
-          message(sprintf("Found better objective value: %3.5f -> %3.5f",
-                         best_objective_value, objective))
+          message(sprintf(
+            "Found better objective value: %3.5f -> %3.5f",
+            best_objective_value,
+            objective
+          ))
         }
         best_objective_value <- objective
         w_best <- w_tilde
@@ -250,8 +270,10 @@ admm <- function(F, losses, reg, lam, control = list(), verbose = FALSE) {
 
     # Check for numerical issues
     if (is.nan(norms$r_norm) || is.nan(norms$s_norm)) {
-      stop("Numerical error in optimization. This usually indicates a poorly formulated ",
-           "problem. Common causes include excessively high or low values of lambda or rho.")
+      stop(
+        "Numerical error in optimization. This usually indicates a poorly formulated ",
+        "problem. Common causes include excessively high or low values of lambda or rho."
+      )
     }
   }
 
@@ -260,6 +282,14 @@ admm <- function(F, losses, reg, lam, control = list(), verbose = FALSE) {
   }
 
   # Return results
-  list(f = f, w = w, w_bar = w_bar, w_tilde = w_tilde,
-       y = y, z = z, u = u, w_best = w_best)
+  list(
+    f = f,
+    w = w,
+    w_bar = w_bar,
+    w_tilde = w_tilde,
+    y = y,
+    z = z,
+    u = u,
+    w_best = w_best
+  )
 }

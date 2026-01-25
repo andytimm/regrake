@@ -116,8 +116,10 @@ kl_loss <- function(x, target) {
   # Process non-NA values
   valid_idx <- !na_vals & x > 0 & target > 0
   result[!valid_idx & !na_vals] <- Inf
-  result[valid_idx] <- x[valid_idx] * log(x[valid_idx] / target[valid_idx]) -
-                      x[valid_idx] + target[valid_idx]
+  result[valid_idx] <- x[valid_idx] *
+    log(x[valid_idx] / target[valid_idx]) -
+    x[valid_idx] +
+    target[valid_idx]
 
   result
 }
@@ -157,5 +159,5 @@ prox_kl <- function(x, target, rho, scale = 0.5) {
   # where _entropy_prox(f, lam) = lam * real(lambertw(exp(f/lam - 1) / lam))
   scaled_rho <- rho * scale
   f <- x + scaled_rho * log(target)
-  scaled_rho * Re(lamW::lambertW0(exp(f/scaled_rho - 1) / scaled_rho))
+  scaled_rho * Re(lamW::lambertW0(exp(f / scaled_rho - 1) / scaled_rho))
 }

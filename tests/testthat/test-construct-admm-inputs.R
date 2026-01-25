@@ -9,7 +9,7 @@ test_that("construct_admm_inputs handles basic case with single exact term", {
 
   # Create formula spec (simulating output from parse_raking_formula)
   formula_spec <- list(
-    formula = ~ x,
+    formula = ~x,
     terms = list(
       list(
         type = "exact",
@@ -36,9 +36,9 @@ test_that("construct_admm_inputs handles basic case with single exact term", {
 
   # Check design matrix
   expect_true(inherits(result$design_matrix, "Matrix"))
-  expect_equal(dim(result$design_matrix), c(2, 5))  # 2 levels, 5 samples
-  expect_equal(as.vector(result$design_matrix[1,]), c(1,0,1,0,1))  # a's
-  expect_equal(as.vector(result$design_matrix[2,]), c(0,1,0,1,0))  # b's
+  expect_equal(dim(result$design_matrix), c(2, 5)) # 2 levels, 5 samples
+  expect_equal(as.vector(result$design_matrix[1, ]), c(1, 0, 1, 0, 1)) # a's
+  expect_equal(as.vector(result$design_matrix[2, ]), c(0, 1, 0, 1, 0)) # b's
 
   # Check losses
   expect_length(result$losses, 1)
@@ -55,7 +55,7 @@ test_that("construct_admm_inputs handles l2 terms", {
   )
 
   formula_spec <- list(
-    formula = ~ x,
+    formula = ~x,
     terms = list(
       list(
         type = "l2",
@@ -109,7 +109,7 @@ test_that("construct_admm_inputs handles interactions", {
 
   # Verify interaction encoding - must use Matrix::colSums explicitly for sparse matrices
   # to ensure correct method dispatch (base::colSums may not work as expected)
-  expect_equal(Matrix::colSums(result$design_matrix), rep(1, 5))  # Each sample in exactly one category
+  expect_equal(Matrix::colSums(result$design_matrix), rep(1, 5)) # Each sample in exactly one category
 })
 
 test_that("construct_admm_inputs handles multiple terms", {
@@ -157,7 +157,7 @@ test_that("construct_admm_inputs errors on missing target values", {
   data <- data.frame(x = factor(c("a", "b")))
 
   formula_spec <- list(
-    formula = ~ x,
+    formula = ~x,
     terms = list(
       list(
         type = "exact",
@@ -167,7 +167,7 @@ test_that("construct_admm_inputs errors on missing target values", {
     )
   )
 
-  target_values <- list(targets = list())  # Empty targets
+  target_values <- list(targets = list()) # Empty targets
 
   expect_error(
     construct_admm_inputs(data, formula_spec, target_values),
@@ -184,7 +184,7 @@ test_that("construct_admm_inputs handles character variables", {
   )
 
   formula_spec <- list(
-    formula = ~ x,
+    formula = ~x,
     terms = list(
       list(
         type = "exact",
@@ -208,7 +208,7 @@ test_that("construct_admm_inputs errors on unknown term type", {
   data <- data.frame(x = factor(c("a", "b")))
 
   formula_spec <- list(
-    formula = ~ x,
+    formula = ~x,
     terms = list(
       list(
         type = "unknown",
@@ -241,16 +241,16 @@ test_that("construct_admm_inputs handles mixed exact and l2 loss types", {
 
   # Simulate what parse_raking_formula returns for ~ rr_exact(sex) + rr_l2(age)
   formula_spec <- list(
-    formula = ~ rr_exact(sex) + rr_l2(age),  # The wrapped formula
+    formula = ~ rr_exact(sex) + rr_l2(age), # The wrapped formula
     terms = list(
       list(
         type = "exact",
-        variables = "sex",  # Variables are unwrapped
+        variables = "sex", # Variables are unwrapped
         interaction = NULL
       ),
       list(
         type = "l2",
-        variables = "age",  # Variables are unwrapped
+        variables = "age", # Variables are unwrapped
         interaction = NULL
       )
     )
@@ -283,7 +283,7 @@ test_that("construct_admm_inputs handles continuous variables", {
   # Test that numeric variables get actual values in design matrix, not indicators
   data <- data.frame(
     sex = factor(c("M", "F", "M", "F", "M")),
-    income = c(50000, 75000, 45000, 80000, 55000)  # Continuous
+    income = c(50000, 75000, 45000, 80000, 55000) # Continuous
   )
 
   formula_spec <- list(
@@ -305,12 +305,17 @@ test_that("construct_admm_inputs handles continuous variables", {
   target_values <- list(
     targets = list(
       exact_sex = c(M = 0.5, F = 0.5),
-      exact_income = c(mean = 60000)  # Target mean income
+      exact_income = c(mean = 60000) # Target mean income
     )
   )
 
   # Use normalize = FALSE to test raw values in design matrix
-  result <- construct_admm_inputs(data, formula_spec, target_values, normalize = FALSE)
+  result <- construct_admm_inputs(
+    data,
+    formula_spec,
+    target_values,
+    normalize = FALSE
+  )
 
   # Verify structure
   expect_type(result, "list")
@@ -326,8 +331,8 @@ test_that("construct_admm_inputs handles continuous variables", {
   expect_equal(income_row, c(50000, 75000, 45000, 80000, 55000))
 
   # The sex rows should still be indicators
-  expect_equal(as.vector(result$design_matrix[1, ]), c(0, 1, 0, 1, 0))  # F
-  expect_equal(as.vector(result$design_matrix[2, ]), c(1, 0, 1, 0, 1))  # M
+  expect_equal(as.vector(result$design_matrix[1, ]), c(0, 1, 0, 1, 0)) # F
+  expect_equal(as.vector(result$design_matrix[2, ]), c(1, 0, 1, 0, 1)) # M
 })
 
 test_that("construct_admm_inputs handles continuous-only formula", {
@@ -361,7 +366,12 @@ test_that("construct_admm_inputs handles continuous-only formula", {
   )
 
   # Use normalize = FALSE to test raw values
-  result <- construct_admm_inputs(data, formula_spec, target_values, normalize = FALSE)
+  result <- construct_admm_inputs(
+    data,
+    formula_spec,
+    target_values,
+    normalize = FALSE
+  )
 
   # Design matrix should have 2 rows (one per continuous variable)
   expect_equal(dim(result$design_matrix), c(2, 5))
@@ -370,7 +380,10 @@ test_that("construct_admm_inputs handles continuous-only formula", {
   expect_equal(as.vector(result$design_matrix[1, ]), c(25, 35, 45, 30, 40))
 
   # Row 2 (income) should contain actual incomes
-  expect_equal(as.vector(result$design_matrix[2, ]), c(50000, 75000, 45000, 80000, 55000))
+  expect_equal(
+    as.vector(result$design_matrix[2, ]),
+    c(50000, 75000, 45000, 80000, 55000)
+  )
 })
 
 test_that("construct_admm_inputs normalizes continuous variables by default", {
@@ -380,7 +393,7 @@ test_that("construct_admm_inputs normalizes continuous variables by default", {
   )
 
   formula_spec <- list(
-    formula = ~ income,
+    formula = ~income,
     terms = list(
       list(
         type = "exact",
@@ -418,7 +431,7 @@ test_that("construct_admm_inputs normalizes continuous variables by default", {
 test_that("construct_admm_inputs errors on continuous in interaction", {
   data <- data.frame(
     sex = factor(c("M", "F", "M")),
-    age = c(25, 35, 45)  # Continuous
+    age = c(25, 35, 45) # Continuous
   )
 
   formula_spec <- list(
@@ -430,7 +443,9 @@ test_that("construct_admm_inputs errors on continuous in interaction", {
     ))
   )
 
-  target_values <- list(targets = list("exact_sex:age" = c(0.25, 0.25, 0.25, 0.25)))
+  target_values <- list(
+    targets = list("exact_sex:age" = c(0.25, 0.25, 0.25, 0.25))
+  )
 
   expect_error(
     construct_admm_inputs(data, formula_spec, target_values),
@@ -443,7 +458,7 @@ test_that("construct_admm_inputs handles variance constraint", {
   # Mean = 40, Variance = sum((x - 40)^2) / 5 = (400+100+0+100+400)/5 = 200
 
   formula_spec <- list(
-    formula = ~ age,
+    formula = ~age,
     terms = list(list(
       type = "var",
       variables = "age",
@@ -455,7 +470,12 @@ test_that("construct_admm_inputs handles variance constraint", {
   target_values <- list(targets = list(var_age = c(var = 250)))
 
   # Without normalization to check raw values
-  result <- construct_admm_inputs(data, formula_spec, target_values, normalize = FALSE)
+  result <- construct_admm_inputs(
+    data,
+    formula_spec,
+    target_values,
+    normalize = FALSE
+  )
 
   # Verify structure
   expect_type(result, "list")
@@ -463,8 +483,8 @@ test_that("construct_admm_inputs handles variance constraint", {
   expect_true("losses" %in% names(result))
 
   # Design matrix row should be (x - mean(x))^2
-  mean_age <- mean(data$age)  # 40
-  expected <- (data$age - mean_age)^2  # c(400, 100, 0, 100, 400)
+  mean_age <- mean(data$age) # 40
+  expected <- (data$age - mean_age)^2 # c(400, 100, 0, 100, 400)
   expect_equal(as.vector(result$design_matrix[1, ]), expected)
 
   # Loss function should use equality (exact match on variance)
@@ -478,7 +498,7 @@ test_that("construct_admm_inputs normalizes variance constraint", {
   # Mean = 40, (x - mean)^2 = c(400, 100, 0, 100, 400)
 
   formula_spec <- list(
-    formula = ~ age,
+    formula = ~age,
     terms = list(list(
       type = "var",
       variables = "age",
@@ -509,7 +529,7 @@ test_that("construct_admm_inputs handles quantile constraint", {
   # Target: 50% of weighted data should be <= 45000
 
   formula_spec <- list(
-    formula = ~ income,
+    formula = ~income,
     terms = list(list(
       type = "quantile",
       variables = "income",
@@ -547,7 +567,7 @@ test_that("construct_admm_inputs errors on multiple quantile targets", {
   data <- data.frame(income = c(30000, 40000, 50000))
 
   formula_spec <- list(
-    formula = ~ income,
+    formula = ~income,
     terms = list(list(
       type = "quantile",
       variables = "income",
@@ -557,9 +577,11 @@ test_that("construct_admm_inputs errors on multiple quantile targets", {
   )
 
   # Two targets for same variable - should error
-  target_values <- list(targets = list(
-    quantile_income = c(q25 = 35000, q50 = 45000)
-  ))
+  target_values <- list(
+    targets = list(
+      quantile_income = c(q25 = 35000, q50 = 45000)
+    )
+  )
 
   expect_error(
     construct_admm_inputs(data, formula_spec, target_values),

@@ -1,6 +1,6 @@
 test_that("basic formula parsing works", {
   # Test single variable
-  f1 <- parse_raking_formula(~ age)
+  f1 <- parse_raking_formula(~age)
   expect_equal(length(f1$terms), 1)
   expect_equal(f1$terms[[1]]$type, "exact")
   expect_equal(f1$terms[[1]]$variables, "age")
@@ -32,7 +32,7 @@ test_that("constraint functions are parsed correctly", {
 
   # Test mean constraint (for continuous variables)
   f4 <- parse_raking_formula(~ rr_mean(income))
-  expect_equal(f4$terms[[1]]$type, "exact")  # rr_mean maps to exact internally
+  expect_equal(f4$terms[[1]]$type, "exact") # rr_mean maps to exact internally
   expect_equal(f4$terms[[1]]$variables, "income")
 })
 
@@ -73,7 +73,7 @@ test_that("rr_var() parses correctly for variance constraints", {
   # Combined with mean constraint
   f2 <- parse_raking_formula(~ rr_mean(age) + rr_var(age))
   expect_equal(length(f2$terms), 2)
-  expect_equal(f2$terms[[1]]$type, "exact")  # rr_mean maps to exact
+  expect_equal(f2$terms[[1]]$type, "exact") # rr_mean maps to exact
   expect_equal(f2$terms[[2]]$type, "var")
 
   # Mix of categorical, mean, and variance
@@ -103,9 +103,11 @@ test_that("rr_quantile() parses correctly for quantile constraints", {
   expect_equal(f2$terms[[1]]$params$p, 0.25)
 
   # Combined with other constraints
-  f3 <- parse_raking_formula(~ rr_mean(age) + rr_quantile(age, 0.5) + rr_var(age))
+  f3 <- parse_raking_formula(
+    ~ rr_mean(age) + rr_quantile(age, 0.5) + rr_var(age)
+  )
   expect_equal(length(f3$terms), 3)
-  expect_equal(f3$terms[[1]]$type, "exact")  # rr_mean
+  expect_equal(f3$terms[[1]]$type, "exact") # rr_mean
   expect_equal(f3$terms[[2]]$type, "quantile")
   expect_equal(f3$terms[[2]]$params$p, 0.5)
   expect_equal(f3$terms[[3]]$type, "var")
@@ -147,7 +149,9 @@ test_that("interactions are handled correctly", {
 })
 
 test_that("complex formulas are parsed correctly", {
-  f <- parse_raking_formula(~ race + rr_l2(age:education) + rr_kl(income) + state:region)
+  f <- parse_raking_formula(
+    ~ race + rr_l2(age:education) + rr_kl(income) + state:region
+  )
 
   expect_equal(length(f$terms), 4)
   expect_equal(f$terms[[1]]$type, "exact")
@@ -155,10 +159,12 @@ test_that("complex formulas are parsed correctly", {
   expect_equal(f$terms[[3]]$type, "kl")
   expect_equal(f$terms[[4]]$type, "exact")
 
-  expect_equal(sort(f$variables),
-               sort(c("race", "age", "education", "income", "state", "region")))
+  expect_equal(
+    sort(f$variables),
+    sort(c("race", "age", "education", "income", "state", "region"))
+  )
 
-  expect_equal(length(f$interactions), 2)  # age:education and state:region
+  expect_equal(length(f$interactions), 2) # age:education and state:region
 })
 
 test_that("term IDs are unique", {
@@ -173,12 +179,13 @@ test_that("term IDs are unique", {
 
 test_that("error conditions and edge cases are handled appropriately", {
   # Not a formula
-  expect_error(parse_raking_formula("race + age"),
-               "'formula' must be a formula")
+  expect_error(
+    parse_raking_formula("race + age"),
+    "'formula' must be a formula"
+  )
 
   # Formula with only intercept
-  expect_error(parse_raking_formula(~ 1),
-               "Empty formula")
+  expect_error(parse_raking_formula(~1), "Empty formula")
 
   # Invalid constraint type (should default to exact)
   expect_warning(
@@ -207,15 +214,17 @@ test_that("print method works correctly", {
 })
 
 test_that("formula environment is preserved", {
-  age <- "not_the_variable"  # This should not affect the parsing
+  age <- "not_the_variable" # This should not affect the parsing
   f <- parse_raking_formula(~ age + education)
   expect_equal(f$terms[[1]]$variables, "age")
 })
 
 test_that("mixed constraints with overlapping variables work correctly", {
   expect_warning(
-    {f <- parse_raking_formula(~ age + race + rr_l2(age:race))
-     f},
+    {
+      f <- parse_raking_formula(~ age + race + rr_l2(age:race))
+      f
+    },
     "Variables in rr_l2\\(age:race\\) also appear as main effects. Using exact constraints for main effects and rr_l2 constraint for the interaction term"
   )
 
@@ -289,9 +298,9 @@ test_that("n-way interactions are handled correctly", {
   # Mixed n-way interactions
   f4 <- parse_raking_formula(~ a:b:c + d:e + f)
   expect_equal(length(f4$terms), 3)
-  expect_equal(length(f4$terms[[1]]$interaction), 3)  # 3-way
-  expect_equal(length(f4$terms[[2]]$interaction), 2)  # 2-way
-  expect_null(f4$terms[[3]]$interaction)  # main effect
+  expect_equal(length(f4$terms[[1]]$interaction), 3) # 3-way
+  expect_equal(length(f4$terms[[2]]$interaction), 2) # 2-way
+  expect_null(f4$terms[[3]]$interaction) # main effect
 })
 
 test_that("categorical variables include all levels", {
@@ -303,7 +312,7 @@ test_that("categorical variables include all levels", {
   )
 
   # Test single categorical variable
-  term <- raking_term(~ race, type = "exact")
+  term <- raking_term(~race, type = "exact")
   spec <- process_term(term, df)
 
   # Check that all levels are included

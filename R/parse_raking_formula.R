@@ -54,9 +54,11 @@ parse_raking_formula <- function(formula) {
   rhs <- rlang::f_rhs(formula)
 
   # Check for empty or intercept-only formula
-  if (rlang::quo_is_missing(rlang::quo(!!rhs)) ||
+  if (
+    rlang::quo_is_missing(rlang::quo(!!rhs)) ||
       identical(rhs, 1L) ||
-      identical(rhs, 1)) {
+      identical(rhs, 1)
+  ) {
     stop("Empty formula", call. = FALSE)
   }
 
@@ -74,18 +76,20 @@ parse_raking_formula <- function(formula) {
   names(interactions) <- vapply(terms, function(t) t$term_id, character(1))
 
   # Return structured specification
-  structure(list(
-    terms = terms,
-    variables = variables,
-    interactions = interactions[!vapply(interactions, is.null, logical(1))],
-    formula = formula  # Include the original formula
-  ), class = "raking_formula")
+  structure(
+    list(
+      terms = terms,
+      variables = variables,
+      interactions = interactions[!vapply(interactions, is.null, logical(1))],
+      formula = formula # Include the original formula
+    ),
+    class = "raking_formula"
+  )
 }
 
 #' Validate that there are no invalid overlapping constraints
 #' @keywords internal
 validate_overlapping_constraints <- function(terms) {
-
   # Moment constraint types that can be combined on the same variable
   # (e.g., you can match mean, variance, and quantiles of the same continuous variable)
   # "exact" here refers to rr_mean() on continuous, "var" to rr_var(), "quantile" to rr_quantile()
@@ -93,30 +97,41 @@ validate_overlapping_constraints <- function(terms) {
 
   # Check for pure duplicates first
   for (i in seq_along(terms)) {
-    for (j in seq_len(i-1)) {
+    for (j in seq_len(i - 1)) {
       term_i <- terms[[i]]
       term_j <- terms[[j]]
 
       # If both terms have same variables and one is not an interaction while the other is
       # or both are interactions/non-interactions, then it's a potential duplicate
-      if (identical(sort(term_i$variables), sort(term_j$variables)) &&
-          (is.null(term_i$interaction) == is.null(term_j$interaction))) {
-
+      if (
+        identical(sort(term_i$variables), sort(term_j$variables)) &&
+          (is.null(term_i$interaction) == is.null(term_j$interaction))
+      ) {
         var_desc <- if (is.null(term_i$interaction)) {
           paste0("Variable '", term_i$variables, "'")
         } else {
-          paste0("Interaction '",
-                paste(vapply(term_i$interaction, deparse, character(1)), collapse = ":"),
-                "'")
+          paste0(
+            "Interaction '",
+            paste(
+              vapply(term_i$interaction, deparse, character(1)),
+              collapse = ":"
+            ),
+            "'"
+          )
         }
 
         # Different types on same variable
         if (term_i$type != term_j$type) {
           # Allow combining moment constraints (e.g., rr_mean + rr_var on same variable)
-          both_combinable <- term_i$type %in% combinable_moment_types &&
-                            term_j$type %in% combinable_moment_types
+          both_combinable <- term_i$type %in%
+            combinable_moment_types &&
+            term_j$type %in% combinable_moment_types
           if (!both_combinable) {
-            stop(var_desc, " appears multiple times with different constraints", call. = FALSE)
+            stop(
+              var_desc,
+              " appears multiple times with different constraints",
+              call. = FALSE
+            )
           }
         }
         # Same type duplicates are allowed (creates multiple terms)
@@ -136,11 +151,22 @@ validate_overlapping_constraints <- function(terms) {
     if (!is.null(term$interaction)) {
       overlap <- intersect(term$variables, names(main_effect_vars))
       if (length(overlap) > 0) {
-        warning(paste0("Variables in rr_", term$type, "(",
-                paste(vapply(term$interaction, deparse, character(1)), collapse = ":"),
-                ") also appear as main effects. Using exact constraints for main effects and ",
-                "rr_", term$type, " constraint for the interaction term"),
-                call. = FALSE)
+        warning(
+          paste0(
+            "Variables in rr_",
+            term$type,
+            "(",
+            paste(
+              vapply(term$interaction, deparse, character(1)),
+              collapse = ":"
+            ),
+            ") also appear as main effects. Using exact constraints for main effects and ",
+            "rr_",
+            term$type,
+            " constraint for the interaction term"
+          ),
+          call. = FALSE
+        )
       }
     }
   }
@@ -160,8 +186,7 @@ parse_formula_terms <- function(expr) {
 
   if (fun == "+") {
     # Combine terms from both sides of +
-    c(parse_formula_terms(args[[1]]),
-      parse_formula_terms(args[[2]]))
+    c(parse_formula_terms(args[[1]]), parse_formula_terms(args[[2]]))
   } else if (fun %in% c("rr_l2", "rr_kl", "rr_exact", "rr_mean", "rr_var")) {
     # Handle constraint functions
     # rr_mean maps to exact constraint (for continuous variables)
@@ -172,7 +197,10 @@ parse_formula_terms <- function(expr) {
     # rr_quantile(x, p) matches the p-th quantile of x
     # args[[1]] is the variable, args[[2]] or args$p is the probability
     if (length(args) < 2) {
-      stop("rr_quantile requires two arguments: variable and probability p", call. = FALSE)
+      stop(
+        "rr_quantile requires two arguments: variable and probability p",
+        call. = FALSE
+      )
     }
     p <- if (!is.null(names(args)) && "p" %in% names(args)) {
       args$p
@@ -180,7 +208,10 @@ parse_formula_terms <- function(expr) {
       args[[2]]
     }
     if (!is.numeric(p) || p <= 0 || p >= 1) {
-      stop("rr_quantile probability p must be between 0 and 1 (exclusive)", call. = FALSE)
+      stop(
+        "rr_quantile probability p must be between 0 and 1 (exclusive)",
+        call. = FALSE
+      )
     }
     list(create_quantile_term(args[[1]], p))
   } else if (fun == ":") {
@@ -188,7 +219,12 @@ parse_formula_terms <- function(expr) {
     list(create_interaction_term(collect_interaction_vars(expr)))
   } else {
     # Default to exact matching for unknown functions
-    warning("Unknown function '", fun, "', defaulting to exact constraint", call. = FALSE)
+    warning(
+      "Unknown function '",
+      fun,
+      "', defaulting to exact constraint",
+      call. = FALSE
+    )
     list(create_exact_term(args[[1]]))
   }
 }
@@ -206,8 +242,7 @@ collect_interaction_vars <- function(expr) {
 
   if (fun == ":") {
     # Recursively collect variables from both sides
-    c(collect_interaction_vars(args[[1]]),
-      collect_interaction_vars(args[[2]]))
+    c(collect_interaction_vars(args[[1]]), collect_interaction_vars(args[[2]]))
   } else {
     # Non-: call, treat as single term
     list(expr)
@@ -217,12 +252,15 @@ collect_interaction_vars <- function(expr) {
 #' Create a term specification for exact matching
 #' @keywords internal
 create_exact_term <- function(expr) {
-  structure(list(
-    type = "exact",
-    variables = as.character(expr),
-    interaction = NULL,
-    term_id = create_term_id("exact", expr)
-  ), class = "raking_term")
+  structure(
+    list(
+      type = "exact",
+      variables = as.character(expr),
+      interaction = NULL,
+      term_id = create_term_id("exact", expr)
+    ),
+    class = "raking_term"
+  )
 }
 
 #' Create a term specification for l2/kl constraints
@@ -233,23 +271,29 @@ create_constraint_term <- function(type, expr) {
     # Use collect_interaction_vars for consistent n-way interaction handling
     vars <- collect_interaction_vars(expr)
     var_names <- unname(vapply(vars, as.character, character(1)))
-    structure(list(
-      type = type,
-      variables = var_names,
-      interaction = vars,
-      term_id = create_term_id(type, expr)
-    ), class = "raking_term")
+    structure(
+      list(
+        type = type,
+        variables = var_names,
+        interaction = vars,
+        term_id = create_term_id(type, expr)
+      ),
+      class = "raking_term"
+    )
   } else {
     # Handle nested functions by getting the innermost expression
-    while(rlang::is_call(expr)) {
+    while (rlang::is_call(expr)) {
       expr <- rlang::call_args(expr)[[1]]
     }
-    structure(list(
-      type = type,
-      variables = as.character(expr),
-      interaction = NULL,
-      term_id = create_term_id(type, expr)
-    ), class = "raking_term")
+    structure(
+      list(
+        type = type,
+        variables = as.character(expr),
+        interaction = NULL,
+        term_id = create_term_id(type, expr)
+      ),
+      class = "raking_term"
+    )
   }
 }
 
@@ -257,16 +301,19 @@ create_constraint_term <- function(type, expr) {
 #' @keywords internal
 create_quantile_term <- function(expr, p) {
   # Handle nested functions by getting the innermost expression
-  while(rlang::is_call(expr)) {
+  while (rlang::is_call(expr)) {
     expr <- rlang::call_args(expr)[[1]]
   }
-  structure(list(
-    type = "quantile",
-    variables = as.character(expr),
-    interaction = NULL,
-    params = list(p = p),
-    term_id = create_term_id("quantile", expr)
-  ), class = "raking_term")
+  structure(
+    list(
+      type = "quantile",
+      variables = as.character(expr),
+      interaction = NULL,
+      params = list(p = p),
+      term_id = create_term_id("quantile", expr)
+    ),
+    class = "raking_term"
+  )
 }
 
 #' Create a term specification for interactions
@@ -274,12 +321,15 @@ create_quantile_term <- function(expr, p) {
 create_interaction_term <- function(vars) {
   # vars is now a list of expressions representing individual variables
   var_names <- unname(vapply(vars, as.character, character(1)))
-  structure(list(
-    type = "exact",  # Interactions default to exact matching
-    variables = var_names,  # No names needed, just the vector
-    interaction = vars,
-    term_id = create_term_id("exact", rlang::call2(":", !!!vars))
-  ), class = "raking_term")
+  structure(
+    list(
+      type = "exact", # Interactions default to exact matching
+      variables = var_names, # No names needed, just the vector
+      interaction = vars,
+      term_id = create_term_id("exact", rlang::call2(":", !!!vars))
+    ),
+    class = "raking_term"
+  )
 }
 
 #' Create a unique identifier for a term
@@ -307,13 +357,17 @@ print.raking_formula <- function(x, ...) {
   cat("Variables:", paste(x$variables, collapse = ", "), "\n")
   cat("Terms:\n")
   for (term in x$terms) {
-    cat("  -", term$type, ":",
-        if (!is.null(term$interaction)) {
-          paste(vapply(term$interaction, deparse, character(1)), collapse = ":")
-        } else {
-          paste(term$variables, collapse = " + ")
-        },
-        "\n")
+    cat(
+      "  -",
+      term$type,
+      ":",
+      if (!is.null(term$interaction)) {
+        paste(vapply(term$interaction, deparse, character(1)), collapse = ":")
+      } else {
+        paste(term$variables, collapse = " + ")
+      },
+      "\n"
+    )
   }
   invisible(x)
 }
@@ -385,43 +439,54 @@ validate_inputs <- function(formula, data) {
   }
 
   # Use tryCatch for more informative errors
-  tryCatch({
-    # Handle both single terms and formula combinations
-    terms <- if (inherits(formula, "raking_term")) {
-      list(formula)
-    } else if (inherits(formula, "raking_formula") || inherits(formula, "rakingformula")) {
-      formula
-    } else {
-      stop("Formula must be created with rr_exact(), rr_l2(), rr_kl(), or combinations thereof",
-           call. = FALSE)
-    }
+  tryCatch(
+    {
+      # Handle both single terms and formula combinations
+      terms <- if (inherits(formula, "raking_term")) {
+        list(formula)
+      } else if (
+        inherits(formula, "raking_formula") ||
+          inherits(formula, "rakingformula")
+      ) {
+        formula
+      } else {
+        stop(
+          "Formula must be created with rr_exact(), rr_l2(), rr_kl(), or combinations thereof",
+          call. = FALSE
+        )
+      }
 
-    # Extract variables from all terms
-    vars <- unique(unlist(lapply(terms, function(term) {
-      all.vars(term$formula[[2]])
-    })))
+      # Extract variables from all terms
+      vars <- unique(unlist(lapply(terms, function(term) {
+        all.vars(term$formula[[2]])
+      })))
 
-    # Check for missing variables
-    missing_vars <- setdiff(vars, names(data))
-    if (length(missing_vars) > 0) {
-      stop(sprintf(
-        "Variables not found in data: %s",
-        paste(missing_vars, collapse = ", ")
-      ), call. = FALSE)
-    }
+      # Check for missing variables
+      missing_vars <- setdiff(vars, names(data))
+      if (length(missing_vars) > 0) {
+        stop(
+          sprintf(
+            "Variables not found in data: %s",
+            paste(missing_vars, collapse = ", ")
+          ),
+          call. = FALSE
+        )
+      }
 
-    # Validate each variable
-    for (var in vars) {
-      validate_variable(var, data[[var]])
+      # Validate each variable
+      for (var in vars) {
+        validate_variable(var, data[[var]])
+      }
+    },
+    error = function(e) {
+      # If not already formatted nicely, add context
+      if (!grepl("^Variables not found|^Variable '", e$message)) {
+        stop(paste0("Formula validation error: ", e$message), call. = FALSE)
+      } else {
+        stop(e$message, call. = FALSE)
+      }
     }
-  }, error = function(e) {
-    # If not already formatted nicely, add context
-    if (!grepl("^Variables not found|^Variable '", e$message)) {
-      stop(paste0("Formula validation error: ", e$message), call. = FALSE)
-    } else {
-      stop(e$message, call. = FALSE)
-    }
-  })
+  )
 
   invisible(TRUE)
 }
@@ -448,28 +513,39 @@ validate_inputs <- function(formula, data) {
 validate_variable <- function(name, var) {
   # Check type
   if (!is.numeric(var) && !is.factor(var) && !is.character(var)) {
-    stop(sprintf(
-      "Variable '%s' has unsupported type: %s. Must be numeric, factor, or character.",
-      name, class(var)[1]
-    ), call. = FALSE)
+    stop(
+      sprintf(
+        "Variable '%s' has unsupported type: %s. Must be numeric, factor, or character.",
+        name,
+        class(var)[1]
+      ),
+      call. = FALSE
+    )
   }
 
   # Check for missing values
   if (any(is.na(var))) {
-    stop(sprintf(
-      "Variable '%s' contains missing values (NA). All variables must be complete.",
-      name
-    ), call. = FALSE)
+    stop(
+      sprintf(
+        "Variable '%s' contains missing values (NA). All variables must be complete.",
+        name
+      ),
+      call. = FALSE
+    )
   }
 
   # Check factor levels
   if (is.factor(var)) {
     empty_levels <- levels(var)[!levels(var) %in% unique(var)]
     if (length(empty_levels) > 0) {
-      warning(sprintf(
-        "Variable '%s' has empty factor levels: %s",
-        name, paste(empty_levels, collapse = ", ")
-      ), call. = FALSE)
+      warning(
+        sprintf(
+          "Variable '%s' has empty factor levels: %s",
+          name,
+          paste(empty_levels, collapse = ", ")
+        ),
+        call. = FALSE
+      )
     }
   }
 
@@ -539,12 +615,18 @@ raking_term <- function(formula, type = c("exact", "l2", "kl"), ...) {
     # Preserve the original environment
     formula
   } else {
-    stop("Formula must be a formula object or a character string", call. = FALSE)
+    stop(
+      "Formula must be a formula object or a character string",
+      call. = FALSE
+    )
   }
 
   # Ensure one-sided formula and convert if needed
   if (length(formula) > 2) {
-    formula <- as.formula(paste("~", deparse(formula[[3]])), env = environment(formula))
+    formula <- as.formula(
+      paste("~", deparse(formula[[3]])),
+      env = environment(formula)
+    )
   }
 
   structure(
@@ -552,9 +634,9 @@ raking_term <- function(formula, type = c("exact", "l2", "kl"), ...) {
       formula = formula,
       type = type,
       args = list(...),
-      env = environment(formula)  # Store the environment
+      env = environment(formula) # Store the environment
     ),
-    class = "raking_term"  # Use single class for clearer method dispatch
+    class = "raking_term" # Use single class for clearer method dispatch
   )
 }
 
@@ -729,7 +811,13 @@ print.raking_spec <- function(x, ...) {
   for (var in names(x$original_variables)) {
     var_info <- x$original_variables[[var]]
     if (var_info$type == "categorical") {
-      cat(paste0("  ", var, ": categorical with ", length(var_info$levels), " levels\n"))
+      cat(paste0(
+        "  ",
+        var,
+        ": categorical with ",
+        length(var_info$levels),
+        " levels\n"
+      ))
     } else {
       cat(paste0("  ", var, ": continuous\n"))
     }

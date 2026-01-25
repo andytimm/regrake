@@ -99,7 +99,12 @@
 #'   target value for numerical stability.
 #'
 #' @keywords internal
-construct_admm_inputs <- function(data, formula_spec, target_values, normalize = TRUE) {
+construct_admm_inputs <- function(
+  data,
+  formula_spec,
+  target_values,
+  normalize = TRUE
+) {
   # Map term types to loss functions
   loss_types <- list(
     exact = list(
@@ -123,7 +128,9 @@ construct_admm_inputs <- function(data, formula_spec, target_values, normalize =
   # Create model frame from sample data, converting characters to factors
   # Build a clean formula from variable names (without exact/l2/kl wrappers)
   # to ensure column names match what we expect in term$variables
-  all_vars <- unique(unlist(lapply(formula_spec$terms, function(t) t$variables)))
+  all_vars <- unique(unlist(lapply(formula_spec$terms, function(t) {
+    t$variables
+  })))
   clean_formula <- as.formula(paste("~", paste(all_vars, collapse = " + ")))
   mf <- model.frame(clean_formula, data = data)
 
@@ -137,7 +144,7 @@ construct_admm_inputs <- function(data, formula_spec, target_values, normalize =
 
   # Track scaling factors for de-normalization of continuous variables
   scale_factors <- list()
-  current_row <- 1  # Track which row we're at in the combined design matrix
+  current_row <- 1 # Track which row we're at in the combined design matrix
 
   # Process each term in the formula
   for (term_idx in seq_along(formula_spec$terms)) {
@@ -161,8 +168,11 @@ construct_admm_inputs <- function(data, formula_spec, target_values, normalize =
         if (is.numeric(mf[[var]])) {
           stop(
             "Interactions with continuous variables are not supported.\n",
-            "Variable '", var, "' is numeric but appears in interaction '",
-            paste(term$variables, collapse = ":"), "'.\n",
+            "Variable '",
+            var,
+            "' is numeric but appears in interaction '",
+            paste(term$variables, collapse = ":"),
+            "'.\n",
             "Use rr_mean() for continuous variables without interactions.",
             call. = FALSE
           )
@@ -172,8 +182,8 @@ construct_admm_inputs <- function(data, formula_spec, target_values, normalize =
 
     # Check if this is a continuous variable (single variable, numeric in data)
     is_continuous <- is.null(term$interaction) &&
-                     length(term$variables) == 1 &&
-                     is.numeric(mf[[term$variables]])
+      length(term$variables) == 1 &&
+      is.numeric(mf[[term$variables]])
 
     if (is_continuous) {
       # Continuous variable: design matrix row contains values
@@ -186,8 +196,11 @@ construct_admm_inputs <- function(data, formula_spec, target_values, normalize =
         # Here 'targets' is the quantile VALUE (from pop data), p is from term$params
         # targets comes as a named vector, extract the single value
         if (length(targets) != 1) {
-          stop("Quantile constraint requires exactly one target value for variable: ",
-               term$variables, call. = FALSE)
+          stop(
+            "Quantile constraint requires exactly one target value for variable: ",
+            term$variables,
+            call. = FALSE
+          )
         }
         quantile_value <- unname(targets[1])
         p <- term$params$p
@@ -231,7 +244,8 @@ construct_admm_inputs <- function(data, formula_spec, target_values, normalize =
       }
 
       design_blocks[[term_idx]] <- Matrix::Matrix(
-        matrix(values, nrow = 1), sparse = TRUE
+        matrix(values, nrow = 1),
+        sparse = TRUE
       )
       current_row <- current_row + 1
     } else {
@@ -246,13 +260,23 @@ construct_admm_inputs <- function(data, formula_spec, target_values, normalize =
       }
 
       # Create subset of model frame with only needed variables
-      needed_vars <- if (is.null(term$interaction)) term$variables else term$variables
+      needed_vars <- if (is.null(term$interaction)) {
+        term$variables
+      } else {
+        term$variables
+      }
       mf_subset <- mf[, needed_vars, drop = FALSE]
 
       # Create model matrix with all levels (no reference level)
-      mm <- model.matrix(term_formula, mf_subset,
-                        contrasts.arg = lapply(mf_subset[sapply(mf_subset, is.factor)],
-                                             contrasts, contrasts = FALSE))
+      mm <- model.matrix(
+        term_formula,
+        mf_subset,
+        contrasts.arg = lapply(
+          mf_subset[sapply(mf_subset, is.factor)],
+          contrasts,
+          contrasts = FALSE
+        )
+      )
       # Remove intercept
       mm <- mm[, -1, drop = FALSE]
 
@@ -260,10 +284,10 @@ construct_admm_inputs <- function(data, formula_spec, target_values, normalize =
       # Each row is a constraint (level), each column is a sample
       nonzero <- which(mm != 0, arr.ind = TRUE)
       design_blocks[[term_idx]] <- Matrix::sparseMatrix(
-        i = nonzero[, 2],           # constraint/level index
-        j = nonzero[, 1],           # sample index
-        x = rep(1, nrow(nonzero)),  # all 1s for indicator matrix
-        dims = c(ncol(mm), nrow(mm))  # transpose dimensions
+        i = nonzero[, 2], # constraint/level index
+        j = nonzero[, 1], # sample index
+        x = rep(1, nrow(nonzero)), # all 1s for indicator matrix
+        dims = c(ncol(mm), nrow(mm)) # transpose dimensions
       )
 
       # Update row counter

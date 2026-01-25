@@ -66,7 +66,12 @@ test_that("basic raking workflow works end-to-end with categorical variables", {
   n <- 1000
   sample_data <- data.frame(
     sex = sample(c("M", "F"), n, replace = TRUE, prob = c(0.6, 0.4)),
-    age = sample(c("18-34", "35-54", "55+"), n, replace = TRUE, prob = c(0.5, 0.3, 0.2))
+    age = sample(
+      c("18-34", "35-54", "55+"),
+      n,
+      replace = TRUE,
+      prob = c(0.5, 0.3, 0.2)
+    )
   )
 
   # Create population targets in autumn format
@@ -81,7 +86,7 @@ test_that("basic raking workflow works end-to-end with categorical variables", {
     data = sample_data,
     population = pop_data,
     formula = ~ sex + age,
-    pop_type = "proportions"  # Explicitly specify pop_type
+    pop_type = "proportions" # Explicitly specify pop_type
   )
 
   # Check that weights sum to n
@@ -92,13 +97,15 @@ test_that("basic raking workflow works end-to-end with categorical variables", {
     result$weights,
     list(sex = sample_data$sex),
     sum
-  )$x / n
+  )$x /
+    n
 
   wtd_props_age <- stats::aggregate(
     result$weights,
     list(age = sample_data$age),
     sum
-  )$x / n
+  )$x /
+    n
 
   # Get target proportions in same order as weighted props
   sex_targets <- pop_data$proportion[pop_data$variable == "sex"]
@@ -123,7 +130,7 @@ test_that("regrake handles continuous variables with rr_mean", {
   pop <- data.frame(
     variable = c("sex", "sex", "age"),
     level = c("M", "F", "mean"),
-    target = c(0.5, 0.5, 38)  # Want 50/50 sex, mean age 38 (small shift from ~35)
+    target = c(0.5, 0.5, 38) # Want 50/50 sex, mean age 38 (small shift from ~35)
   )
 
   result <- regrake(
@@ -135,7 +142,7 @@ test_that("regrake handles continuous variables with rr_mean", {
 
   # Check weights exist and are reasonable
   expect_length(result$weights, 500)
-  expect_true(all(result$weights >= 0))  # Allow zero but not negative
+  expect_true(all(result$weights >= 0)) # Allow zero but not negative
 
   # Check achieved values are close to targets
   # Sex proportions
@@ -154,12 +161,12 @@ test_that("regrake handles variance constraints with rr_var", {
   # Sample data: income with lower variance than target
   survey <- data.frame(
     sex = sample(c("M", "F"), 500, replace = TRUE, prob = c(0.6, 0.4)),
-    income = rnorm(500, mean = 50000, sd = 8000)  # SD ~8000, var ~64M
+    income = rnorm(500, mean = 50000, sd = 8000) # SD ~8000, var ~64M
   )
 
   # Population targets - modest variance increase
   # Sample variance is approximately 64M, target 100M (SD ~10000)
-  target_var <- 100000000  # 100 million
+  target_var <- 100000000 # 100 million
 
   pop <- data.frame(
     variable = c("sex", "sex", "income"),
@@ -185,14 +192,16 @@ test_that("regrake handles variance constraints with rr_var", {
 
   # Check weighted variance of income
   # Weighted variance = sum(w * (x - weighted_mean)^2) / sum(w)
-  w <- result$weights / sum(result$weights)  # Normalize to proportions
+  w <- result$weights / sum(result$weights) # Normalize to proportions
   weighted_mean <- sum(w * survey$income)
   weighted_var <- sum(w * (survey$income - weighted_mean)^2)
 
   # Note: The achieved variance may not match exactly due to optimization constraints
   # We just check that it moved in the right direction (increased from sample variance)
-  sample_var <- var(survey$income) * (length(survey$income) - 1) / length(survey$income)  # pop variance
-  expect_true(weighted_var > sample_var * 1.1)  # Should increase noticeably
+  sample_var <- var(survey$income) *
+    (length(survey$income) - 1) /
+    length(survey$income) # pop variance
+  expect_true(weighted_var > sample_var * 1.1) # Should increase noticeably
 })
 
 test_that("regrake handles quantile constraints with rr_quantile", {
@@ -201,7 +210,7 @@ test_that("regrake handles quantile constraints with rr_quantile", {
   # Sample data: income skewed low (most below 50000)
   survey <- data.frame(
     sex = sample(c("M", "F"), 500, replace = TRUE, prob = c(0.6, 0.4)),
-    income = rlnorm(500, meanlog = 10.5, sdlog = 0.5)  # Median ~36000
+    income = rlnorm(500, meanlog = 10.5, sdlog = 0.5) # Median ~36000
   )
 
   # Target: median income should be 45000 (higher than sample median)
