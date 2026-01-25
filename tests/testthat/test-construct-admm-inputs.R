@@ -31,7 +31,8 @@ test_that("construct_admm_inputs handles basic case with single exact term", {
 
   # Check structure
   expect_type(result, "list")
-  expect_named(result, c("design_matrix", "losses"))
+  expect_true("design_matrix" %in% names(result))
+  expect_true("losses" %in% names(result))
 
   # Check design matrix
   expect_true(inherits(result$design_matrix, "Matrix"))
@@ -41,7 +42,7 @@ test_that("construct_admm_inputs handles basic case with single exact term", {
 
   # Check losses
   expect_length(result$losses, 1)
-  expect_named(result$losses[[1]], c("fn", "target", "prox"))
+  expect_true(all(c("fn", "target", "prox") %in% names(result$losses[[1]])))
   expect_equal(result$losses[[1]]$fn, equality_loss)
   expect_equal(result$losses[[1]]$prox, prox_equality)
   expect_equal(result$losses[[1]]$target, c(a = 0.6, b = 0.4))
@@ -267,7 +268,8 @@ test_that("construct_admm_inputs handles mixed exact and l2 loss types", {
 
   # Verify structure
   expect_type(result, "list")
-  expect_named(result, c("design_matrix", "losses"))
+  expect_true("design_matrix" %in% names(result))
+  expect_true("losses" %in% names(result))
 
   # Verify loss functions are correct for each term
   expect_equal(result$losses[[1]]$fn, equality_loss)
@@ -307,11 +309,13 @@ test_that("construct_admm_inputs handles continuous variables", {
     )
   )
 
-  result <- construct_admm_inputs(data, formula_spec, target_values)
+  # Use normalize = FALSE to test raw values in design matrix
+  result <- construct_admm_inputs(data, formula_spec, target_values, normalize = FALSE)
 
   # Verify structure
   expect_type(result, "list")
-  expect_named(result, c("design_matrix", "losses"))
+  expect_true("design_matrix" %in% names(result))
+  expect_true("losses" %in% names(result))
 
   # Verify design matrix dimensions (2 sex levels + 1 income row = 3 rows, 5 samples)
   expect_equal(dim(result$design_matrix), c(3, 5))
@@ -356,7 +360,8 @@ test_that("construct_admm_inputs handles continuous-only formula", {
     )
   )
 
-  result <- construct_admm_inputs(data, formula_spec, target_values)
+  # Use normalize = FALSE to test raw values
+  result <- construct_admm_inputs(data, formula_spec, target_values, normalize = FALSE)
 
   # Design matrix should have 2 rows (one per continuous variable)
   expect_equal(dim(result$design_matrix), c(2, 5))
@@ -366,4 +371,46 @@ test_that("construct_admm_inputs handles continuous-only formula", {
 
   # Row 2 (income) should contain actual incomes
   expect_equal(as.vector(result$design_matrix[2, ]), c(50000, 75000, 45000, 80000, 55000))
+})
+
+test_that("construct_admm_inputs normalizes continuous variables by default", {
+  # Test that normalize = TRUE (default) scales continuous values by target
+  data <- data.frame(
+    income = c(50000, 75000, 45000, 80000, 55000)
+  )
+
+  formula_spec <- list(
+    formula = ~ income,
+    terms = list(
+      list(
+        type = "exact",
+        variables = "income",
+        interaction = NULL
+      )
+    )
+  )
+
+  target_values <- list(
+    targets = list(
+      exact_income = c(mean = 60000)
+    )
+  )
+
+  # With normalization (default)
+  result_norm <- construct_admm_inputs(data, formula_spec, target_values)
+
+  # Values should be scaled by target (60000)
+  expected_normalized <- c(50000, 75000, 45000, 80000, 55000) / 60000
+  expect_equal(as.vector(result_norm$design_matrix[1, ]), expected_normalized)
+
+  # Target should be 1.0 (normalized)
+  expect_equal(unname(result_norm$losses[[1]]$target), 1.0)
+
+  # Original target should be preserved
+  expect_equal(unname(result_norm$losses[[1]]$original_target), 60000)
+
+  # Scale factors should be tracked
+  expect_true(!is.null(result_norm$scale_factors))
+  expect_equal(unname(result_norm$scale_factors[[1]]$scale), 60000)
+  expect_equal(result_norm$scale_factors[[1]]$index, 1)
 })

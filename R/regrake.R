@@ -11,6 +11,9 @@
 #' @param regularizer Regularization method ("entropy", "zero", "kl", or "boolean")
 #' @param lambda Regularization strength (default = 1)
 #' @param bounds Numeric vector of length 2 specifying (min, max) allowed weight values
+#' @param normalize Logical. If TRUE (default), continuous variables are automatically
+#'   scaled by their target value for numerical stability. The achieved values are
+#'   reported in original units. Set to FALSE to disable this behavior.
 #' @param control List of control parameters for the solver
 #' @param verbose Whether to print progress information
 #' @param ... Additional arguments passed to methods
@@ -28,6 +31,7 @@ regrake <- function(data,
                    regularizer = "entropy",
                    lambda = 1,
                    bounds = c(0.1, 10),
+                   normalize = TRUE,
                    control = list(),
                    verbose = FALSE,
                    ...) {
@@ -64,7 +68,8 @@ regrake <- function(data,
   admm_inputs <- construct_admm_inputs(
     data = data,
     formula_spec = formula_spec,
-    target_values = target_values
+    target_values = target_values,
+    normalize = normalize
   )
   if (verbose) {
     cat("Design matrix constructed with", nrow(admm_inputs$design_matrix), "constraints\n")
@@ -98,7 +103,7 @@ regrake <- function(data,
   }
 
   # Step 6: Process results and compute diagnostics
-  results <- process_admm_results(solution, admm_inputs, verbose)
+  results <- process_admm_results(solution, admm_inputs, verbose, normalize)
 
   # Return results with appropriate class for methods dispatch
   structure(
@@ -166,7 +171,7 @@ create_regularizer <- function(regularizer, prior = NULL, limit = NULL) {
 }
 
 # Helper to process solution and compute diagnostics
-process_admm_results <- function(solution, admm_inputs, verbose) {
+process_admm_results <- function(solution, admm_inputs, verbose, normalize = TRUE) {
   # Extract best weights from solution and scale to sum to sample size
   weights <- solution$w_best
   n <- length(weights)
@@ -175,11 +180,24 @@ process_admm_results <- function(solution, admm_inputs, verbose) {
   # Calculate achieved values using design matrix
   achieved_values <- drop(as.matrix(admm_inputs$design_matrix %*% weights))
 
+  # De-normalize continuous variable achieved values if normalization was applied
+  if (normalize && !is.null(admm_inputs$scale_factors)) {
+    for (i in seq_along(admm_inputs$scale_factors)) {
+      idx <- admm_inputs$scale_factors[[i]]$index
+      scale <- admm_inputs$scale_factors[[i]]$scale
+      achieved_values[idx] <- achieved_values[idx] * scale
+    }
+  }
+
   # Split achieved values by loss functions to match structure
   achieved <- split_by_losses(achieved_values, admm_inputs$losses)
 
-  # Extract targets in the same order as achieved values
-  targets <- unlist(lapply(admm_inputs$losses, function(l) l$target))
+  # Extract targets in the same order as achieved values (original, un-normalized)
+  targets <- unlist(lapply(admm_inputs$losses, function(l) l$original_target))
+  # Fallback to target if original_target not present (for backwards compatibility)
+  if (is.null(targets)) {
+    targets <- unlist(lapply(admm_inputs$losses, function(l) l$target))
+  }
 
   # Compute diagnostics
   diagnostics <- list(

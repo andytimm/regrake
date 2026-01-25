@@ -95,8 +95,11 @@
 #' result <- construct_admm_inputs(data, formula_spec, target_values)
 #' }
 #'
+#' @param normalize Logical. If TRUE, continuous variables are scaled by their
+#'   target value for numerical stability.
+#'
 #' @keywords internal
-construct_admm_inputs <- function(data, formula_spec, target_values) {
+construct_admm_inputs <- function(data, formula_spec, target_values, normalize = TRUE) {
   # Map term types to loss functions
   loss_types <- list(
     exact = list(
@@ -124,6 +127,10 @@ construct_admm_inputs <- function(data, formula_spec, target_values) {
   design_blocks <- vector("list", length(formula_spec$terms))
   losses <- vector("list", length(formula_spec$terms))
 
+  # Track scaling factors for de-normalization of continuous variables
+  scale_factors <- list()
+  current_row <- 1  # Track which row we're at in the combined design matrix
+
   # Process each term in the formula
   for (term_idx in seq_along(formula_spec$terms)) {
     term <- formula_spec$terms[[term_idx]]
@@ -150,9 +157,29 @@ construct_admm_inputs <- function(data, formula_spec, target_values) {
       # F row = [x1, x2, ..., xn] where xi is the value for sample i
       # Constraint: sum(wi * xi) = target (e.g., weighted mean)
       values <- mf[[term$variables]]
+      original_target <- targets
+
+      if (normalize && abs(targets) > .Machine$double.eps) {
+        # Normalize by target for numerical stability
+        # This transforms constraint from sum(wi * xi) = target
+        # to sum(wi * xi/target) = 1
+        values <- values / targets
+        normalized_target <- 1.0
+
+        # Store scale factor for de-normalization
+        scale_factors[[length(scale_factors) + 1]] <- list(
+          index = current_row,
+          scale = targets,
+          variable = term$variables
+        )
+
+        targets <- normalized_target
+      }
+
       design_blocks[[term_idx]] <- Matrix::Matrix(
         matrix(values, nrow = 1), sparse = TRUE
       )
+      current_row <- current_row + 1
     } else {
       # Categorical variable: create indicator matrix
 
@@ -184,6 +211,12 @@ construct_admm_inputs <- function(data, formula_spec, target_values) {
         x = rep(1, nrow(nonzero)),  # all 1s for indicator matrix
         dims = c(ncol(mm), nrow(mm))  # transpose dimensions
       )
+
+      # Update row counter
+      current_row <- current_row + ncol(mm)
+
+      # For categorical, original_target is same as targets
+      original_target <- targets
     }
 
     # Create loss function based on term type
@@ -191,9 +224,11 @@ construct_admm_inputs <- function(data, formula_spec, target_values) {
       stop("Unknown term type: ", term$type)
     }
     # Ensure consistent order of loss function components
+    # Store both normalized target (for solver) and original target (for reporting)
     losses[[term_idx]] <- list(
       fn = loss_types[[term$type]]$fn,
       target = targets,
+      original_target = original_target,
       prox = loss_types[[term$type]]$prox
     )
   }
@@ -208,6 +243,7 @@ construct_admm_inputs <- function(data, formula_spec, target_values) {
   # Return results
   list(
     design_matrix = design_matrix,
-    losses = losses
+    losses = losses,
+    scale_factors = if (length(scale_factors) > 0) scale_factors else NULL
   )
 }
