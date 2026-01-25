@@ -494,6 +494,142 @@ def generate_high_constraints(n_constraints):
     print(f"Generated: {name} (n={n}, m={actual_constraints})")
 
 
+def generate_continuous_variable():
+    """Test case 11: Continuous variable (match weighted mean).
+
+    For numerical stability, continuous variables are normalized by target so the
+    constraint becomes sum(w_i * x_i / target) = 1.0 rather than sum(w_i * x_i) = target.
+    This keeps the design matrix values at O(1) scale like the categorical indicators.
+    """
+    np.random.seed(52)
+    n = 1000
+
+    # Categorical variable: sex
+    sex = np.random.choice([0, 1], size=n, p=[0.6, 0.4])
+
+    # Continuous variable: income (sample mean ~50k, we want to match target 55k)
+    income = np.random.normal(50000, 15000, size=n)
+    income = np.maximum(income, 10000)  # Floor at 10k
+
+    # Target mean income (used for normalization)
+    income_target_value = 55000.0
+
+    # Normalize income by target so constraint is sum(w * income/target) = 1
+    income_normalized = income / income_target_value
+
+    # Design matrix:
+    # Rows 0-1: sex indicators
+    # Row 2: normalized income values
+    F = np.zeros((3, n))
+    F[0, sex == 0] = 1
+    F[1, sex == 1] = 1
+    F[2, :] = income_normalized  # Normalized to target scale
+
+    # Targets (all at unit scale now)
+    sex_targets = np.array([0.5, 0.5])
+    income_target = np.array([1.0])  # Normalized target
+
+    losses_spec = [
+        {"type": "equality", "target": sex_targets.tolist()},
+        {"type": "equality", "target": income_target.tolist()}
+    ]
+    regularizer_spec = {"type": "entropy", "limit": None}
+    lam = 1.0
+
+    results = {}
+    if HAS_RSWJAX:
+        losses = [EqualityLoss(sex_targets), EqualityLoss(income_target)]
+        regularizer = EntropyRegularizer()
+        results["rswjax"] = run_rswjax(F, losses, regularizer, lam)
+
+    if HAS_ORIGINAL_RSW:
+        orig_losses = [OrigEqualityLoss(sex_targets), OrigEqualityLoss(income_target)]
+        orig_regularizer = OrigEntropyRegularizer()
+        results["rsw_original"] = run_original_rsw(F, orig_losses, orig_regularizer, lam)
+
+    save_test_case("11_continuous_variable", F, losses_spec, regularizer_spec, lam, results)
+    print("Generated: 11_continuous_variable")
+
+
+def generate_mixed_continuous_categorical():
+    """Test case 12: Multiple continuous and categorical variables.
+
+    Continuous variables are normalized by their target values for numerical stability.
+    """
+    np.random.seed(53)
+    n = 1000
+
+    # Categorical variables
+    sex = np.random.choice([0, 1], size=n, p=[0.55, 0.45])
+    region = np.random.choice([0, 1, 2], size=n, p=[0.4, 0.35, 0.25])
+
+    # Continuous variables
+    age = np.random.normal(35, 12, size=n)
+    age = np.clip(age, 18, 80)
+    income = np.random.lognormal(10.5, 0.5, size=n)
+
+    # Target values for normalization
+    age_target_value = 42.0
+    income_target_value = 45000.0
+
+    # Normalize continuous variables by their targets
+    age_normalized = age / age_target_value
+    income_normalized = income / income_target_value
+
+    # Design matrix:
+    # Rows 0-1: sex indicators (2 rows)
+    # Rows 2-4: region indicators (3 rows)
+    # Row 5: normalized age values
+    # Row 6: normalized income values
+    F = np.zeros((7, n))
+    F[0, sex == 0] = 1
+    F[1, sex == 1] = 1
+    F[2, region == 0] = 1
+    F[3, region == 1] = 1
+    F[4, region == 2] = 1
+    F[5, :] = age_normalized
+    F[6, :] = income_normalized
+
+    # Targets (normalized to 1.0 for continuous)
+    sex_targets = np.array([0.49, 0.51])
+    region_targets = np.array([0.33, 0.34, 0.33])
+    age_target = np.array([1.0])  # Normalized target
+    income_target = np.array([1.0])  # Normalized target
+
+    losses_spec = [
+        {"type": "equality", "target": sex_targets.tolist()},
+        {"type": "equality", "target": region_targets.tolist()},
+        {"type": "equality", "target": age_target.tolist()},
+        {"type": "equality", "target": income_target.tolist()}
+    ]
+    regularizer_spec = {"type": "entropy", "limit": None}
+    lam = 1.0
+
+    results = {}
+    if HAS_RSWJAX:
+        losses = [
+            EqualityLoss(sex_targets),
+            EqualityLoss(region_targets),
+            EqualityLoss(age_target),
+            EqualityLoss(income_target)
+        ]
+        regularizer = EntropyRegularizer()
+        results["rswjax"] = run_rswjax(F, losses, regularizer, lam)
+
+    if HAS_ORIGINAL_RSW:
+        orig_losses = [
+            OrigEqualityLoss(sex_targets),
+            OrigEqualityLoss(region_targets),
+            OrigEqualityLoss(age_target),
+            OrigEqualityLoss(income_target)
+        ]
+        orig_regularizer = OrigEntropyRegularizer()
+        results["rsw_original"] = run_original_rsw(F, orig_losses, orig_regularizer, lam)
+
+    save_test_case("12_mixed_continuous_categorical", F, losses_spec, regularizer_spec, lam, results)
+    print("Generated: 12_mixed_continuous_categorical")
+
+
 def generate_100k_scale():
     """Test case 09: 100k samples to test scaling."""
     np.random.seed(50)
@@ -558,6 +694,11 @@ if __name__ == "__main__":
     print("\nGenerating high-constraint tests...")
     generate_high_constraints(50)
     generate_high_constraints(100)
+
+    # Continuous variable tests
+    print("\nGenerating continuous variable tests...")
+    generate_continuous_variable()
+    generate_mixed_continuous_categorical()
 
     if args.include_100k:
         print("\nGenerating 100K test (this may take a while)...")
