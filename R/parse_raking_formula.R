@@ -85,6 +85,13 @@ parse_raking_formula <- function(formula) {
 #' Validate that there are no invalid overlapping constraints
 #' @keywords internal
 validate_overlapping_constraints <- function(terms) {
+
+  # Moment constraint types that can be combined on the same variable
+
+  # (e.g., you can match both mean and variance of the same continuous variable)
+  # "exact" here refers to rr_mean() on continuous, "var" to rr_var()
+  combinable_moment_types <- c("exact", "var")
+
   # Check for pure duplicates first
   for (i in seq_along(terms)) {
     for (j in seq_len(i-1)) {
@@ -92,7 +99,7 @@ validate_overlapping_constraints <- function(terms) {
       term_j <- terms[[j]]
 
       # If both terms have same variables and one is not an interaction while the other is
-      # or both are interactions/non-interactions, then it's a pure duplicate
+      # or both are interactions/non-interactions, then it's a potential duplicate
       if (identical(sort(term_i$variables), sort(term_j$variables)) &&
           (is.null(term_i$interaction) == is.null(term_j$interaction))) {
 
@@ -104,9 +111,16 @@ validate_overlapping_constraints <- function(terms) {
                 "'")
         }
 
+        # Different types on same variable
         if (term_i$type != term_j$type) {
-          stop(var_desc, " appears multiple times with different constraints", call. = FALSE)
+          # Allow combining moment constraints (e.g., rr_mean + rr_var on same variable)
+          both_combinable <- term_i$type %in% combinable_moment_types &&
+                            term_j$type %in% combinable_moment_types
+          if (!both_combinable) {
+            stop(var_desc, " appears multiple times with different constraints", call. = FALSE)
+          }
         }
+        # Same type duplicates are allowed (creates multiple terms)
       }
     }
   }
@@ -149,9 +163,10 @@ parse_formula_terms <- function(expr) {
     # Combine terms from both sides of +
     c(parse_formula_terms(args[[1]]),
       parse_formula_terms(args[[2]]))
-  } else if (fun %in% c("rr_l2", "rr_kl", "rr_exact", "rr_mean")) {
+  } else if (fun %in% c("rr_l2", "rr_kl", "rr_exact", "rr_mean", "rr_var")) {
     # Handle constraint functions
     # rr_mean maps to exact constraint (for continuous variables)
+    # rr_var keeps its own type for variance matching
     internal_type <- if (fun == "rr_mean") "exact" else sub("^rr_", "", fun)
     list(create_constraint_term(internal_type, args[[1]]))
   } else if (fun == ":") {
@@ -295,6 +310,13 @@ rr_exact <- function(x) {
 rr_mean <- function(x) {
   # When used in formula context, return unevaluated
   # rr_mean is specifically for continuous variables - matches mean exactly
+  x
+}
+
+#' @export
+rr_var <- function(x) {
+  # When used in formula context, return unevaluated
+  # rr_var is for matching variance of continuous variables
   x
 }
 

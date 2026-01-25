@@ -109,6 +109,10 @@ construct_admm_inputs <- function(data, formula_spec, target_values, normalize =
     l2 = list(
       fn = least_squares_loss,
       prox = prox_least_squares
+    ),
+    var = list(
+      fn = equality_loss,
+      prox = prox_equality
     )
   )
 
@@ -168,16 +172,26 @@ construct_admm_inputs <- function(data, formula_spec, target_values, normalize =
                      is.numeric(mf[[term$variables]])
 
     if (is_continuous) {
-      # Continuous variable: design matrix row contains actual values
-      # F row = [x1, x2, ..., xn] where xi is the value for sample i
-      # Constraint: sum(wi * xi) = target (e.g., weighted mean)
-      values <- mf[[term$variables]]
+      # Continuous variable: design matrix row contains values
+      raw_values <- mf[[term$variables]]
       original_target <- targets
+
+      if (term$type == "var") {
+        # Variance constraint: use (x - mean(x))^2
+        # Constraint: sum(wi * (xi - x_bar)^2) = target_var
+        x_mean <- mean(raw_values)
+        values <- (raw_values - x_mean)^2
+      } else {
+        # Mean constraint (exact, l2): use raw values
+        # F row = [x1, x2, ..., xn] where xi is the value for sample i
+        # Constraint: sum(wi * xi) = target (e.g., weighted mean)
+        values <- raw_values
+      }
 
       if (normalize && abs(targets) > .Machine$double.eps) {
         # Normalize by target for numerical stability
-        # This transforms constraint from sum(wi * xi) = target
-        # to sum(wi * xi/target) = 1
+        # This transforms constraint from sum(wi * f(xi)) = target
+        # to sum(wi * f(xi)/target) = 1
         values <- values / targets
         normalized_target <- 1.0
 

@@ -437,3 +437,69 @@ test_that("construct_admm_inputs errors on continuous in interaction", {
     "Interactions with continuous variables are not supported"
   )
 })
+
+test_that("construct_admm_inputs handles variance constraint", {
+  data <- data.frame(age = c(20, 30, 40, 50, 60))
+  # Mean = 40, Variance = sum((x - 40)^2) / 5 = (400+100+0+100+400)/5 = 200
+
+  formula_spec <- list(
+    formula = ~ age,
+    terms = list(list(
+      type = "var",
+      variables = "age",
+      interaction = NULL
+    ))
+  )
+
+  # Target variance of 250
+  target_values <- list(targets = list(var_age = c(var = 250)))
+
+  # Without normalization to check raw values
+  result <- construct_admm_inputs(data, formula_spec, target_values, normalize = FALSE)
+
+  # Verify structure
+  expect_type(result, "list")
+  expect_true("design_matrix" %in% names(result))
+  expect_true("losses" %in% names(result))
+
+  # Design matrix row should be (x - mean(x))^2
+  mean_age <- mean(data$age)  # 40
+  expected <- (data$age - mean_age)^2  # c(400, 100, 0, 100, 400)
+  expect_equal(as.vector(result$design_matrix[1, ]), expected)
+
+  # Loss function should use equality (exact match on variance)
+  expect_equal(result$losses[[1]]$fn, equality_loss)
+  expect_equal(result$losses[[1]]$prox, prox_equality)
+  expect_equal(unname(result$losses[[1]]$target), 250)
+})
+
+test_that("construct_admm_inputs normalizes variance constraint", {
+  data <- data.frame(age = c(20, 30, 40, 50, 60))
+  # Mean = 40, (x - mean)^2 = c(400, 100, 0, 100, 400)
+
+  formula_spec <- list(
+    formula = ~ age,
+    terms = list(list(
+      type = "var",
+      variables = "age",
+      interaction = NULL
+    ))
+  )
+
+  target_values <- list(targets = list(var_age = c(var = 200)))
+
+  # With normalization (default)
+  result <- construct_admm_inputs(data, formula_spec, target_values)
+
+  # Values should be scaled by target
+  mean_age <- mean(data$age)
+  raw_values <- (data$age - mean_age)^2
+  expected_normalized <- raw_values / 200
+  expect_equal(as.vector(result$design_matrix[1, ]), expected_normalized)
+
+  # Target should be 1.0 (normalized)
+  expect_equal(unname(result$losses[[1]]$target), 1.0)
+
+  # Original target should be preserved
+  expect_equal(unname(result$losses[[1]]$original_target), 200)
+})

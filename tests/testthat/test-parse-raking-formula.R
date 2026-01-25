@@ -61,6 +61,32 @@ test_that("rr_mean() works for continuous variables", {
   expect_equal(f3$terms[[2]]$variables, "age")
 })
 
+test_that("rr_var() parses correctly for variance constraints", {
+  # rr_var keeps its own type "var" for variance matching
+
+  # Single continuous variable
+  f1 <- parse_raking_formula(~ rr_var(age))
+  expect_equal(f1$terms[[1]]$type, "var")
+  expect_equal(f1$terms[[1]]$variables, "age")
+  expect_null(f1$terms[[1]]$interaction)
+
+  # Combined with mean constraint
+  f2 <- parse_raking_formula(~ rr_mean(age) + rr_var(age))
+  expect_equal(length(f2$terms), 2)
+  expect_equal(f2$terms[[1]]$type, "exact")  # rr_mean maps to exact
+  expect_equal(f2$terms[[2]]$type, "var")
+
+  # Mix of categorical, mean, and variance
+  f3 <- parse_raking_formula(~ rr_exact(sex) + rr_mean(age) + rr_var(income))
+  expect_equal(length(f3$terms), 3)
+  expect_equal(f3$terms[[1]]$type, "exact")
+  expect_equal(f3$terms[[1]]$variables, "sex")
+  expect_equal(f3$terms[[2]]$type, "exact")
+  expect_equal(f3$terms[[2]]$variables, "age")
+  expect_equal(f3$terms[[3]]$type, "var")
+  expect_equal(f3$terms[[3]]$variables, "income")
+})
+
 test_that("interactions are handled correctly", {
   # Simple interaction
   f1 <- parse_raking_formula(~ race:age)

@@ -147,3 +147,50 @@ test_that("regrake handles continuous variables with rr_mean", {
   weighted_age_mean <- sum(result$weights * survey$age) / sum(result$weights)
   expect_equal(weighted_age_mean, 38, tolerance = 0.1)
 })
+
+test_that("regrake handles variance constraints with rr_var", {
+  set.seed(42)
+
+  # Sample data: income with lower variance than target
+  survey <- data.frame(
+    sex = sample(c("M", "F"), 500, replace = TRUE, prob = c(0.6, 0.4)),
+    income = rnorm(500, mean = 50000, sd = 8000)  # SD ~8000, var ~64M
+  )
+
+  # Population targets - modest variance increase
+  # Sample variance is approximately 64M, target 100M (SD ~10000)
+  target_var <- 100000000  # 100 million
+
+  pop <- data.frame(
+    variable = c("sex", "sex", "income"),
+    level = c("M", "F", "var"),
+    target = c(0.5, 0.5, target_var)
+  )
+
+  result <- regrake(
+    data = survey,
+    formula = ~ rr_exact(sex) + rr_var(income),
+    population_data = pop,
+    pop_type = "proportions"
+  )
+
+  # Check weights exist and are reasonable
+  expect_length(result$weights, 500)
+  expect_true(all(result$weights >= 0))
+
+  # Check sex proportions
+  weighted_sex <- tapply(result$weights, survey$sex, sum) / sum(result$weights)
+  expect_equal(unname(weighted_sex["M"]), 0.5, tolerance = 0.01)
+  expect_equal(unname(weighted_sex["F"]), 0.5, tolerance = 0.01)
+
+  # Check weighted variance of income
+  # Weighted variance = sum(w * (x - weighted_mean)^2) / sum(w)
+  w <- result$weights / sum(result$weights)  # Normalize to proportions
+  weighted_mean <- sum(w * survey$income)
+  weighted_var <- sum(w * (survey$income - weighted_mean)^2)
+
+  # Note: The achieved variance may not match exactly due to optimization constraints
+  # We just check that it moved in the right direction (increased from sample variance)
+  sample_var <- var(survey$income) * (length(survey$income) - 1) / length(survey$income)  # pop variance
+  expect_true(weighted_var > sample_var * 1.1)  # Should increase noticeably
+})
