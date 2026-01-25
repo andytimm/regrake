@@ -194,3 +194,42 @@ test_that("regrake handles variance constraints with rr_var", {
   sample_var <- var(survey$income) * (length(survey$income) - 1) / length(survey$income)  # pop variance
   expect_true(weighted_var > sample_var * 1.1)  # Should increase noticeably
 })
+
+test_that("regrake handles quantile constraints with rr_quantile", {
+  set.seed(42)
+
+  # Sample data: income skewed low (most below 50000)
+  survey <- data.frame(
+    sex = sample(c("M", "F"), 500, replace = TRUE, prob = c(0.6, 0.4)),
+    income = rlnorm(500, meanlog = 10.5, sdlog = 0.5)  # Median ~36000
+  )
+
+  # Target: median income should be 45000 (higher than sample median)
+  # Also want 50/50 sex split
+  pop <- data.frame(
+    variable = c("sex", "sex", "income"),
+    level = c("M", "F", "q50"),
+    target = c(0.5, 0.5, 45000)
+  )
+
+  result <- regrake(
+    data = survey,
+    formula = ~ rr_exact(sex) + rr_quantile(income, 0.5),
+    population_data = pop,
+    pop_type = "proportions"
+  )
+
+  # Check weights exist and are reasonable
+  expect_length(result$weights, 500)
+  expect_true(all(result$weights >= 0))
+
+  # Check sex proportions
+  weighted_sex <- tapply(result$weights, survey$sex, sum) / sum(result$weights)
+  expect_equal(unname(weighted_sex["M"]), 0.5, tolerance = 0.01)
+  expect_equal(unname(weighted_sex["F"]), 0.5, tolerance = 0.01)
+
+  # Check that weighted proportion below 45000 is close to 0.5
+  w <- result$weights / sum(result$weights)
+  weighted_below <- sum(w * (survey$income <= 45000))
+  expect_equal(weighted_below, 0.5, tolerance = 0.02)
+})

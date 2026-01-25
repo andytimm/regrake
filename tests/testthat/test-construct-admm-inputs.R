@@ -503,3 +503,66 @@ test_that("construct_admm_inputs normalizes variance constraint", {
   # Original target should be preserved
   expect_equal(unname(result$losses[[1]]$original_target), 200)
 })
+
+test_that("construct_admm_inputs handles quantile constraint", {
+  data <- data.frame(income = c(30000, 40000, 50000, 60000, 70000))
+  # Target: 50% of weighted data should be <= 45000
+
+  formula_spec <- list(
+    formula = ~ income,
+    terms = list(list(
+      type = "quantile",
+      variables = "income",
+      interaction = NULL,
+      params = list(p = 0.5)
+    ))
+  )
+
+  # Target quantile value is 45000, probability is 0.5
+  target_values <- list(targets = list(quantile_income = c(q50 = 45000)))
+
+  result <- construct_admm_inputs(data, formula_spec, target_values)
+
+  # Verify structure
+  expect_type(result, "list")
+  expect_true("design_matrix" %in% names(result))
+  expect_true("losses" %in% names(result))
+
+  # Design matrix row should be indicators I(x <= 45000)
+  # income values: 30000, 40000, 50000, 60000, 70000
+  # indicators:    1,     1,     0,     0,     0  (30000 <= 45000, 40000 <= 45000)
+  expected <- c(1, 1, 0, 0, 0)
+  expect_equal(as.vector(result$design_matrix[1, ]), expected)
+
+  # Loss function should use equality
+  expect_equal(result$losses[[1]]$fn, equality_loss)
+  expect_equal(result$losses[[1]]$prox, prox_equality)
+
+  # Target should be the probability p, not the quantile value
+  expect_equal(unname(result$losses[[1]]$target), 0.5)
+  expect_equal(unname(result$losses[[1]]$original_target), 0.5)
+})
+
+test_that("construct_admm_inputs errors on multiple quantile targets", {
+  data <- data.frame(income = c(30000, 40000, 50000))
+
+  formula_spec <- list(
+    formula = ~ income,
+    terms = list(list(
+      type = "quantile",
+      variables = "income",
+      interaction = NULL,
+      params = list(p = 0.5)
+    ))
+  )
+
+  # Two targets for same variable - should error
+  target_values <- list(targets = list(
+    quantile_income = c(q25 = 35000, q50 = 45000)
+  ))
+
+  expect_error(
+    construct_admm_inputs(data, formula_spec, target_values),
+    "Quantile constraint requires exactly one target value"
+  )
+})

@@ -87,6 +87,46 @@ test_that("rr_var() parses correctly for variance constraints", {
   expect_equal(f3$terms[[3]]$variables, "income")
 })
 
+test_that("rr_quantile() parses correctly for quantile constraints", {
+  # rr_quantile requires two arguments: variable and probability
+
+  # Positional argument
+  f1 <- parse_raking_formula(~ rr_quantile(income, 0.5))
+  expect_equal(f1$terms[[1]]$type, "quantile")
+  expect_equal(f1$terms[[1]]$variables, "income")
+  expect_equal(f1$terms[[1]]$params$p, 0.5)
+
+  # Named argument
+  f2 <- parse_raking_formula(~ rr_quantile(age, p = 0.25))
+  expect_equal(f2$terms[[1]]$type, "quantile")
+  expect_equal(f2$terms[[1]]$variables, "age")
+  expect_equal(f2$terms[[1]]$params$p, 0.25)
+
+  # Combined with other constraints
+  f3 <- parse_raking_formula(~ rr_mean(age) + rr_quantile(age, 0.5) + rr_var(age))
+  expect_equal(length(f3$terms), 3)
+  expect_equal(f3$terms[[1]]$type, "exact")  # rr_mean
+  expect_equal(f3$terms[[2]]$type, "quantile")
+  expect_equal(f3$terms[[2]]$params$p, 0.5)
+  expect_equal(f3$terms[[3]]$type, "var")
+
+  # Errors on missing probability
+  expect_error(
+    parse_raking_formula(~ rr_quantile(income)),
+    "rr_quantile requires two arguments"
+  )
+
+  # Errors on invalid probability
+  expect_error(
+    parse_raking_formula(~ rr_quantile(income, 0)),
+    "probability p must be between 0 and 1"
+  )
+  expect_error(
+    parse_raking_formula(~ rr_quantile(income, 1)),
+    "probability p must be between 0 and 1"
+  )
+})
+
 test_that("interactions are handled correctly", {
   # Simple interaction
   f1 <- parse_raking_formula(~ race:age)

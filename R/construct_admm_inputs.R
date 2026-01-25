@@ -113,6 +113,10 @@ construct_admm_inputs <- function(data, formula_spec, target_values, normalize =
     var = list(
       fn = equality_loss,
       prox = prox_equality
+    ),
+    quantile = list(
+      fn = equality_loss,
+      prox = prox_equality
     )
   )
 
@@ -176,33 +180,54 @@ construct_admm_inputs <- function(data, formula_spec, target_values, normalize =
       raw_values <- mf[[term$variables]]
       original_target <- targets
 
-      if (term$type == "var") {
+      if (term$type == "quantile") {
+        # Quantile constraint: use indicator I(x <= target_quantile_value)
+        # Constraint: sum(wi * I(xi <= q)) = p
+        # Here 'targets' is the quantile VALUE (from pop data), p is from term$params
+        # targets comes as a named vector, extract the single value
+        if (length(targets) != 1) {
+          stop("Quantile constraint requires exactly one target value for variable: ",
+               term$variables, call. = FALSE)
+        }
+        quantile_value <- unname(targets[1])
+        p <- term$params$p
+        values <- as.numeric(raw_values <= quantile_value)
+        # For quantile, the constraint target is p, not the quantile value
+        original_target <- p
+        targets <- p
+        # No normalization needed for quantile (target is already a probability)
+      } else if (term$type == "var") {
         # Variance constraint: use (x - mean(x))^2
         # Constraint: sum(wi * (xi - x_bar)^2) = target_var
         x_mean <- mean(raw_values)
         values <- (raw_values - x_mean)^2
+
+        if (normalize && abs(targets) > .Machine$double.eps) {
+          values <- values / targets
+          scale_factors[[length(scale_factors) + 1]] <- list(
+            index = current_row,
+            scale = targets,
+            variable = term$variables
+          )
+          original_target <- targets
+          targets <- 1.0
+        }
       } else {
         # Mean constraint (exact, l2): use raw values
         # F row = [x1, x2, ..., xn] where xi is the value for sample i
         # Constraint: sum(wi * xi) = target (e.g., weighted mean)
         values <- raw_values
-      }
 
-      if (normalize && abs(targets) > .Machine$double.eps) {
-        # Normalize by target for numerical stability
-        # This transforms constraint from sum(wi * f(xi)) = target
-        # to sum(wi * f(xi)/target) = 1
-        values <- values / targets
-        normalized_target <- 1.0
-
-        # Store scale factor for de-normalization
-        scale_factors[[length(scale_factors) + 1]] <- list(
-          index = current_row,
-          scale = targets,
-          variable = term$variables
-        )
-
-        targets <- normalized_target
+        if (normalize && abs(targets) > .Machine$double.eps) {
+          values <- values / targets
+          scale_factors[[length(scale_factors) + 1]] <- list(
+            index = current_row,
+            scale = targets,
+            variable = term$variables
+          )
+          original_target <- targets
+          targets <- 1.0
+        }
       }
 
       design_blocks[[term_idx]] <- Matrix::Matrix(

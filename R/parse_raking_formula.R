@@ -87,10 +87,9 @@ parse_raking_formula <- function(formula) {
 validate_overlapping_constraints <- function(terms) {
 
   # Moment constraint types that can be combined on the same variable
-
-  # (e.g., you can match both mean and variance of the same continuous variable)
-  # "exact" here refers to rr_mean() on continuous, "var" to rr_var()
-  combinable_moment_types <- c("exact", "var")
+  # (e.g., you can match mean, variance, and quantiles of the same continuous variable)
+  # "exact" here refers to rr_mean() on continuous, "var" to rr_var(), "quantile" to rr_quantile()
+  combinable_moment_types <- c("exact", "var", "quantile")
 
   # Check for pure duplicates first
   for (i in seq_along(terms)) {
@@ -169,6 +168,21 @@ parse_formula_terms <- function(expr) {
     # rr_var keeps its own type for variance matching
     internal_type <- if (fun == "rr_mean") "exact" else sub("^rr_", "", fun)
     list(create_constraint_term(internal_type, args[[1]]))
+  } else if (fun == "rr_quantile") {
+    # rr_quantile(x, p) matches the p-th quantile of x
+    # args[[1]] is the variable, args[[2]] or args$p is the probability
+    if (length(args) < 2) {
+      stop("rr_quantile requires two arguments: variable and probability p", call. = FALSE)
+    }
+    p <- if (!is.null(names(args)) && "p" %in% names(args)) {
+      args$p
+    } else {
+      args[[2]]
+    }
+    if (!is.numeric(p) || p <= 0 || p >= 1) {
+      stop("rr_quantile probability p must be between 0 and 1 (exclusive)", call. = FALSE)
+    }
+    list(create_quantile_term(args[[1]], p))
   } else if (fun == ":") {
     # Handle interactions by recursively collecting all variables
     list(create_interaction_term(collect_interaction_vars(expr)))
@@ -237,6 +251,22 @@ create_constraint_term <- function(type, expr) {
       term_id = create_term_id(type, expr)
     ), class = "raking_term")
   }
+}
+
+#' Create a term specification for quantile constraints
+#' @keywords internal
+create_quantile_term <- function(expr, p) {
+  # Handle nested functions by getting the innermost expression
+  while(rlang::is_call(expr)) {
+    expr <- rlang::call_args(expr)[[1]]
+  }
+  structure(list(
+    type = "quantile",
+    variables = as.character(expr),
+    interaction = NULL,
+    params = list(p = p),
+    term_id = create_term_id("quantile", expr)
+  ), class = "raking_term")
 }
 
 #' Create a term specification for interactions
@@ -317,6 +347,14 @@ rr_mean <- function(x) {
 rr_var <- function(x) {
   # When used in formula context, return unevaluated
   # rr_var is for matching variance of continuous variables
+  x
+}
+
+#' @export
+rr_quantile <- function(x, p) {
+  # When used in formula context, arguments are captured by the parser
+  # rr_quantile is for matching a specific quantile of continuous variables
+  # p is the quantile probability (e.g., 0.5 for median)
   x
 }
 
