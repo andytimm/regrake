@@ -46,19 +46,20 @@ data + formula_spec + target_values → construct_admm_inputs() → design_matri
 
 **Working:**
 - ADMM solver (core optimization)
-- Formula parsing for `rr_exact()`, `rr_l2()`, and interactions
-- Basic categorical variable raking
+- Formula parsing for `rr_exact()`, `rr_l2()`, `rr_mean()`, and interactions
+- Categorical and continuous variable raking
+- Continuous variables auto-normalized by target for numerical stability (`normalize=TRUE` default)
 - Entropy and zero regularizers
 - "Proportions" format for population targets
 
-**Known Bugs:**
-1. **Continuous variables not supported**: `process_raw_data()` skips numeric columns. Need to extend target computation to handle means for continuous variables.
+**Known Limitations:**
+- Interactions with continuous variables not supported (e.g., `~ rr_mean(age):sex` will fail)
 
 ## Building & Testing
 
 ```r
 devtools::load_all()    # Load package
-devtools::test()        # Run tests (265 pass, 1 flaky perf test)
+devtools::test()        # Run tests (312 pass)
 devtools::check()       # Full R CMD check
 ```
 
@@ -150,12 +151,12 @@ For typical survey raking problems (< 10K samples, reasonable constraint counts)
 ## Future Priorities
 
 **High priority (core functionality):**
-1. **Continuous variables** - `process_raw_data()` skips numeric columns. Need mean-matching for continuous features (age, income, etc.)
-2. **Complete loss/regularizer parity** - KL loss, inequality loss, KL regularizer need testing against Python
+1. **Complete loss/regularizer parity** - KL loss, inequality loss, KL regularizer need testing against Python
+2. **Guard continuous + interactions** - `~ rr_mean(age):sex` should error with a clear message
 
 **Medium priority (user experience):**
 3. **Polish `regrake()` end-to-end** - Robust error messages, input validation
-4. **Formula interface for continuous** - e.g., `~ rr_exact(sex) + rr_mean(age)`
+4. **Additional continuous stats** - `rr_var()`, `rr_quantile()` for matching variance/quantiles
 
 **Lower priority (ecosystem):**
 5. **Documentation/vignettes** - Real survey weighting workflow examples
