@@ -21,3 +21,6 @@ Thumbs.db
 benchmarks/test_cases/
 ai_context/rsw_original
 .claude/settings.local.json
+
+# NYOSP presentation source materials (not tracked)
+ai_context/NYOSP_private/
