@@ -122,6 +122,7 @@ regrake <- function(
       data = data,
       weights = results$weights,
       achieved = results$achieved,
+      targets = results$targets,
       solution = solution,
       diagnostics = results$diagnostics,
       call = match.call() # Store call for reproducibility
@@ -249,11 +250,14 @@ process_admm_results <- function(
   achieved <- split_by_losses(achieved_values, admm_inputs$losses, term_names)
 
   # Extract targets in the same order as achieved values (original, un-normalized)
-  targets <- unlist(lapply(admm_inputs$losses, function(l) l$original_target))
+  targets_flat <- unlist(lapply(admm_inputs$losses, function(l) l$original_target))
   # Fallback to target if original_target not present (for backwards compatibility)
-  if (is.null(targets)) {
-    targets <- unlist(lapply(admm_inputs$losses, function(l) l$target))
+  if (is.null(targets_flat)) {
+    targets_flat <- unlist(lapply(admm_inputs$losses, function(l) l$target))
   }
+
+  # Split targets by loss functions to match achieved structure
+  targets <- split_by_losses(targets_flat, admm_inputs$losses, term_names)
 
   # Compute diagnostics
   diagnostics <- list(
@@ -263,8 +267,8 @@ process_admm_results <- function(
     weight_sd = sd(weights),
 
     # Margin matching quality (achieved_values already on proportion/mean scale)
-    max_abs_diff = max(abs(achieved_values - targets)),
-    max_pct_diff = max_pct_diff(achieved_values, targets)
+    max_abs_diff = max(abs(achieved_values - targets_flat)),
+    max_pct_diff = max_pct_diff(achieved_values, targets_flat)
   )
 
   if (verbose) {
@@ -287,6 +291,7 @@ process_admm_results <- function(
   list(
     weights = weights,
     achieved = achieved,
+    targets = targets,
     diagnostics = diagnostics
   )
 }

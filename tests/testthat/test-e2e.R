@@ -408,7 +408,7 @@ test_that("regrake works with weighted population data format", {
 # Tests for achieved field naming
 # ============================================================================
 
-test_that("achieved field has named elements matching formula terms", {
+test_that("achieved and targets fields have named elements matching formula terms", {
   set.seed(42)
   n <- 500
 
@@ -445,9 +445,22 @@ test_that("achieved field has named elements matching formula terms", {
   # Check numeric indexing still works (backwards compatibility)
   expect_equal(result$achieved[[1]], result$achieved$exact_sex)
   expect_equal(result$achieved[[2]], result$achieved$l2_age)
+
+  # Check targets field has same structure as achieved
+
+  expect_named(result$targets, names(result$achieved))
+  expect_named(result$targets$exact_sex, c("M", "F"))
+  expect_named(result$targets$l2_age, c("young", "old"))
+
+  # Check targets match population data input
+  expect_equal(unname(result$targets$exact_sex), c(0.5, 0.5))
+  expect_equal(unname(result$targets$l2_age), c(0.5, 0.5))
+
+  # For exact constraints, achieved should match targets closely
+  expect_equal(result$achieved$exact_sex, result$targets$exact_sex, tolerance = 1e-4)
 })
 
-test_that("achieved field names work with interactions", {
+test_that("achieved and targets fields work with interactions", {
   set.seed(42)
   n <- 500
 
@@ -474,9 +487,14 @@ test_that("achieved field names work with interactions", {
   # Check that interaction is named correctly
   expect_true("exact_sex:region" %in% names(result$achieved))
   expect_length(result$achieved$`exact_sex:region`, 4) # 2x2 combinations
+
+  # Check targets has same structure
+  expect_named(result$targets, names(result$achieved))
+  expect_true("exact_sex:region" %in% names(result$targets))
+  expect_length(result$targets$`exact_sex:region`, 4)
 })
 
-test_that("achieved field names work with continuous variables", {
+test_that("achieved and targets fields work with continuous variables", {
   set.seed(42)
   n <- 500
 
@@ -500,4 +518,12 @@ test_that("achieved field names work with continuous variables", {
 
   # rr_mean maps to "exact" type internally
   expect_named(result$achieved, c("exact_sex", "exact_income"))
+
+  # Check targets has same structure
+  expect_named(result$targets, names(result$achieved))
+
+  # Check continuous target value is preserved (may be normalized internally but
+
+  # original_target should be returned)
+  expect_equal(unname(result$targets$exact_income), 55000, tolerance = 1)
 })
