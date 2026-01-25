@@ -806,8 +806,13 @@ lambdas <- c(0.1, 1, 10, 100)
 lambda_results <- lapply(lambdas, function(lam) {
   result <- regrake(
     data = pew,
-    formula = ~ rr_l2(recode_age_bucket) + rr_l2(recode_female) +
-                rr_l2(recode_race) + rr_l2(recode_region),
+    formula = ~ rr_exact(recode_age_bucket) + rr_exact(recode_female) +
+                rr_exact(recode_inputstate) + rr_exact(recode_region) +
+                rr_exact(recode_educ) + rr_exact(recode_race) +
+                rr_l2(recode_region:recode_educ) +
+                rr_l2(recode_region:recode_race) +
+                rr_l2(recode_educ:recode_race) +
+                rr_l2(recode_region:recode_educ:recode_race),
     population_data = cces_wt_design,
     pop_type = "survey_design",
     regularizer = "entropy",
