@@ -108,3 +108,42 @@ test_that("basic raking workflow works end-to-end with categorical variables", {
   expect_equal(wtd_props_sex, sex_targets, tolerance = 1e-4)
   expect_equal(wtd_props_age, age_targets, tolerance = 1e-4)
 })
+
+test_that("regrake handles continuous variables with rr_mean", {
+  set.seed(42)
+
+  # Sample data: sex slightly skewed, age mean around 35
+  # Using 500 samples for more stable optimization
+  survey <- data.frame(
+    sex = sample(c("M", "F"), 500, replace = TRUE, prob = c(0.6, 0.4)),
+    age = rnorm(500, mean = 35, sd = 10)
+  )
+
+  # Population targets - modest adjustments from sample
+  pop <- data.frame(
+    variable = c("sex", "sex", "age"),
+    level = c("M", "F", "mean"),
+    target = c(0.5, 0.5, 38)  # Want 50/50 sex, mean age 38 (small shift from ~35)
+  )
+
+  result <- regrake(
+    data = survey,
+    formula = ~ rr_exact(sex) + rr_mean(age),
+    population_data = pop,
+    pop_type = "proportions"
+  )
+
+  # Check weights exist and are reasonable
+  expect_length(result$weights, 500)
+  expect_true(all(result$weights >= 0))  # Allow zero but not negative
+
+  # Check achieved values are close to targets
+  # Sex proportions
+  weighted_sex <- tapply(result$weights, survey$sex, sum) / sum(result$weights)
+  expect_equal(unname(weighted_sex["M"]), 0.5, tolerance = 0.01)
+  expect_equal(unname(weighted_sex["F"]), 0.5, tolerance = 0.01)
+
+  # Age mean
+  weighted_age_mean <- sum(result$weights * survey$age) / sum(result$weights)
+  expect_equal(weighted_age_mean, 38, tolerance = 0.1)
+})
