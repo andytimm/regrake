@@ -639,27 +639,38 @@ Steps:
 #| echo: true
 #| output: true
 n_pew <- nrow(pew)
-regrake_weights_1 <- regrake_result_1$weights * n_pew
+regrake_weights_1 <- regrake_result_1$weights  # Already sums to n
 
 regrake_design_1 <- svydesign(ids = ~1, data = pew, weights = regrake_weights_1,
-                # Ensures we handle these not being sampling weights
-                # See: https://cran.r-project.org/web/packages/survey/vignettes/precalibrated.pdf
                 calibrate.formula = formula_1)
 
 svycontrast(svymean(~recode_vote_2016, regrake_design_1, na.rm = TRUE),
                         vote_contrast)
+```
 
-# Compare weight distributions
+Same result as vanilla raking! With entropy regularizer and $\lambda = 1$, we're
+essentially doing the same optimization.
+
+## Illustration: weight distributions
+
+```{r}
+#| echo: false
+#| output: true
+#| fig-height: 4.5
+# Compare weight distributions (raking weights sum to 1, so multiply by n)
 raked_1 <- enframe(weights(pew_raked_1) * n_pew) %>% mutate(method = "rake")
-regrake_1 <- tibble(value = regrake_weights_1, method = "regrake")
+regrake_1 <- tibble(value = regrake_weights_1, method = "regrake")  # Already sums to n
 
 compare_weights_1 <- bind_rows(raked_1, regrake_1)
 
 compare_weights_1 %>%
   ggplot(aes(x = value, color = method, fill = method)) +
   geom_density(alpha=.5)+
-  scale_fill_manual(values=c("red","blue"))
+  scale_fill_manual(values=c("red","blue")) +
+  labs(x = "Weight", y = "Density", title = "Weight distributions: raking vs regrake")
 ```
+
+Nearly identical weight distributions - as expected when we're solving the same problem.
 
 ## About as far as raking will take us
 
@@ -682,7 +693,9 @@ svycontrast(svymean(~recode_vote_2016, pew_raked_2, na.rm = TRUE),
                         vote_contrast)
 ```
 
-# Something more complicated with regrake
+# Something more complicated with regrake {background-color="#40666e"}
+
+## Mixed loss types
 
 With regularized raking, we can do something vanilla raking can't:
 **exact matching on main effects, but soft (L2) matching on interactions**.
@@ -690,12 +703,16 @@ With regularized raking, we can do something vanilla raking can't:
 This lets us include more information without the convergence problems
 that come from trying to exactly match every cell.
 
+## Mixed loss types: the code
+
+::: {style="font-size: 80%;"}
+
 ```{r}
 #| echo: true
 #| output: true
 
-# Main effects: exact matching
-# Interactions: L2 (soft) matching
+# Main effects: exact matching (rr_exact)
+# Interactions: L2/soft matching (rr_l2)
 regrake_result_2 <- regrake(
   data = pew,
   formula = ~ rr_exact(recode_age_bucket) + rr_exact(recode_female) +
@@ -712,25 +729,35 @@ regrake_result_2 <- regrake(
 )
 ```
 
-## Results with mixed constraints
+:::
+
+51 states + 6 main effect vars + all 2/3-way interactions = lots of constraints!
+
+## Results: weight distributions
 
 ```{r}
-#| echo: true
+#| echo: false
 #| output: true
-regrake_weights_2 <- regrake_result_2$weights * n_pew
+#| fig-height: 4.5
+regrake_weights_2 <- regrake_result_2$weights  # Already sums to n
 
-# Compare weight distributions
+# Compare weight distributions (raking weights sum to 1, so multiply by n)
 raked_2 <- enframe(weights(pew_raked_2) * n_pew) %>% mutate(method = "rake")
-regrake_2 <- tibble(value = regrake_weights_2, method = "regrake")
+regrake_2 <- tibble(value = regrake_weights_2, method = "regrake")  # Already sums to n
 
 compare_weights_2 <- bind_rows(raked_2, regrake_2)
 
 compare_weights_2 %>%
   ggplot(aes(x = value, color = method, fill = method)) +
   geom_density(alpha=.5)+
-  scale_fill_manual(values=c("red","blue"))
+  scale_fill_manual(values=c("red","blue")) +
+  labs(x = "Weight", y = "Density",
+       title = "Raking (exact on all) vs regrake (exact main + L2 interactions)")
 ```
 
+regrake produces smoother weights - less extreme values.
+
+## Results: vote margin estimate
 
 ```{r}
 #| echo: true
@@ -742,6 +769,63 @@ regrake_design_2 <- svydesign(ids = ~1, data = pew, weights = regrake_weights_2,
 svycontrast(svymean(~recode_vote_2016, regrake_design_2, na.rm = TRUE),
                         vote_contrast)
 ```
+
+::: {style="font-size: 90%;"}
+
+| Method | Vote Margin | True Margin |
+|--------|-------------|-------------|
+| Unweighted | ~5% | 2.2% |
+| Vanilla raking (main + interactions) | 1.1% | 2.2% |
+| **regrake (exact main + L2 interactions)** | **2.1%** | **2.2%** |
+
+The soft constraints on interactions help us get closer to the truth!
+
+:::
+
+## The role of $\lambda$
+
+Recall the optimization problem:
+
+$$
+\operatorname{minimize} \quad \ell\left(f, f^{\mathrm{target}}\right)+\lambda r(w)
+$$
+
+- **Small $\lambda$**: Prioritize matching targets exactly → lower bias, higher variance
+- **Large $\lambda$**: Prioritize regular weights → higher bias, lower variance
+
+This gives us explicit control over the bias-variance tradeoff!
+
+## $\lambda$ in practice
+
+```{r}
+#| echo: false
+#| output: true
+#| fig-height: 4
+# Show how different lambda values affect weight distribution
+lambdas <- c(0.1, 1, 10, 100)
+lambda_results <- lapply(lambdas, function(lam) {
+  result <- regrake(
+    data = pew,
+    formula = ~ rr_exact(recode_age_bucket) + rr_exact(recode_female) +
+                rr_exact(recode_race) + rr_exact(recode_region),
+    population_data = cces_wt_design,
+    pop_type = "survey_design",
+    regularizer = "entropy",
+    lambda = lam
+  )
+  tibble(weight = result$weights, lambda = paste0("λ = ", lam))  # Already sums to n
+})
+
+bind_rows(lambda_results) %>%
+  ggplot(aes(x = weight, fill = lambda)) +
+  geom_density(alpha = 0.5) +
+  facet_wrap(~lambda, scales = "free_y") +
+  labs(x = "Weight", y = "Density",
+       title = "Weight distributions across different λ values") +
+  theme(legend.position = "none")
+```
+
+Higher $\lambda$ → more uniform weights (but potentially worse target matching).
 
 ## Regularized Raking in the Survey Weights Cinematic Universe
 
