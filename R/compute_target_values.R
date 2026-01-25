@@ -6,11 +6,9 @@
 #' 2. Data is converted to a standardized "autumn" format (which I think is most elegant)
 #' 3. Target values are computed for each term in the raking formula based on the formula specification
 #'
-#' Currently implemented formats:
+#' Supported formats:
 #' - proportions: "autumn" style data frame with variable, level, target columns
-#'
-#' Future formats (not yet implemented):
-#' - weighted: target data with weights
+#' - weighted: Unit-level data with weights column
 #' - anesrake: List of named vectors (anesrake package format)
 #' - survey: Data frame with margin, category, value columns
 #' - survey_design: survey package design object
@@ -23,8 +21,8 @@
 #'
 #' @section File Structure:
 #' - process_pop_data: Main entry point for format detection and conversion
-#' - process_proportions_data: Currently implemented format processor
-#' - process_*_data functions: Future format processors (not yet implemented)
+#' - process_proportions_data: Proportions/autumn format processor
+#' - process_*_data functions: Other format processors (weighted, raw, anesrake, survey, survey_design)
 #' - compute_target_values: Main function to compute raking targets
 #' - expand_joint_distribution: Helper for computing joint distributions
 

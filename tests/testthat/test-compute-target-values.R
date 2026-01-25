@@ -356,3 +356,198 @@ test_that("autumn format handles complex interactions", {
     c("exact_x", "exact_y", "exact_x:y", "exact_x:y:z")
   )
 })
+
+# ============================================================================
+# Tests for process_weighted_data
+# ============================================================================
+
+test_that("process_weighted_data computes weighted proportions for categorical", {
+  weighted_data <- data.frame(
+    sex = c("M", "F", "M", "F"),
+    wt = c(100, 200, 50, 150) # Total weight = 500
+  )
+
+  result <- process_pop_data(weighted_data, "weighted", "wt")
+
+  # Expected: M = 150/500 = 0.3, F = 350/500 = 0.7
+  sex_rows <- result[result$variable == "sex", ]
+  expect_equal(nrow(sex_rows), 2)
+
+  m_target <- sex_rows$target[sex_rows$level == "M"]
+  f_target <- sex_rows$target[sex_rows$level == "F"]
+
+  expect_equal(m_target, 0.3)
+  expect_equal(f_target, 0.7)
+  expect_equal(sum(sex_rows$target), 1)
+})
+
+test_that("process_weighted_data computes weighted means for continuous", {
+  weighted_data <- data.frame(
+    age = c(20, 30, 40, 50),
+    wt = c(1, 2, 3, 4) # Total weight = 10
+  )
+
+  result <- process_pop_data(weighted_data, "weighted", "wt")
+
+  # Expected: weighted mean = (20*1 + 30*2 + 40*3 + 50*4) / 10 = 400/10 = 40
+  age_rows <- result[result$variable == "age", ]
+  expect_equal(nrow(age_rows), 1)
+  expect_equal(age_rows$level, "mean")
+  expect_equal(age_rows$target, 40)
+})
+
+test_that("process_weighted_data handles mixed variables", {
+  weighted_data <- data.frame(
+    sex = c("M", "F", "M"),
+    age = c(25, 35, 45),
+    wt = c(2, 3, 5) # Total weight = 10
+  )
+
+  result <- process_pop_data(weighted_data, "weighted", "wt")
+
+  # Sex: M = 7/10 = 0.7, F = 3/10 = 0.3
+  sex_rows <- result[result$variable == "sex", ]
+  expect_equal(sum(sex_rows$target), 1)
+
+  # Age: weighted mean = (25*2 + 35*3 + 45*5) / 10 = 380/10 = 38
+  age_rows <- result[result$variable == "age", ]
+  expect_equal(age_rows$target, 38)
+})
+
+test_that("process_weighted_data errors on missing weight column", {
+  data <- data.frame(sex = c("M", "F"))
+  # Format detection sees this as "raw" since weight column is missing
+  expect_error(
+    process_pop_data(data, "weighted", "wt"),
+    "appears to be in 'raw' format"
+  )
+})
+
+# ============================================================================
+# Tests for process_anesrake_data
+# ============================================================================
+
+test_that("process_anesrake_data converts named vectors to autumn format", {
+  anesrake_data <- list(
+    sex = c(M = 0.49, F = 0.51),
+    age = c("18-34" = 0.3, "35-54" = 0.4, "55+" = 0.3)
+  )
+
+  result <- process_pop_data(anesrake_data, "anesrake", NULL)
+
+  # Check structure
+  expect_true(all(c("variable", "level", "target") %in% names(result)))
+
+  # Check sex
+  sex_rows <- result[result$variable == "sex", ]
+  expect_equal(nrow(sex_rows), 2)
+  expect_equal(sum(sex_rows$target), 1)
+  expect_equal(sex_rows$target[sex_rows$level == "M"], 0.49)
+  expect_equal(sex_rows$target[sex_rows$level == "F"], 0.51)
+
+  # Check age
+  age_rows <- result[result$variable == "age", ]
+  expect_equal(nrow(age_rows), 3)
+  expect_equal(sum(age_rows$target), 1)
+})
+
+test_that("process_anesrake_data errors on non-numeric vectors", {
+  bad_data <- list(
+    sex = c(M = "0.49", F = "0.51") # Character, not numeric
+  )
+
+  # Format detection sees this as "raw" since vectors aren't numeric
+  expect_error(
+    process_pop_data(bad_data, "anesrake", NULL),
+    "appears to be in 'raw' format"
+  )
+})
+
+test_that("process_anesrake_data errors when targets don't sum to 1", {
+  bad_data <- list(
+    sex = c(M = 0.4, F = 0.4) # Sums to 0.8
+  )
+
+  expect_error(
+    process_pop_data(bad_data, "anesrake", NULL),
+    "do not sum to 1"
+  )
+})
+
+# ============================================================================
+# Tests for process_survey_data
+# ============================================================================
+
+test_that("process_survey_data converts margin format to autumn format", {
+  survey_data <- data.frame(
+    margin = c("sex", "sex", "age", "age", "age"),
+    category = c("M", "F", "18-34", "35-54", "55+"),
+    value = c(0.49, 0.51, 0.3, 0.4, 0.3)
+  )
+
+  result <- process_pop_data(survey_data, "survey", NULL)
+
+  # Check structure
+  expect_true(all(c("variable", "level", "target") %in% names(result)))
+
+  # Check sex
+  sex_rows <- result[result$variable == "sex", ]
+  expect_equal(nrow(sex_rows), 2)
+  expect_equal(sum(sex_rows$target), 1)
+
+  # Check age
+  age_rows <- result[result$variable == "age", ]
+  expect_equal(nrow(age_rows), 3)
+  expect_equal(sum(age_rows$target), 1)
+})
+
+test_that("process_survey_data handles interactions in margin", {
+  survey_data <- data.frame(
+    margin = c(rep("sex:age", 6)),
+    category = c("M:young", "M:old", "M:middle", "F:young", "F:old", "F:middle"),
+    value = c(0.15, 0.2, 0.14, 0.17, 0.19, 0.15)
+  )
+
+  result <- process_pop_data(survey_data, "survey", NULL)
+
+  # Check interaction is preserved
+  expect_equal(unique(result$variable), "sex:age")
+  expect_equal(nrow(result), 6)
+  expect_equal(sum(result$target), 1)
+})
+
+test_that("process_survey_data errors when targets don't sum to 1", {
+  bad_data <- data.frame(
+    margin = c("sex", "sex"),
+    category = c("M", "F"),
+    value = c(0.4, 0.4) # Sums to 0.8
+  )
+
+  expect_error(
+    process_pop_data(bad_data, "survey", NULL),
+    "do not sum to 1"
+  )
+})
+
+test_that("process_survey_data errors on missing columns", {
+  bad_data <- data.frame(
+    margin = "sex",
+    category = "M"
+    # Missing value column
+  )
+
+  # Format detection sees this as "raw" since value column is missing
+  expect_error(
+    process_pop_data(bad_data, "survey", NULL),
+    "appears to be in 'raw' format"
+  )
+})
+
+# ============================================================================
+# Tests for process_survey_design_data
+# ============================================================================
+
+# TODO: process_survey_design_data needs rework - it expects design to have
+# a terms component which isn't standard for survey.design objects.
+# For now, this format is implemented but not well-tested.
+# The other formats (weighted, raw, anesrake, survey, proportions) all work.

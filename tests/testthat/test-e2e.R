@@ -242,3 +242,164 @@ test_that("regrake handles quantile constraints with rr_quantile", {
   weighted_below <- sum(w * (survey$income <= 45000))
   expect_equal(weighted_below, 0.5, tolerance = 0.02)
 })
+
+# ============================================================================
+# Tests for different population data formats
+# ============================================================================
+
+test_that("regrake works with raw population data format", {
+  set.seed(42)
+  n <- 500
+
+  # Sample: 60% male, skewed toward young
+  sample_data <- data.frame(
+    sex = sample(c("M", "F"), n, replace = TRUE, prob = c(0.6, 0.4)),
+    age = sample(
+      c("young", "middle", "old"),
+      n,
+      replace = TRUE,
+      prob = c(0.5, 0.3, 0.2)
+    )
+  )
+
+  # Population (raw): 50/50 sex, more balanced age
+  # Using larger n to get stable proportions
+  pop_data <- data.frame(
+    sex = sample(c("M", "F"), 10000, replace = TRUE, prob = c(0.5, 0.5)),
+    age = sample(
+      c("young", "middle", "old"),
+      10000,
+      replace = TRUE,
+      prob = c(0.33, 0.34, 0.33)
+    )
+  )
+
+  result <- regrake(
+    data = sample_data,
+    population = pop_data,
+    formula = ~ sex + age,
+    pop_type = "raw"
+  )
+
+  # Check weights sum to n
+  expect_equal(sum(result$weights), n)
+
+  # Check weighted proportions roughly match population
+  w <- result$weights / sum(result$weights)
+  weighted_sex <- tapply(w, sample_data$sex, sum)
+  expect_equal(unname(weighted_sex["M"]), 0.5, tolerance = 0.02)
+  expect_equal(unname(weighted_sex["F"]), 0.5, tolerance = 0.02)
+})
+
+test_that("regrake works with anesrake population data format", {
+  set.seed(42)
+  n <- 500
+
+  sample_data <- data.frame(
+    sex = sample(c("M", "F"), n, replace = TRUE, prob = c(0.6, 0.4)),
+    region = sample(
+      c("North", "South", "East", "West"),
+      n,
+      replace = TRUE,
+      prob = c(0.4, 0.3, 0.2, 0.1)
+    )
+  )
+
+  # Anesrake format: list of named numeric vectors
+  pop_data <- list(
+    sex = c(F = 0.52, M = 0.48),
+    region = c(North = 0.25, South = 0.25, East = 0.25, West = 0.25)
+  )
+
+  result <- regrake(
+    data = sample_data,
+    population = pop_data,
+    formula = ~ sex + region,
+    pop_type = "anesrake"
+  )
+
+  # Check weights sum to n
+  expect_equal(sum(result$weights), n)
+
+  # Check sex proportions by computing from weights
+  w <- result$weights / sum(result$weights)
+  weighted_sex <- tapply(w, sample_data$sex, sum)
+
+  # Should match targets (0.52 for F, 0.48 for M)
+  expect_equal(unname(weighted_sex["F"]), 0.52, tolerance = 0.01)
+  expect_equal(unname(weighted_sex["M"]), 0.48, tolerance = 0.01)
+})
+
+test_that("regrake works with survey population data format", {
+  set.seed(42)
+  n <- 500
+
+  sample_data <- data.frame(
+    sex = sample(c("M", "F"), n, replace = TRUE, prob = c(0.6, 0.4)),
+    edu = sample(c("HS", "College", "Grad"), n, replace = TRUE, prob = c(0.5, 0.3, 0.2))
+  )
+
+  # Survey format: margin, category, value columns
+  pop_data <- data.frame(
+    margin = c("sex", "sex", "edu", "edu", "edu"),
+    category = c("F", "M", "College", "Grad", "HS"),
+    value = c(0.51, 0.49, 0.35, 0.25, 0.4)
+  )
+
+  result <- regrake(
+    data = sample_data,
+    population = pop_data,
+    formula = ~ sex + edu,
+    pop_type = "survey"
+  )
+
+  # Check weights sum to n
+  expect_equal(sum(result$weights), n)
+
+  # Check sex proportions by computing from weights
+  w <- result$weights / sum(result$weights)
+  weighted_sex <- tapply(w, sample_data$sex, sum)
+
+  # Should match targets (0.51 for F, 0.49 for M)
+  expect_equal(unname(weighted_sex["F"]), 0.51, tolerance = 0.01)
+  expect_equal(unname(weighted_sex["M"]), 0.49, tolerance = 0.01)
+})
+
+test_that("regrake works with weighted population data format", {
+  set.seed(42)
+  n <- 500
+
+  sample_data <- data.frame(
+    sex = sample(c("M", "F"), n, replace = TRUE, prob = c(0.6, 0.4)),
+    age = sample(c("young", "old"), n, replace = TRUE, prob = c(0.7, 0.3))
+  )
+
+  # Weighted format: unit-level data with weights
+  # Weight represents how many population units each row represents
+  pop_data <- data.frame(
+    sex = c("M", "F", "M", "F"),
+    age = c("young", "young", "old", "old"),
+    pop_weight = c(2500, 2500, 2500, 2500) # Equal distribution
+  )
+
+  result <- regrake(
+    data = sample_data,
+    population = pop_data,
+    formula = ~ sex + age,
+    pop_type = "weighted",
+    pop_weights = "pop_weight"
+  )
+
+  # Check weights sum to n
+  expect_equal(sum(result$weights), n)
+
+  # Check proportions are roughly 50/50 for both variables
+  w <- result$weights / sum(result$weights)
+  weighted_sex <- tapply(w, sample_data$sex, sum)
+  expect_equal(unname(weighted_sex["M"]), 0.5, tolerance = 0.01)
+  expect_equal(unname(weighted_sex["F"]), 0.5, tolerance = 0.01)
+
+  weighted_age <- tapply(w, sample_data$age, sum)
+  expect_equal(unname(weighted_age["young"]), 0.5, tolerance = 0.01)
+  expect_equal(unname(weighted_age["old"]), 0.5, tolerance = 0.01)
+})

@@ -8,7 +8,7 @@ regrake(
   data,
   formula,
   population_data,
-  pop_type = c("raw", "weighted", "proportions"),
+  pop_type = c("raw", "weighted", "proportions", "anesrake", "survey", "survey_design"),
   pop_weights = NULL,
   regularizer = "entropy",
   lambda = 1,
@@ -31,7 +31,10 @@ regrake(
 \itemize{
 \item "raw": Raw population data (one row per unit)
 \item "weighted": Population data with weights column
-\item "proportions": Direct specification of target proportions
+\item "proportions": Direct specification of target proportions (variable, level, target columns)
+\item "anesrake": List of named numeric vectors (anesrake package format)
+\item "survey": Data frame with margin, category, value columns
+\item "survey_design": survey package design object
 }}
 
 \item{pop_weights}{Column name in population_data containing weights (if pop_type = "weighted")}

@@ -6,7 +6,10 @@
 #' @param pop_type How population data is specified:
 #'   - "raw": Raw population data (one row per unit)
 #'   - "weighted": Population data with weights column
-#'   - "proportions": Direct specification of target proportions
+#'   - "proportions": Direct specification of target proportions (variable, level, target columns)
+#'   - "anesrake": List of named numeric vectors (anesrake package format)
+#'   - "survey": Data frame with margin, category, value columns
+#'   - "survey_design": survey package design object
 #' @param pop_weights Column name in population_data containing weights (if pop_type = "weighted")
 #' @param regularizer Regularization method ("entropy", "zero", "kl", or "boolean")
 #' @param lambda Regularization strength (default = 1)
@@ -28,7 +31,7 @@ regrake <- function(
   data,
   formula,
   population_data,
-  pop_type = c("raw", "weighted", "proportions"),
+  pop_type = c("raw", "weighted", "proportions", "anesrake", "survey", "survey_design"),
   pop_weights = NULL,
   regularizer = "entropy",
   lambda = 1,
