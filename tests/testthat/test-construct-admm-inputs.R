@@ -414,3 +414,26 @@ test_that("construct_admm_inputs normalizes continuous variables by default", {
   expect_equal(unname(result_norm$scale_factors[[1]]$scale), 60000)
   expect_equal(result_norm$scale_factors[[1]]$index, 1)
 })
+
+test_that("construct_admm_inputs errors on continuous in interaction", {
+  data <- data.frame(
+    sex = factor(c("M", "F", "M")),
+    age = c(25, 35, 45)  # Continuous
+  )
+
+  formula_spec <- list(
+    formula = ~ sex:age,
+    terms = list(list(
+      type = "exact",
+      variables = c("sex", "age"),
+      interaction = TRUE
+    ))
+  )
+
+  target_values <- list(targets = list("exact_sex:age" = c(0.25, 0.25, 0.25, 0.25)))
+
+  expect_error(
+    construct_admm_inputs(data, formula_spec, target_values),
+    "Interactions with continuous variables are not supported"
+  )
+})

@@ -147,6 +147,21 @@ construct_admm_inputs <- function(data, formula_spec, target_values, normalize =
     }
     targets <- target_values$targets[[target_key]]
 
+    # Check for unsupported continuous + interaction
+    if (!is.null(term$interaction)) {
+      for (var in term$variables) {
+        if (is.numeric(mf[[var]])) {
+          stop(
+            "Interactions with continuous variables are not supported.\n",
+            "Variable '", var, "' is numeric but appears in interaction '",
+            paste(term$variables, collapse = ":"), "'.\n",
+            "Use rr_mean() for continuous variables without interactions.",
+            call. = FALSE
+          )
+        }
+      }
+    }
+
     # Check if this is a continuous variable (single variable, numeric in data)
     is_continuous <- is.null(term$interaction) &&
                      length(term$variables) == 1 &&
