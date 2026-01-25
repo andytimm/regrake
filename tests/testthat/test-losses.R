@@ -226,3 +226,84 @@ test_that("proximal operators handle edge cases", {
   expect_error(prox_kl(c(0, 1), c(1, 1), rho), class = "regrake_domain_error")
   expect_error(prox_kl(c(1, 1), c(0, 1), rho), class = "regrake_domain_error")
 })
+
+# Test weighted least squares --------------------------------------------------------
+
+test_that("weighted least squares loss matches optimization solution", {
+  set.seed(605)
+  m <- 10
+  f <- rnorm(m)
+  fdes <- rnorm(m)
+  diag_weight <- abs(rnorm(m)) + 0.1  # Positive weights
+
+  # Direct loss calculation
+  direct_loss <- sum(least_squares_loss(f, fdes, diag_weight))
+
+  # Optimization solution using CVXR
+  library(CVXR)
+  x <- Variable(m)
+  objective <- Minimize(sum((diag_weight * (x - fdes))^2))
+  problem <- Problem(objective)
+  result <- CVXR::solve(problem)
+  opt_x <- as.vector(result$getValue(x))
+
+  expect_equal(opt_x, fdes, tolerance = 1e-5)
+  expect_equal(sum(least_squares_loss(opt_x, fdes, diag_weight)), 0, tolerance = 1e-5)
+})
+
+test_that("weighted least squares prox matches optimization solution", {
+  set.seed(605)
+  m <- 10
+  f <- rnorm(m)
+  fdes <- rnorm(m)
+  tau <- 1  # lam in Python
+  diag_weight <- abs(rnorm(m)) + 0.1  # Positive weights
+
+  # Our prox with weighting
+  prox_result <- prox_least_squares(f, fdes, tau, diag_weight)
+
+  # CVXR solution: minimize sum((dw * (x - fdes))^2) + (1/tau) * sum((x - f)^2)
+  library(CVXR)
+  fhat <- CVXR::Variable(m)
+  objective <- CVXR::Minimize(
+    0.5 * CVXR::sum_squares(diag_weight * (fhat - fdes)) +
+    1/(2 * tau) * CVXR::sum_squares(fhat - f)
+  )
+  prob <- CVXR::Problem(objective)
+  result <- CVXR::solve(prob)
+
+  expect_equal(as.numeric(result$getValue(fhat)), prox_result, tolerance = 1e-5)
+})
+
+test_that("weighted least squares with scalar weight equals uniform scaling", {
+  set.seed(605)
+  m <- 10
+  f <- rnorm(m)
+  fdes <- rnorm(m)
+  tau <- 1.5
+  scalar_weight <- 2.5
+
+  # Scalar weight applied uniformly
+  result_scalar <- prox_least_squares(f, fdes, tau, scalar_weight)
+
+  # Vector of same weights should give same result
+  result_vector <- prox_least_squares(f, fdes, tau, rep(scalar_weight, m))
+
+  expect_equal(result_scalar, result_vector)
+})
+
+test_that("weighted least squares with weight=1 equals unweighted", {
+  set.seed(605)
+  m <- 10
+  f <- rnorm(m)
+  fdes <- rnorm(m)
+  tau <- 1.5
+
+  # Default (unweighted)
+  result_default <- prox_least_squares(f, fdes, tau)
+
+  # Explicit weight=1
+  result_weighted <- prox_least_squares(f, fdes, tau, diag_weight = 1)
+
+  expect_equal(result_default, result_weighted)
+})

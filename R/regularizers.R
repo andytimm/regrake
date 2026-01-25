@@ -118,3 +118,25 @@ prox_equality_reg <- function(w, lam) {
 prox_sum_squares_reg <- function(w, lam) {
   w / (1 + 2 * lam)
 }
+
+#' Proximal operator for boolean regularizer
+#'
+#' Selects top-k weights and assigns them equal weight 1/k.
+#' All other weights are set to zero. This is used for representative
+#' sample selection where exactly k samples should be selected.
+#'
+#' @param w Input vector of weights
+#' @param lam Regularization parameter (unused, kept for interface consistency)
+#' @param k Number of samples to select
+#' @return Vector with k non-zero entries, each equal to 1/k
+#' @export
+prox_boolean_reg <- function(w, lam, k) {
+  n <- length(w)
+  if (k < 1 || k > n) {
+    stop("k must be between 1 and length(w)", call. = FALSE)
+  }
+  result <- rep(0, n)
+  top_k_idx <- order(w, decreasing = TRUE)[1:k]
+  result[top_k_idx] <- 1 / k
+  result
+}

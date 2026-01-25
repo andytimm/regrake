@@ -38,11 +38,13 @@ prox_equality <- function(x, target, rho) {
 }
 
 #' @describeIn losses Squared error (least squares) loss
-#' @return Numeric vector of squared differences between x and target
+#' @param diag_weight Numeric scalar or vector of weights for each element (default 1)
+#' @return Numeric vector of weighted squared differences between x and target
 #' @export
 #' @examples
 #' least_squares_loss(c(0.1, 0.2), c(0.15, 0.25))
-least_squares_loss <- function(x, target) {
+#' least_squares_loss(c(0.1, 0.2), c(0.15, 0.25), diag_weight = c(2, 1))
+least_squares_loss <- function(x, target, diag_weight = 1) {
   if (length(x) != length(target)) {
     rlang::abort(
       "Inputs must have equal lengths",
@@ -50,19 +52,22 @@ least_squares_loss <- function(x, target) {
       class = "regrake_length_error"
     )
   }
-  (x - target)^2
+  (diag_weight * (x - target))^2
 }
 
 #' Proximal operator for least squares loss
 #' @param x Input vector
 #' @param target Target vector
 #' @param tau Proximal parameter (1/rho)
-#' @return Updated vector minimizing quadratic plus proximal term
+#' @param diag_weight Numeric scalar or vector of weights for each element (default 1)
+#' @return Updated vector minimizing weighted quadratic plus proximal term
 #' @export
-prox_least_squares <- function(x, target, tau) {
+prox_least_squares <- function(x, target, tau, diag_weight = 1) {
   # tau is passed as 1/ρ, so set r = 1/tau = ρ.
-  r <- 1 / tau
-  (target + r * x) / (1 + r)
+  # Matches Python: (diag_weight^2 * fdes + f / lam) / (diag_weight^2 + 1 / lam)
+  # where lam = tau and f = x, fdes = target
+  dw2 <- diag_weight^2
+  (dw2 * target + x / tau) / (dw2 + 1 / tau)
 }
 
 #' @describeIn losses Inequality constraint loss

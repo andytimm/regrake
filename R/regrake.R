@@ -10,6 +10,7 @@
 #' @param pop_weights Column name in population_data containing weights (if pop_type = "weighted")
 #' @param regularizer Regularization method ("entropy", "zero", "kl", or "boolean")
 #' @param lambda Regularization strength (default = 1)
+#' @param k Number of samples to select (required for regularizer = "boolean")
 #' @param bounds Numeric vector of length 2 specifying (min, max) allowed weight values
 #' @param normalize Logical. If TRUE (default), continuous variables are automatically
 #'   scaled by their target value for numerical stability. The achieved values are
@@ -30,6 +31,7 @@ regrake <- function(data,
                    pop_weights = NULL,
                    regularizer = "entropy",
                    lambda = 1,
+                   k = NULL,
                    bounds = c(0.1, 10),
                    normalize = TRUE,
                    control = list(),
@@ -90,7 +92,7 @@ regrake <- function(data,
   solution <- admm(
     F = admm_inputs$design_matrix,
     losses = admm_inputs$losses,
-    reg = create_regularizer(regularizer),
+    reg = create_regularizer(regularizer, k = k),
     lam = lambda,
     control = ctrl,
     verbose = verbose
@@ -139,7 +141,7 @@ validate_inputs <- function(formula, population_data, pop_type, pop_weights, bou
 }
 
 # Helper to create regularizer object from string specification
-create_regularizer <- function(regularizer, prior = NULL, limit = NULL) {
+create_regularizer <- function(regularizer, prior = NULL, limit = NULL, k = NULL) {
   # Validate regularizer type
   regularizer <- match.arg(
     regularizer,
@@ -166,7 +168,17 @@ create_regularizer <- function(regularizer, prior = NULL, limit = NULL) {
         prox = function(w, lambda) prox_kl_reg(w, lambda, prior = prior, limit = limit)
       )
     },
-    "boolean" = stop("Boolean regularization not yet implemented")
+    "boolean" = {
+      if (is.null(k)) {
+        stop("k (number of samples to select) must be provided for boolean regularization")
+      }
+      reg <- list(
+        fn = function(w, lambda) prox_boolean_reg(w, lambda, k),
+        prox = function(w, lambda) prox_boolean_reg(w, lambda, k)
+      )
+      class(reg) <- c("BooleanRegularizer", class(reg))
+      reg
+    }
   )
 }
 

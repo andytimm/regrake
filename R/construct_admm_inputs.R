@@ -279,11 +279,20 @@ construct_admm_inputs <- function(data, formula_spec, target_values, normalize =
     }
     # Ensure consistent order of loss function components
     # Store both normalized target (for solver) and original target (for reporting)
+    # Include evaluate method for BooleanRegularizer objective tracking
+    # Use local() to properly capture values for closures
+    loss_fn <- loss_types[[term$type]]$fn
+    loss_target <- targets
     losses[[term_idx]] <- list(
-      fn = loss_types[[term$type]]$fn,
+      fn = loss_fn,
       target = targets,
       original_target = original_target,
-      prox = loss_types[[term$type]]$prox
+      prox = loss_types[[term$type]]$prox,
+      evaluate = local({
+        fn <- loss_fn
+        tgt <- loss_target
+        function(x) sum(fn(x, tgt))
+      })
     )
   }
 
