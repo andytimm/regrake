@@ -397,8 +397,9 @@ process_survey_design_data <- function(design) {
   formula <- terms(design)
 
   # Create model frame, converting characters to factors
-  mf <- model.frame(formula, model.frame(design)) %>%
-    modify_if(is.character, as.factor)
+  mf <- model.frame(formula, model.frame(design))
+  char_cols <- vapply(mf, is.character, logical(1))
+  mf[char_cols] <- lapply(mf[char_cols], as.factor)
 
   # Create model matrix with all levels (no reference level)
   mm <- model.matrix(

@@ -348,9 +348,6 @@ create_term_id <- function(type, expr) {
 #' @param x A raking_formula object
 #' @param ... Additional arguments passed to other methods
 #' @return Invisibly returns the object
-#' @examples
-#' formula <- rr_exact(~ race) + rr_l2(~ age:educ)
-#' print(formula)
 #' @export
 print.raking_formula <- function(x, ...) {
   cat("Raking Formula Specification:\n")
@@ -372,43 +369,70 @@ print.raking_formula <- function(x, ...) {
   invisible(x)
 }
 
+#' Raking Constraint Functions
+#'
+#' These functions specify constraint types for raking formulas. They are used
+#' within formula specifications passed to [regrake()].
+#'
+#' @param x Variable name (unquoted) to apply the constraint to
+#' @param p For `rr_quantile`, the quantile probability (0 to 1, e.g., 0.5 for median)
+#'
+#' @details
+#' - `rr_exact()`: Exact equality constraint (weighted sum equals target exactly)
+#' - `rr_l2()`: Soft L2/least squares constraint (penalizes deviation from target)
+#' - `rr_kl()`: KL divergence constraint
+#' - `rr_mean()`: Match the mean of a continuous variable (alias for rr_exact on continuous)
+#' - `rr_var()`: Match the variance of a continuous variable
+#' - `rr_quantile()`: Match a specific quantile of a continuous variable
+#'
+#' @return The input variable (these functions are markers for the formula parser)
+#'
+#' @examples
+#' # Match sex proportions exactly, age proportions with soft constraint
+#' formula <- ~ rr_exact(sex) + rr_l2(age)
+#'
+#' # Match categorical variable and continuous mean
+#' formula <- ~ rr_exact(region) + rr_mean(income)
+#'
+#' # Match mean and variance of a continuous variable
+#' formula <- ~ rr_mean(income) + rr_var(income)
+#'
+#' # Match median income
+#' formula <- ~ rr_quantile(income, 0.5)
+#'
+#' @name rr_constraints
 #' @export
 rr_l2 <- function(x) {
-  # When used in formula context, return unevaluated
   x
 }
 
+#' @rdname rr_constraints
 #' @export
 rr_kl <- function(x) {
-  # When used in formula context, return unevaluated
   x
 }
 
+#' @rdname rr_constraints
 #' @export
 rr_exact <- function(x) {
-  # When used in formula context, return unevaluated
   x
 }
 
+#' @rdname rr_constraints
 #' @export
 rr_mean <- function(x) {
-  # When used in formula context, return unevaluated
-  # rr_mean is specifically for continuous variables - matches mean exactly
   x
 }
 
+#' @rdname rr_constraints
 #' @export
 rr_var <- function(x) {
-  # When used in formula context, return unevaluated
-  # rr_var is for matching variance of continuous variables
   x
 }
 
+#' @rdname rr_constraints
 #' @export
 rr_quantile <- function(x, p) {
-  # When used in formula context, arguments are captured by the parser
-  # rr_quantile is for matching a specific quantile of continuous variables
-  # p is the quantile probability (e.g., 0.5 for median)
   x
 }
 
@@ -797,13 +821,6 @@ print.raking_term <- function(x, ...) {
 #' @param x A raking_spec object
 #' @param ... Additional arguments passed to other methods
 #' @return Invisibly returns the object
-#' @examples
-#' df <- data.frame(
-#'   race = factor(c("white", "black", "hispanic")),
-#'   age = c(25, 35, 45)
-#' )
-#' spec <- parse_raking_formula(rr_exact(~ race) + rr_l2(~ age), df)
-#' print(spec)
 #' @export
 print.raking_spec <- function(x, ...) {
   cat("Raking specification with", length(x$terms), "constraints\n")

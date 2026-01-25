@@ -4,3 +4,7 @@
 ^benchmarks$
 ^CLAUDE\.md$
 ^\.claude$
+^\.cursorrules$
+^\.lintr$
+^\.cursor$
+^NOTICE$

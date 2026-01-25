@@ -33,11 +33,9 @@ projection_simplex <- function(v, z = 1) {
 #' @param rho ADMM penalty parameter
 #' @param eps_abs Absolute convergence tolerance
 #' @param eps_rel Relative convergence tolerance
-#' @return List containing:
-#'   \item{s_norm}{Dual residual norm}
-#'   \item{r_norm}{Primal residual norm}
-#'   \item{eps_pri}{Primal feasibility threshold}
-#'   \item{eps_dual}{Dual feasibility threshold}
+#' @return List containing s_norm (dual residual norm), r_norm (primal residual
+#'   norm), eps_pri (primal feasibility threshold), and eps_dual (dual
+#'   feasibility threshold)
 #' @keywords internal
 compute_norms_and_epsilons <- function(
   f,
@@ -98,28 +96,19 @@ compute_norms_and_epsilons <- function(
 #' and damping.
 #'
 #' @param F Design matrix (converted to sparse internally)
-#' @param losses List of loss functions, each containing:
-#'   \item{fn}{Loss function}
-#'   \item{target}{Target values}
-#'   \item{prox}{Proximal operator}
-#'   \item{lower,upper}{Optional bounds for inequality constraints}
-#' @param reg Regularizer object with:
-#'   \item{fn}{Regularization function}
-#'   \item{prox}{Proximal operator}
+#' @param losses List of loss functions, each containing fn (loss function),
+#'   target (target values), prox (proximal operator), and optionally
+#'   lower/upper (bounds for inequality constraints)
+#' @param reg Regularizer object with fn (regularization function) and
+#'   prox (proximal operator)
 #' @param lam Regularization strength parameter
-#' @param control List of control parameters:
-#'   \item{rho}{ADMM penalty parameter (default 50)}
-#'   \item{maxiter}{Maximum iterations (default 5000)}
-#'   \item{eps_abs}{Absolute convergence tolerance (default 1e-5)}
-#'   \item{eps_rel}{Relative convergence tolerance (default 1e-5)}
+#' @param control List of control parameters: rho (ADMM penalty, default 50),
+#'   maxiter (max iterations, default 5000), eps_abs and eps_rel (convergence
+#'   tolerances, default 1e-5)
 #' @param verbose Print convergence progress (default FALSE)
-#' @return List containing:
-#'   \item{f}{Final f vector}
-#'   \item{w}{Final weights}
-#'   \item{w_bar}{Projected weights}
-#'   \item{w_tilde}{Regularized weights}
-#'   \item{y,z,u}{Final dual variables}
-#'   \item{w_best}{Best solution found (w_bar or w_tilde for boolean regularizer)}
+#' @return List containing f (final f vector), w (final weights), w_bar
+#'   (projected weights), w_tilde (regularized weights), y/z/u (dual variables),
+#'   and w_best (best solution found)
 #' @export
 admm <- function(F, losses, reg, lam, control = list(), verbose = FALSE) {
   # Set defaults for control parameters

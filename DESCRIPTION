@@ -13,7 +13,7 @@ Description: A modern implementation of regularized survey raking that prioritiz
     the package provides straightforward formula interfaces for survey weight calibration 
     using various loss functions and regularization methods. Supports multiple target 
     specification formats and integrates smoothly with common survey analysis workflows.
-License: Apache License (>= 2.0)
+License: Apache License 2.0 | file LICENSE
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
@@ -23,9 +23,8 @@ Imports:
     rlang (>= 1.0.0),
     stats,
     lamW,
-    methods,
     tibble,
-    checkmate
+    digest
 Suggests:
     dplyr,
     survey,
