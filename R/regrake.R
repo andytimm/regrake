@@ -114,7 +114,7 @@ regrake <- function(
   }
 
   # Step 6: Process results and compute diagnostics
-  results <- process_admm_results(solution, admm_inputs, verbose, normalize)
+  results <- process_admm_results(solution, admm_inputs, formula_spec, verbose, normalize)
 
   # Return results with appropriate class for methods dispatch
   structure(
@@ -215,6 +215,7 @@ create_regularizer <- function(
 process_admm_results <- function(
   solution,
   admm_inputs,
+  formula_spec,
   verbose,
   normalize = TRUE
 ) {
@@ -224,7 +225,8 @@ process_admm_results <- function(
   weights <- weights * n # Scale up to sum to sample size
 
   # Calculate achieved values using design matrix
-  achieved_values <- drop(as.matrix(admm_inputs$design_matrix %*% weights))
+  # Result is weighted totals; divide by n to get proportions/means on same scale as targets
+  achieved_values <- drop(as.matrix(admm_inputs$design_matrix %*% weights)) / n
 
   # De-normalize continuous variable achieved values if normalization was applied
   if (normalize && !is.null(admm_inputs$scale_factors)) {
@@ -235,8 +237,16 @@ process_admm_results <- function(
     }
   }
 
+  # Generate term names from formula_spec for named access to achieved values
+  term_names <- vapply(formula_spec$terms, function(t) {
+    paste0(
+      t$type, "_",
+      if (is.null(t$interaction)) t$variables else paste(t$variables, collapse = ":")
+    )
+  }, character(1))
+
   # Split achieved values by loss functions to match structure
-  achieved <- split_by_losses(achieved_values, admm_inputs$losses)
+  achieved <- split_by_losses(achieved_values, admm_inputs$losses, term_names)
 
   # Extract targets in the same order as achieved values (original, un-normalized)
   targets <- unlist(lapply(admm_inputs$losses, function(l) l$original_target))
@@ -252,9 +262,9 @@ process_admm_results <- function(
     weight_mean = mean(weights),
     weight_sd = sd(weights),
 
-    # Margin matching quality
-    max_abs_diff = max(abs(achieved_values / n - targets)), # Compare proportions
-    max_pct_diff = max_pct_diff(achieved_values / n, targets) # Compare proportions
+    # Margin matching quality (achieved_values already on proportion/mean scale)
+    max_abs_diff = max(abs(achieved_values - targets)),
+    max_pct_diff = max_pct_diff(achieved_values, targets)
   )
 
   if (verbose) {
@@ -289,13 +299,18 @@ max_pct_diff <- function(achieved, desired) {
 }
 
 # Helper to split achieved values by loss functions
-split_by_losses <- function(means, losses) {
+split_by_losses <- function(means, losses, term_names = NULL) {
   start <- 1
   result <- vector("list", length(losses))
   for (i in seq_along(losses)) {
-    end <- start + length(losses[[i]]$targets) - 1
+    end <- start + length(losses[[i]]$target) - 1
     result[[i]] <- means[start:end]
+    # Copy level names from targets to achieved values
+    names(result[[i]]) <- names(losses[[i]]$target)
     start <- end + 1
+  }
+  if (!is.null(term_names)) {
+    names(result) <- term_names
   }
   result
 }

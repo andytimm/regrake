@@ -57,19 +57,19 @@ data + formula_spec + target_values → construct_admm_inputs() → design_matri
   - `weighted` - unit-level data with weights column
   - `anesrake` - list of named numeric vectors
   - `survey` - margin/category/value columns
-  - `survey_design` - survey package design objects (needs rework, see below)
+  - `survey_design` - survey package design objects
+- `achieved` field has named elements (e.g., `result$achieved$exact_sex`) with per-level values on same scale as targets
 - R CMD check: 0 errors, 0 warnings, 0 notes
-- 431 tests passing
+- 468 tests passing
 
 **Known Limitations:**
 - Interactions with continuous variables not supported (e.g., `~ rr_mean(age):sex` will error)
-- `survey_design` format needs rework - expects design to have a terms component which isn't standard for survey.design objects
 
 ## Building & Testing
 
 ```r
 devtools::load_all()    # Load package
-devtools::test()        # Run tests (431 pass)
+devtools::test()        # Run tests (468 pass)
 devtools::check()       # Full R CMD check (0 errors, 0 warnings, 0 notes)
 ```
 
@@ -166,13 +166,11 @@ For typical survey raking problems (< 10K samples, reasonable constraint counts)
 3. **Improve README** - Add usage examples, installation instructions
 
 **Medium priority (polish & fixes):**
-4. **Fix `survey_design` format** - Rework to not require terms component in design object
-5. **Code review pass** - Simplification, correctness verification, better documentation of internals
-6. **Fix `achieved` field naming** - Result's `achieved` list should have named elements (e.g., `exact_sex`) not just numbered indices
+4. **Code review pass** - Simplification, correctness verification, better documentation of internals
 
 **Lower priority (ecosystem):**
-7. **Create NEWS.md** - Track changes for releases
-8. **CRAN prep** - If that's a goal
+5. **Create NEWS.md** - Track changes for releases
+6. **CRAN prep** - If that's a goal
 
 **Completed (January 2025):**
 - ✅ Loss/regularizer parity with Python (BooleanRegularizer, weighted least squares)
@@ -180,6 +178,8 @@ For typical survey raking problems (< 10K samples, reasonable constraint counts)
 - ✅ Continuous variable constraints (`rr_mean()`, `rr_var()`, `rr_quantile()`)
 - ✅ R CMD check clean (0 errors, 0 warnings, 0 notes)
 - ✅ Code formatted with air 0.8.1
+- ✅ Fix `survey_design` format - now uses formula_spec instead of requiring terms component
+- ✅ Fix `achieved` field - named elements (`exact_sex`, `l2_age`) with per-level values (`c(M=0.5, F=0.5)`) on same scale as targets
 
 ## Adding New Features
 

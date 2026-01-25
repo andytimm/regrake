@@ -39,8 +39,13 @@
 #' - survey_design: Inherits from survey.design
 #' - raw: Default if no other format matches
 #'
+#' @param population_data The population data in one of the supported formats
+#' @param pop_type The type of population data format
+#' @param pop_weights Column name for weights (if pop_type = "weighted")
+#' @param formula_spec Parsed formula specification (required for survey_design format)
+#'
 #' @keywords internal
-process_pop_data <- function(population_data, pop_type, pop_weights = NULL) {
+process_pop_data <- function(population_data, pop_type, pop_weights = NULL, formula_spec = NULL) {
   # Check for either "target" (preferred) or "proportion" (legacy) column
   has_target_col <- "target" %in% names(population_data)
   has_proportion_col <- "proportion" %in% names(population_data)
@@ -107,7 +112,7 @@ process_pop_data <- function(population_data, pop_type, pop_weights = NULL) {
     weighted = process_weighted_data(population_data, pop_weights),
     anesrake = process_anesrake_data(population_data),
     survey = process_survey_data(population_data),
-    survey_design = process_survey_design_data(population_data),
+    survey_design = process_survey_design_data(population_data, formula_spec),
     raw = process_raw_data(population_data)
   )
 }
@@ -381,81 +386,129 @@ process_survey_data <- function(data) {
 #' Process survey design object
 #' @description
 #' Extracts population information from a survey design object.
-#' Uses design formula and weights to compute target values.
+#' Uses the formula specification from regrake to determine which variables
+#' to extract, and the design weights to compute target values.
 #'
 #' @section Processing Steps:
-#' 1. Extract formula and create model matrix
-#' 2. Use design weights to compute proportions
-#' 3. Parse variable names and levels from matrix
-#' 4. Format in autumn format
+#' 1. Validate design object and extract variables/weights
+#' 2. Use formula_spec to determine which variables are needed
+#' 3. For categorical variables: compute weighted proportions
+#' 4. For continuous variables: compute weighted mean
+#' 5. For interactions: compute joint distribution
+#' 6. Format in autumn format
+#'
+#' @param design A survey.design object from the survey package
+#' @param formula_spec A parsed raking formula specification from parse_raking_formula
 #'
 #' @keywords internal
-process_survey_design_data <- function(design) {
-  # Extract formula from design
-  formula <- terms(design)
+process_survey_design_data <- function(design, formula_spec) {
+  # Validate design object
+  if (!inherits(design, "survey.design")) {
+    stop("Expected a survey.design object from the survey package", call. = FALSE)
+  }
 
-  # Create model frame, converting characters to factors
-  mf <- model.frame(formula, model.frame(design))
-  char_cols <- vapply(mf, is.character, logical(1))
-  mf[char_cols] <- lapply(mf[char_cols], as.factor)
-
-  # Create model matrix with all levels (no reference level)
-  mm <- model.matrix(
-    formula,
-    mf,
-    contrasts.arg = lapply(
-      mf[sapply(mf, is.factor)],
-      contrasts,
-      contrasts = FALSE
+  if (is.null(formula_spec)) {
+    stop(
+      "formula_spec is required for survey_design population data.\n",
+      "Please provide a formula when calling regrake().",
+      call. = FALSE
     )
-  )
+  }
 
-  # Get design weights
+  # Extract data and weights from design
+  data <- design$variables
   wts <- weights(design)
+  total_weight <- sum(wts)
 
-  # Compute weighted proportions
-  props <- colSums(mm * wts) / sum(wts)
+  # Get all unique variables from formula_spec
+  vars <- formula_spec$variables
 
-  # Convert to autumn format
-  # Skip intercept column
-  var_levels <- colnames(mm)[-1]
+  # Check that all variables exist in the design
+  missing_vars <- setdiff(vars, names(data))
+  if (length(missing_vars) > 0) {
+    stop(
+      "Variable(s) not found in survey design: ",
+      paste(missing_vars, collapse = ", "),
+      call. = FALSE
+    )
+  }
 
-  # Parse variable names and levels from matrix column names
-  parsed <- strsplit(var_levels, ":")
-  result <- vector("list", length(parsed))
+  # Process main effects for each variable
+  result_list <- list()
 
-  for (i in seq_along(parsed)) {
-    parts <- parsed[[i]]
-    if (length(parts) == 1) {
-      # Main effect
-      var_name <- sub("^([^.]+).*", "\\1", parts[1]) # Extract variable name
-      level <- sub("^[^.]+\\.", "", parts[1]) # Extract level
+  for (var in vars) {
+    col <- data[[var]]
 
-      result[[i]] <- tibble::tibble(
-        variable = var_name,
-        level = level,
-        target = props[i + 1] # +1 to skip intercept
+    if (is.numeric(col) && !is.factor(col)) {
+      # Continuous variable: compute weighted mean
+      wtd_mean <- sum(col * wts) / total_weight
+      result_list[[var]] <- tibble::tibble(
+        variable = var,
+        level = "mean",
+        target = wtd_mean
       )
     } else {
-      # Interaction
-      var_name <- paste(sub("^([^.]+).*", "\\1", parts), collapse = ":")
-      level <- paste(sub("^[^.]+\\.", "", parts), collapse = ":")
+      # Categorical variable: compute weighted proportions
+      if (is.character(col)) {
+        col <- factor(col)
+      }
 
-      result[[i]] <- tibble::tibble(
-        variable = var_name,
-        level = level,
-        target = props[i + 1] # +1 to skip intercept
+      # Aggregate weights by level
+      level_weights <- tapply(wts, col, sum, default = 0)
+      level_props <- level_weights / total_weight
+
+      result_list[[var]] <- tibble::tibble(
+        variable = var,
+        level = names(level_props),
+        target = as.numeric(level_props)
       )
     }
   }
 
-  # Combine and validate
-  result <- do.call(rbind, result)
+  # Process interactions from formula_spec$terms
+  for (term in formula_spec$terms) {
+    if (!is.null(term$interaction)) {
+      interaction_vars <- term$variables
+      joint_var <- paste(interaction_vars, collapse = ":")
 
-  # Validate targets sum to 1 within each variable
+      # Skip if we've already processed this interaction
+      if (joint_var %in% names(result_list)) {
+        next
+      }
+
+      # Create combined factor for the interaction
+      interaction_data <- lapply(interaction_vars, function(v) {
+        col <- data[[v]]
+        if (is.character(col)) factor(col) else col
+      })
+      combined <- interaction(interaction_data, drop = TRUE, sep = ":")
+
+      # Compute weighted proportions for joint distribution
+      level_weights <- tapply(wts, combined, sum, default = 0)
+      level_props <- level_weights / total_weight
+
+      result_list[[joint_var]] <- tibble::tibble(
+        variable = joint_var,
+        level = names(level_props),
+        target = as.numeric(level_props)
+      )
+    }
+  }
+
+  # Combine all results
+  result <- do.call(rbind, result_list)
+
+  # Validate targets sum to 1 for categorical variables
+  # (skip continuous variables which have "mean" level)
   var_sums <- tapply(result$target, result$variable, sum)
-  if (any(abs(var_sums - 1) > 1e-6)) {
-    stop("Targets do not sum to 1 for some variables", call. = FALSE)
+  categorical_vars <- names(var_sums)[!names(var_sums) %in% names(result_list)[
+    vapply(result_list, function(x) any(x$level == "mean"), logical(1))
+  ]]
+
+  for (v in categorical_vars) {
+    if (abs(var_sums[v] - 1) > 1e-6) {
+      stop("Targets do not sum to 1 for variable: ", v, call. = FALSE)
+    }
   }
 
   result
@@ -498,7 +551,7 @@ compute_target_values <- function(
   pop_weights = NULL
 ) {
   # First convert population data to autumn format regardless of input type
-  population_data <- process_pop_data(population_data, pop_type, pop_weights)
+  population_data <- process_pop_data(population_data, pop_type, pop_weights, formula_spec)
 
   # Check for duplicate variable-level combinations within each variable
   dups <- tapply(population_data$level, population_data$variable, duplicated)

@@ -4,18 +4,26 @@
 \alias{process_survey_design_data}
 \title{Process survey design object}
 \usage{
-process_survey_design_data(design)
+process_survey_design_data(design, formula_spec)
+}
+\arguments{
+\item{design}{A survey.design object from the survey package}
+
+\item{formula_spec}{A parsed raking formula specification from parse_raking_formula}
 }
 \description{
 Extracts population information from a survey design object.
-Uses design formula and weights to compute target values.
+Uses the formula specification from regrake to determine which variables
+to extract, and the design weights to compute target values.
 }
 \section{Processing Steps}{
 
 \enumerate{
-\item Extract formula and create model matrix
-\item Use design weights to compute proportions
-\item Parse variable names and levels from matrix
+\item Validate design object and extract variables/weights
+\item Use formula_spec to determine which variables are needed
+\item For categorical variables: compute weighted proportions
+\item For continuous variables: compute weighted mean
+\item For interactions: compute joint distribution
 \item Format in autumn format
 }
 }

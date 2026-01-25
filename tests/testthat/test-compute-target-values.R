@@ -547,7 +547,171 @@ test_that("process_survey_data errors on missing columns", {
 # Tests for process_survey_design_data
 # ============================================================================
 
-# TODO: process_survey_design_data needs rework - it expects design to have
-# a terms component which isn't standard for survey.design objects.
-# For now, this format is implemented but not well-tested.
-# The other formats (weighted, raw, anesrake, survey, proportions) all work.
+test_that("process_survey_design_data works with categorical variables", {
+  # Create sample data with known proportions
+  data <- data.frame(
+    sex = factor(c("M", "F", "M", "F", "M")),
+    age = factor(c("young", "old", "young", "old", "young")),
+    prob = rep(0.2, 5) # Equal probability sample
+  )
+
+  # Create survey design
+  design <- survey::svydesign(ids = ~1, probs = ~prob, data = data)
+
+  # Create formula_spec
+  formula_spec <- parse_raking_formula(~ sex + age)
+
+  # Process
+  result <- process_survey_design_data(design, formula_spec)
+
+  # Verify structure
+  expect_true(all(c("variable", "level", "target") %in% names(result)))
+
+  # Verify sex proportions (3 M, 2 F -> 0.6, 0.4)
+  sex_rows <- result[result$variable == "sex", ]
+  expect_equal(nrow(sex_rows), 2)
+  expect_equal(sum(sex_rows$target), 1)
+  expect_equal(sex_rows$target[sex_rows$level == "M"], 0.6)
+  expect_equal(sex_rows$target[sex_rows$level == "F"], 0.4)
+
+  # Verify age proportions (3 young, 2 old -> 0.6, 0.4)
+  age_rows <- result[result$variable == "age", ]
+  expect_equal(nrow(age_rows), 2)
+  expect_equal(sum(age_rows$target), 1)
+  expect_equal(age_rows$target[age_rows$level == "young"], 0.6)
+  expect_equal(age_rows$target[age_rows$level == "old"], 0.4)
+})
+
+test_that("process_survey_design_data works with continuous variables", {
+  data <- data.frame(
+    income = c(50000, 60000, 70000, 80000),
+    prob = rep(0.25, 4)
+  )
+
+  design <- survey::svydesign(ids = ~1, probs = ~prob, data = data)
+  formula_spec <- parse_raking_formula(~ rr_mean(income))
+
+  result <- process_survey_design_data(design, formula_spec)
+
+  # Should have weighted mean
+  expect_equal(nrow(result), 1)
+  expect_equal(result$variable, "income")
+  expect_equal(result$level, "mean")
+  expect_equal(result$target, 65000) # (50+60+70+80)/4 = 65
+})
+
+test_that("process_survey_design_data works with weighted samples", {
+  # Unequal weights scenario
+  data <- data.frame(
+    sex = factor(c("M", "F", "M", "F")),
+    prob = c(0.1, 0.4, 0.1, 0.4) # M oversampled (lower prob = higher weight)
+  )
+
+  design <- survey::svydesign(ids = ~1, probs = ~prob, data = data)
+  formula_spec <- parse_raking_formula(~ sex)
+
+  result <- process_survey_design_data(design, formula_spec)
+
+  # Weights: 1/0.1=10, 1/0.4=2.5, 1/0.1=10, 1/0.4=2.5
+  # M total weight: 10+10=20, F total weight: 2.5+2.5=5
+  # M proportion: 20/25=0.8, F proportion: 5/25=0.2
+  sex_rows <- result[result$variable == "sex", ]
+  expect_equal(sex_rows$target[sex_rows$level == "M"], 0.8)
+  expect_equal(sex_rows$target[sex_rows$level == "F"], 0.2)
+})
+
+test_that("process_survey_design_data works with interactions", {
+  data <- data.frame(
+    sex = factor(c("M", "F", "M", "F")),
+    age = factor(c("young", "young", "old", "old")),
+    prob = rep(0.25, 4)
+  )
+
+  design <- survey::svydesign(ids = ~1, probs = ~prob, data = data)
+
+  suppressWarnings({
+    formula_spec <- parse_raking_formula(~ sex + age + sex:age)
+  })
+
+  result <- process_survey_design_data(design, formula_spec)
+
+  # Should have sex:age joint distribution
+  joint_rows <- result[result$variable == "sex:age", ]
+  expect_equal(nrow(joint_rows), 4) # 2x2
+  expect_equal(sum(joint_rows$target), 1)
+  # Each combination appears once with equal weight -> 0.25 each
+  expect_true(all(abs(joint_rows$target - 0.25) < 1e-10))
+})
+
+test_that("process_survey_design_data requires formula_spec", {
+  data <- data.frame(x = c(1, 2, 3), prob = rep(0.33, 3))
+  design <- survey::svydesign(ids = ~1, probs = ~prob, data = data)
+
+  expect_error(
+    process_survey_design_data(design, NULL),
+    "formula_spec is required"
+  )
+})
+
+test_that("process_survey_design_data validates design object", {
+  formula_spec <- parse_raking_formula(~ sex)
+
+  expect_error(
+    process_survey_design_data(data.frame(sex = c("M", "F")), formula_spec),
+    "Expected a survey.design object"
+  )
+})
+
+test_that("process_survey_design_data errors on missing variables", {
+  data <- data.frame(
+    sex = factor(c("M", "F")),
+    prob = rep(0.5, 2)
+  )
+
+  design <- survey::svydesign(ids = ~1, probs = ~prob, data = data)
+  formula_spec <- parse_raking_formula(~ sex + age) # age doesn't exist
+
+  expect_error(
+    process_survey_design_data(design, formula_spec),
+    "Variable\\(s\\) not found in survey design: age"
+  )
+})
+
+test_that("regrake works end-to-end with survey_design format", {
+  set.seed(42)
+  n <- 500
+
+  # Sample data (biased toward M and N)
+  sample_data <- data.frame(
+    sex = sample(c("M", "F"), n, replace = TRUE, prob = c(0.65, 0.35)),
+    region = sample(c("N", "S"), n, replace = TRUE, prob = c(0.7, 0.3))
+  )
+
+  # Population survey design (50/50 splits)
+  pop_n <- 1000
+  pop_data <- data.frame(
+    sex = rep(c("M", "F"), each = pop_n / 2),
+    region = rep(c("N", "S"), pop_n / 2),
+    prob = rep(1 / pop_n, pop_n)
+  )
+  pop_design <- survey::svydesign(ids = ~1, probs = ~prob, data = pop_data)
+
+  result <- regrake(
+    data = sample_data,
+    population_data = pop_design,
+    formula = ~ sex + region,
+    pop_type = "survey_design"
+  )
+
+  expect_equal(sum(result$weights), n)
+
+  # Check proportions are close to 50/50
+  w <- result$weights / sum(result$weights)
+  weighted_sex <- tapply(w, sample_data$sex, sum)
+  expect_equal(unname(weighted_sex["M"]), 0.5, tolerance = 0.01)
+  expect_equal(unname(weighted_sex["F"]), 0.5, tolerance = 0.01)
+
+  weighted_region <- tapply(w, sample_data$region, sum)
+  expect_equal(unname(weighted_region["N"]), 0.5, tolerance = 0.01)
+  expect_equal(unname(weighted_region["S"]), 0.5, tolerance = 0.01)
+})

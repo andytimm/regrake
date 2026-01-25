@@ -403,3 +403,101 @@ test_that("regrake works with weighted population data format", {
   expect_equal(unname(weighted_age["young"]), 0.5, tolerance = 0.01)
   expect_equal(unname(weighted_age["old"]), 0.5, tolerance = 0.01)
 })
+
+# ============================================================================
+# Tests for achieved field naming
+# ============================================================================
+
+test_that("achieved field has named elements matching formula terms", {
+  set.seed(42)
+  n <- 500
+
+  sample_data <- data.frame(
+    sex = sample(c("M", "F"), n, replace = TRUE, prob = c(0.6, 0.4)),
+    age = sample(c("young", "old"), n, replace = TRUE, prob = c(0.7, 0.3))
+  )
+
+  pop_data <- data.frame(
+    variable = c("sex", "sex", "age", "age"),
+    level = c("M", "F", "young", "old"),
+    target = c(0.5, 0.5, 0.5, 0.5)
+  )
+
+  result <- regrake(
+    data = sample_data,
+    population_data = pop_data,
+    formula = ~ rr_exact(sex) + rr_l2(age),
+    pop_type = "proportions"
+  )
+
+  # Check that achieved has proper term names
+  expect_named(result$achieved, c("exact_sex", "l2_age"))
+
+  # Check per-level values exist with proper names
+  expect_length(result$achieved$exact_sex, 2) # M, F
+  expect_length(result$achieved$l2_age, 2) # young, old
+  expect_named(result$achieved$exact_sex, c("M", "F"))
+  expect_named(result$achieved$l2_age, c("young", "old"))
+
+  # Check values are on proportion scale (sum to 1 for categorical)
+  expect_equal(sum(result$achieved$exact_sex), 1, tolerance = 0.01)
+
+  # Check numeric indexing still works (backwards compatibility)
+  expect_equal(result$achieved[[1]], result$achieved$exact_sex)
+  expect_equal(result$achieved[[2]], result$achieved$l2_age)
+})
+
+test_that("achieved field names work with interactions", {
+  set.seed(42)
+  n <- 500
+
+  sample_data <- data.frame(
+    sex = sample(c("M", "F"), n, replace = TRUE),
+    region = sample(c("N", "S"), n, replace = TRUE)
+  )
+
+  pop_data <- data.frame(
+    variable = c("sex", "sex", "region", "region", rep("sex:region", 4)),
+    level = c("M", "F", "N", "S", "M:N", "M:S", "F:N", "F:S"),
+    target = c(0.5, 0.5, 0.5, 0.5, 0.25, 0.25, 0.25, 0.25)
+  )
+
+  suppressWarnings({
+    result <- regrake(
+      data = sample_data,
+      population_data = pop_data,
+      formula = ~ sex + region + sex:region,
+      pop_type = "proportions"
+    )
+  })
+
+  # Check that interaction is named correctly
+  expect_true("exact_sex:region" %in% names(result$achieved))
+  expect_length(result$achieved$`exact_sex:region`, 4) # 2x2 combinations
+})
+
+test_that("achieved field names work with continuous variables", {
+  set.seed(42)
+  n <- 500
+
+  sample_data <- data.frame(
+    sex = sample(c("M", "F"), n, replace = TRUE),
+    income = rnorm(n, 50000, 10000)
+  )
+
+  pop_data <- data.frame(
+    variable = c("sex", "sex", "income"),
+    level = c("M", "F", "mean"),
+    target = c(0.5, 0.5, 55000)
+  )
+
+  result <- regrake(
+    data = sample_data,
+    population_data = pop_data,
+    formula = ~ rr_exact(sex) + rr_mean(income),
+    pop_type = "proportions"
+  )
+
+  # rr_mean maps to "exact" type internally
+  expect_named(result$achieved, c("exact_sex", "exact_income"))
+})

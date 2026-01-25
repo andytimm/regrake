@@ -4,7 +4,21 @@
 \alias{process_pop_data}
 \title{Target Value Computation for Raking}
 \usage{
-process_pop_data(population_data, pop_type, pop_weights = NULL)
+process_pop_data(
+  population_data,
+  pop_type,
+  pop_weights = NULL,
+  formula_spec = NULL
+)
+}
+\arguments{
+\item{population_data}{The population data in one of the supported formats}
+
+\item{pop_type}{The type of population data format}
+
+\item{pop_weights}{Column name for weights (if pop_type = "weighted")}
+
+\item{formula_spec}{Parsed formula specification (required for survey_design format)}
 }
 \description{
 This file contains functions for computing target values used in raking.
