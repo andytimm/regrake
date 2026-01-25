@@ -46,21 +46,31 @@ data + formula_spec + target_values → construct_admm_inputs() → design_matri
 
 **Working:**
 - ADMM solver (core optimization)
-- Formula parsing for `rr_exact()`, `rr_l2()`, `rr_mean()`, and interactions
+- Formula parsing for `rr_exact()`, `rr_l2()`, `rr_kl()`, `rr_mean()`, `rr_var()`, `rr_quantile()`, and interactions
 - Categorical and continuous variable raking
 - Continuous variables auto-normalized by target for numerical stability (`normalize=TRUE` default)
-- Entropy and zero regularizers
-- "Proportions" format for population targets
+- All regularizers: entropy, zero, kl, sum_squares, boolean
+- Weighted least squares with `diag_weight` parameter
+- **6 population data formats:**
+  - `proportions` - "autumn" style (variable, level, target columns)
+  - `raw` - unit-level data (computes means & proportions)
+  - `weighted` - unit-level data with weights column
+  - `anesrake` - list of named numeric vectors
+  - `survey` - margin/category/value columns
+  - `survey_design` - survey package design objects (needs rework, see below)
+- R CMD check: 0 errors, 0 warnings, 0 notes
+- 431 tests passing
 
 **Known Limitations:**
-- Interactions with continuous variables not supported (e.g., `~ rr_mean(age):sex` will fail)
+- Interactions with continuous variables not supported (e.g., `~ rr_mean(age):sex` will error)
+- `survey_design` format needs rework - expects design to have a terms component which isn't standard for survey.design objects
 
 ## Building & Testing
 
 ```r
 devtools::load_all()    # Load package
-devtools::test()        # Run tests (312 pass)
-devtools::check()       # Full R CMD check
+devtools::test()        # Run tests (431 pass)
+devtools::check()       # Full R CMD check (0 errors, 0 warnings, 0 notes)
 ```
 
 ## Windows Environment Note
@@ -150,17 +160,26 @@ For typical survey raking problems (< 10K samples, reasonable constraint counts)
 
 ## Future Priorities
 
-**High priority (core functionality):**
-1. **Complete loss/regularizer parity** - KL loss, inequality loss, KL regularizer need testing against Python
-2. **Guard continuous + interactions** - `~ rr_mean(age):sex` should error with a clear message
+**High priority (documentation & examples):**
+1. **Translate NYOSPM talk to regrake** - Create a longer tutorial/presentation using this package for regularized raking (statistical audience)
+2. **Write introductory vignette** - Shorter getting-started guide with real survey weighting workflow examples
+3. **Improve README** - Add usage examples, installation instructions
 
-**Medium priority (user experience):**
-3. **Polish `regrake()` end-to-end** - Robust error messages, input validation
-4. **Additional continuous stats** - `rr_var()`, `rr_quantile()` for matching variance/quantiles
+**Medium priority (polish & fixes):**
+4. **Fix `survey_design` format** - Rework to not require terms component in design object
+5. **Code review pass** - Simplification, correctness verification, better documentation of internals
+6. **Fix `achieved` field naming** - Result's `achieved` list should have named elements (e.g., `exact_sex`) not just numbered indices
 
 **Lower priority (ecosystem):**
-5. **Documentation/vignettes** - Real survey weighting workflow examples
-6. **CRAN prep** - If that's a goal
+7. **Create NEWS.md** - Track changes for releases
+8. **CRAN prep** - If that's a goal
+
+**Completed (January 2025):**
+- ✅ Loss/regularizer parity with Python (BooleanRegularizer, weighted least squares)
+- ✅ All 6 population data formats implemented and tested
+- ✅ Continuous variable constraints (`rr_mean()`, `rr_var()`, `rr_quantile()`)
+- ✅ R CMD check clean (0 errors, 0 warnings, 0 notes)
+- ✅ Code formatted with air 0.8.1
 
 ## Adding New Features
 
@@ -184,4 +203,12 @@ devtools::test(filter = "e2e")
 
 # Check a specific function
 parse_raking_formula(~ rr_exact(sex) + rr_l2(age))
+
+# Basic raking example
+result <- regrake(
+  data = sample_data,
+  formula = ~ rr_exact(sex) + rr_mean(age),
+  population_data = pop_targets,
+  pop_type = "proportions"
+)
 ```
