@@ -355,7 +355,7 @@ $$
 $$
 
 -   In other words, $f$ must match $f^{target}$ exactly to be a valid solution
--   If $F$ is a collection of all the marginal expected values for our raking
+-   If $f$ is a vector of all the marginal expected values for our raking
 dimensions, this is what vanilla raking requires!
 :::
 
@@ -465,7 +465,7 @@ between our loss term and our regularization term.
 ### Regularization Example 1
 
 $$
-r(w) = \sum_{i=1}^{n} w_i \operatorname{logw}_i
+r(w) = \sum_{i=1}^{n} w_i \log w_i
 $$
 
 -   This is the negative entropy, equivalent to the Kullback–Leibler divergence from the
@@ -479,7 +479,7 @@ subject to all our other constraints
 ### Regularization Example 2
 
 $$
-D_{\text{KL}}(w \parallel w^{des}) = \sum_{i=1}^{n} w \log\left(\frac{w}{w^{des}}\right)
+D_{\text{KL}}(w \parallel w^{des}) = \sum_{i=1}^{n} w_i \log\left(\frac{w_i}{w_i^{des}}\right)
 $$
 
 -   Alternatively, might want a weights distribution close to some target distribution
