@@ -23,9 +23,12 @@
 #' @param ... Additional arguments passed to methods
 #'
 #' @return A list containing:
-#'   \item{weights}{The optimal weights}
-#'   \item{achieved}{The achieved margins}
+#'   \item{weights}{The optimal weights (sum to n)}
+#'   \item{balance}{Data frame comparing achieved vs target values with columns:
+#'     constraint (e.g., "exact_sex"), type ("exact" or "l2"), variable,
+#'     level, achieved, target, residual}
 #'   \item{solution}{Full solution details from solver}
+#'   \item{diagnostics}{Weight and margin matching diagnostics}
 #' @export
 regrake <- function(
   data,
@@ -121,8 +124,7 @@ regrake <- function(
     list(
       data = data,
       weights = results$weights,
-      achieved = results$achieved,
-      targets = results$targets,
+      balance = results$balance,
       solution = solution,
       diagnostics = results$diagnostics,
       call = match.call() # Store call for reproducibility
@@ -238,17 +240,6 @@ process_admm_results <- function(
     }
   }
 
-  # Generate term names from formula_spec for named access to achieved values
-  term_names <- vapply(formula_spec$terms, function(t) {
-    paste0(
-      t$type, "_",
-      if (is.null(t$interaction)) t$variables else paste(t$variables, collapse = ":")
-    )
-  }, character(1))
-
-  # Split achieved values by loss functions to match structure
-  achieved <- split_by_losses(achieved_values, admm_inputs$losses, term_names)
-
   # Extract targets in the same order as achieved values (original, un-normalized)
   targets_flat <- unlist(lapply(admm_inputs$losses, function(l) l$original_target))
   # Fallback to target if original_target not present (for backwards compatibility)
@@ -256,8 +247,8 @@ process_admm_results <- function(
     targets_flat <- unlist(lapply(admm_inputs$losses, function(l) l$target))
   }
 
-  # Split targets by loss functions to match achieved structure
-  targets <- split_by_losses(targets_flat, admm_inputs$losses, term_names)
+  # Build balance data frame
+  balance <- build_balance_df(formula_spec, admm_inputs$losses, achieved_values, targets_flat)
 
   # Compute diagnostics
   diagnostics <- list(
@@ -290,8 +281,7 @@ process_admm_results <- function(
 
   list(
     weights = weights,
-    achieved = achieved,
-    targets = targets,
+    balance = balance,
     diagnostics = diagnostics
   )
 }
@@ -303,19 +293,49 @@ max_pct_diff <- function(achieved, desired) {
   max(pct_diff, na.rm = TRUE)
 }
 
-# Helper to split achieved values by loss functions
-split_by_losses <- function(means, losses, term_names = NULL) {
+# Helper to build balance data frame from formula_spec and results
+build_balance_df <- function(formula_spec, losses, achieved_values, targets_flat) {
+  # Build rows for each term
+  rows <- vector("list", length(formula_spec$terms))
   start <- 1
-  result <- vector("list", length(losses))
-  for (i in seq_along(losses)) {
-    end <- start + length(losses[[i]]$target) - 1
-    result[[i]] <- means[start:end]
-    # Copy level names from targets to achieved values
-    names(result[[i]]) <- names(losses[[i]]$target)
+
+
+  for (i in seq_along(formula_spec$terms)) {
+    term <- formula_spec$terms[[i]]
+    loss <- losses[[i]]
+    n_levels <- length(loss$target)
+    end <- start + n_levels - 1
+
+    # Get constraint name (e.g., "exact_sex" or "l2_region:educ")
+    variable <- if (is.null(term$interaction)) {
+      term$variables
+    } else {
+      paste(term$variables, collapse = ":")
+    }
+    constraint <- paste0(term$type, "_", variable)
+
+    # Get level names from targets
+    level_names <- names(loss$target)
+    if (is.null(level_names)) {
+      level_names <- as.character(seq_len(n_levels))
+    }
+
+    rows[[i]] <- data.frame(
+      constraint = constraint,
+      type = term$type,
+      variable = variable,
+      level = level_names,
+      achieved = achieved_values[start:end],
+      target = targets_flat[start:end],
+      stringsAsFactors = FALSE
+    )
+
     start <- end + 1
   }
-  if (!is.null(term_names)) {
-    names(result) <- term_names
-  }
-  result
+
+  # Combine all rows
+  balance <- do.call(rbind, rows)
+  balance$residual <- balance$achieved - balance$target
+  rownames(balance) <- NULL
+  balance
 }

@@ -58,7 +58,7 @@ data + formula_spec + target_values → construct_admm_inputs() → design_matri
   - `anesrake` - list of named numeric vectors
   - `survey` - margin/category/value columns
   - `survey_design` - survey package design objects
-- `achieved` field has named elements (e.g., `result$achieved$exact_sex`) with per-level values on same scale as targets
+- `balance` field: tidy data frame comparing achieved vs target values (columns: constraint, type, variable, level, achieved, target, residual) - ready for plotting/inspection
 - R CMD check: 0 errors, 0 warnings, 0 notes
 - 468 tests passing
 
@@ -179,7 +179,7 @@ For typical survey raking problems (< 10K samples, reasonable constraint counts)
 - ✅ R CMD check clean (0 errors, 0 warnings, 0 notes)
 - ✅ Code formatted with air 0.8.1
 - ✅ Fix `survey_design` format - now uses formula_spec instead of requiring terms component
-- ✅ Fix `achieved` field - named elements (`exact_sex`, `l2_age`) with per-level values (`c(M=0.5, F=0.5)`) on same scale as targets
+- ✅ Simplified result structure - replaced `achieved`/`targets` lists with single `balance` data frame for easy plotting/inspection
 
 ## Adding New Features
 

@@ -14,6 +14,7 @@ bibliography: refs.bib
 set.seed(605)
 library(tidyverse)
 library(survey)
+library(ggrepel)
 # Load regrake from parent directory (development package)
 devtools::load_all("..")
 
@@ -782,64 +783,49 @@ The soft constraints on interactions help us get closer to the truth!
 
 :::
 
-## The role of $\lambda$
+## Checking the balance: what did we actually achieve?
 
-Recall the optimization problem:
-
-$$
-\operatorname{minimize} \quad \ell\left(f, f^{\mathrm{target}}\right)+\lambda r(w)
-$$
-
-- **Small $\lambda$**: Prioritize matching targets exactly → lower bias, higher variance
-- **Large $\lambda$**: Prioritize regular weights → higher bias, lower variance
-
-This gives us explicit control over the bias-variance tradeoff!
-
-## $\lambda$ in practice
+Unlike vanilla raking, soft constraints don't guarantee exact balance.
+The `balance` data frame lets us inspect what regrake actually achieved:
 
 ```{r}
 #| echo: false
 #| output: true
-#| fig-height: 4
-# Show how different lambda values affect weight distribution and vote margin
-lambdas <- c(0.01, 0.1, 1, 10)
-lambda_results <- lapply(lambdas, function(lam) {
-  result <- regrake(
-    data = pew,
-    formula = ~ rr_exact(recode_age_bucket) + rr_exact(recode_female) +
-                rr_exact(recode_inputstate) + rr_exact(recode_region) +
-                rr_exact(recode_educ) + rr_exact(recode_race) +
-                rr_l2(recode_region:recode_educ) +
-                rr_l2(recode_region:recode_race) +
-                rr_l2(recode_educ:recode_race) +
-                rr_l2(recode_region:recode_educ:recode_race),
-    population_data = cces_wt_design,
-    pop_type = "survey_design",
-    regularizer = "entropy",
-    lambda = lam
+#| fig-height: 4.5
+# Get balance data and identify worst-balanced constraints
+balance_df <- regrake_result_2$balance %>%
+  mutate(
+    constraint_type = factor(type, levels = c("exact", "l2")),
+    abs_residual = abs(residual)
   )
-  # Compute vote margin for this lambda
-  design <- svydesign(ids = ~1, data = pew, weights = result$weights)
-  margin <- svycontrast(svymean(~recode_vote_2016, design, na.rm = TRUE),
-                        vote_contrast)
-  margin_pct <- sprintf("%.1f%%", as.numeric(margin) * 100)
 
-  tibble(weight = result$weights,
-         lambda = paste0("λ = ", lam, ", margin = ", margin_pct))
-})
+# Find the 8 worst L2 constraints for labeling
+worst_l2 <- balance_df %>%
+  filter(type == "l2") %>%
+  slice_max(abs_residual, n = 8)
 
-bind_rows(lambda_results) %>%
-  mutate(lambda = factor(lambda, levels = unique(lambda))) %>%
-  ggplot(aes(x = weight, fill = lambda)) +
-  geom_density(alpha = 0.7) +
-  facet_wrap(~lambda, scales = "free_y") +
-  scale_fill_viridis_d(option = "D") +
-  labs(x = "Weight", y = "Density",
-       title = "Weight distributions across different λ values") +
-  theme(legend.position = "none")
+balance_df %>%
+  ggplot(aes(x = target, y = residual, color = constraint_type)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+  geom_point(alpha = 0.7) +
+  geom_text_repel(
+    data = worst_l2,
+    aes(label = level),
+    size = 2.5, max.overlaps = 10, color = "gray30"
+  ) +
+  scale_color_manual(
+    values = c("exact" = "#2166AC", "l2" = "#B2182B"),
+    labels = c("Exact (must match)", "L2 (soft)")
+  ) +
+  labs(
+    x = "Target proportion",
+    y = "Residual (achieved - target)",
+    color = "Constraint type"
+  ) +
+  theme_minimal()
 ```
 
-Higher $\lambda$ → more uniform weights (but potentially worse target matching).
+Exact constraints (blue) cluster at 0; L2 constraints (red) have slack.
 
 ## Regularized Raking in the Survey Weights Cinematic Universe
 

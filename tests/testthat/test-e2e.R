@@ -405,10 +405,10 @@ test_that("regrake works with weighted population data format", {
 })
 
 # ============================================================================
-# Tests for achieved field naming
+# Tests for balance data frame
 # ============================================================================
 
-test_that("achieved and targets fields have named elements matching formula terms", {
+test_that("balance data frame has correct structure and values", {
   set.seed(42)
   n <- 500
 
@@ -430,37 +430,63 @@ test_that("achieved and targets fields have named elements matching formula term
     pop_type = "proportions"
   )
 
-  # Check that achieved has proper term names
-  expect_named(result$achieved, c("exact_sex", "l2_age"))
+  # Check balance is a data frame with expected columns
+  expect_s3_class(result$balance, "data.frame")
+  expect_named(
+    result$balance,
+    c("constraint", "type", "variable", "level", "achieved", "target", "residual")
+  )
 
-  # Check per-level values exist with proper names
-  expect_length(result$achieved$exact_sex, 2) # M, F
-  expect_length(result$achieved$l2_age, 2) # young, old
-  expect_named(result$achieved$exact_sex, c("M", "F"))
-  expect_named(result$achieved$l2_age, c("young", "old"))
+  # Check correct number of rows (2 sex levels + 2 age levels = 4)
+  expect_equal(nrow(result$balance), 4)
 
-  # Check values are on proportion scale (sum to 1 for categorical)
-  expect_equal(sum(result$achieved$exact_sex), 1, tolerance = 0.01)
+  # Check constraint types are correct
+  expect_equal(
+    result$balance$type,
+    c("exact", "exact", "l2", "l2")
+  )
 
-  # Check numeric indexing still works (backwards compatibility)
-  expect_equal(result$achieved[[1]], result$achieved$exact_sex)
-  expect_equal(result$achieved[[2]], result$achieved$l2_age)
+  # Check constraint names are correct
+  expect_equal(
+    result$balance$constraint,
+    c("exact_sex", "exact_sex", "l2_age", "l2_age")
+  )
 
-  # Check targets field has same structure as achieved
+  # Check variable names are correct
+  expect_equal(
+    result$balance$variable,
+    c("sex", "sex", "age", "age")
+  )
 
-  expect_named(result$targets, names(result$achieved))
-  expect_named(result$targets$exact_sex, c("M", "F"))
-  expect_named(result$targets$l2_age, c("young", "old"))
+  # Check levels are correct
+  expect_equal(
+    result$balance$level,
+    c("M", "F", "young", "old")
+  )
 
   # Check targets match population data input
-  expect_equal(unname(result$targets$exact_sex), c(0.5, 0.5))
-  expect_equal(unname(result$targets$l2_age), c(0.5, 0.5))
+  expect_equal(result$balance$target, c(0.5, 0.5, 0.5, 0.5))
+
+  # Check residual is computed correctly
+  expect_equal(
+    result$balance$residual,
+    result$balance$achieved - result$balance$target
+  )
 
   # For exact constraints, achieved should match targets closely
-  expect_equal(result$achieved$exact_sex, result$targets$exact_sex, tolerance = 1e-4)
+  exact_rows <- result$balance$type == "exact"
+  expect_equal(
+    result$balance$achieved[exact_rows],
+    result$balance$target[exact_rows],
+    tolerance = 1e-4
+  )
+
+  # Check achieved values sum to 1 for each variable (categorical proportions)
+  sex_achieved <- result$balance$achieved[result$balance$variable == "sex"]
+  expect_equal(sum(sex_achieved), 1, tolerance = 0.01)
 })
 
-test_that("achieved and targets fields work with interactions", {
+test_that("balance data frame works with interactions", {
   set.seed(42)
   n <- 500
 
@@ -484,17 +510,22 @@ test_that("achieved and targets fields work with interactions", {
     )
   })
 
-  # Check that interaction is named correctly
-  expect_true("exact_sex:region" %in% names(result$achieved))
-  expect_length(result$achieved$`exact_sex:region`, 4) # 2x2 combinations
+  # Check that interaction is present in balance
+  expect_true("sex:region" %in% result$balance$variable)
+  expect_true("exact_sex:region" %in% result$balance$constraint)
 
-  # Check targets has same structure
-  expect_named(result$targets, names(result$achieved))
-  expect_true("exact_sex:region" %in% names(result$targets))
-  expect_length(result$targets$`exact_sex:region`, 4)
+  # Check correct number of interaction rows (2x2 = 4)
+  interaction_rows <- result$balance$variable == "sex:region"
+  expect_equal(sum(interaction_rows), 4)
+
+  # Check interaction targets
+  expect_equal(
+    result$balance$target[interaction_rows],
+    rep(0.25, 4)
+  )
 })
 
-test_that("achieved and targets fields work with continuous variables", {
+test_that("balance data frame works with continuous variables", {
   set.seed(42)
   n <- 500
 
@@ -516,14 +547,20 @@ test_that("achieved and targets fields work with continuous variables", {
     pop_type = "proportions"
   )
 
+  # Check income is in balance
+  expect_true("income" %in% result$balance$variable)
+
   # rr_mean maps to "exact" type internally
-  expect_named(result$achieved, c("exact_sex", "exact_income"))
+  income_rows <- result$balance$variable == "income"
+  expect_equal(result$balance$type[income_rows], "exact")
 
-  # Check targets has same structure
-  expect_named(result$targets, names(result$achieved))
+  # Check continuous target value is preserved
+  expect_equal(result$balance$target[income_rows], 55000, tolerance = 1)
 
-  # Check continuous target value is preserved (may be normalized internally but
-
-  # original_target should be returned)
-  expect_equal(unname(result$targets$exact_income), 55000, tolerance = 1)
+  # Check achieved is close to target for exact constraint
+  expect_equal(
+    result$balance$achieved[income_rows],
+    result$balance$target[income_rows],
+    tolerance = 100
+  )
 })
