@@ -279,7 +279,7 @@ does this have on weighting?
 
 ::: {.column width="50%"}
 
-- Trying to weight to cover all the issues
+- Trying to weight to cover all the issues sampling can't.
 - On the left, everything the NYT weighted their recent 2024 battleground state
 poll on.
 - Of course, we probably believe interactions of variables matter too...
@@ -540,7 +540,7 @@ favored Trump.
 I like this dataset for a few reasons:
 
 -   Easy access
--   There is a correct answer, and we know it (Hilary won the national vote by 2.2%)
+-   There is a correct answer, and we know it (Hillary won the national vote by 2.2%)
 -   If you do not weight by education, you will be wrong by like 10 points :)
 -   Decent variety of covariates
 
@@ -879,12 +879,12 @@ Exact constraints (blue) cluster at 0; L2 constraints (red) have slack.
 
 ##
 
-I've only been talking about only weighting today, so want to emphasize:
+I've only been talking about weighting today, so want to emphasize:
 
 -   Good sampling matters (and more than how you weight)
 -   Selection of weighting variables matters (and more than how you weight)
 
-That said, how you weight is entangled with these, as more flexible weighting
+That said, how you weight is entangled with these, and more flexible weighting
 gives you more options with the above.
 
 
