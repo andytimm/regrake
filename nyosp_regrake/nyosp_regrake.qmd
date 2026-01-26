@@ -829,9 +829,7 @@ Exact constraints (blue) cluster at 0; L2 constraints (red) have slack.
 
 # Regularized Raking in the Survey Weights Cinematic Universe {background-color="#40666e"}
 
-##
-
-![](images/polling_avengers.jpg){fig-align="center"}
+## {background-image="images/polling_avengers.jpg" background-size="contain"}
 
 ## Versus other modern options
 
@@ -894,11 +892,12 @@ gives you more options with the above.
 
 ::: columns
 ::: {.column width="50%"}
-#### Hire me!
+#### Don't hire me!
 
--   Currently looking political/non-profit data science roles.
+-   Currently happy with my job; Grow Progress is great.
 -   Experience as a data science manager, data scientist, and campaign staffer.
 -   keywords: Causal Inference, Bayes, HTE estimation, Surveys
+-   (This is a bit; I was on the job market when I gave this talk originally)
 :::
 
 ::: {.column width="50%"}
