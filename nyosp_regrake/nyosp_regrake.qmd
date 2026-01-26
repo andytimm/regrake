@@ -831,6 +831,8 @@ Exact constraints (blue) cluster at 0; L2 constraints (red) have slack.
 
 ##
 
+![](images/polling_avengers.jpg){fig-align="center"}
+
 ## Versus other modern options
 
 ### MRP (and friends!)
@@ -877,7 +879,7 @@ Exact constraints (blue) cluster at 0; L2 constraints (red) have slack.
 :::
 :::
 
-## Regularized Raking in the Survey Weights Cinematic Universe
+##
 
 I've only been talking about only weighting today, so want to emphasize:
 
@@ -908,3 +910,7 @@ gives you more options with the above.
 :::
 :::
 
+## References {.smaller .scrollable}
+
+::: {#refs}
+:::
