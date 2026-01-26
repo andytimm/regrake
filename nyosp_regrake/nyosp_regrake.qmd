@@ -827,6 +827,56 @@ balance_df %>%
 
 Exact constraints (blue) cluster at 0; L2 constraints (red) have slack.
 
+# Regularized Raking in the Survey Weights Cinematic Universe {background-color="#40666e"}
+
+##
+
+## Versus other modern options
+
+### MRP (and friends!)
+
+**Multilevel Regression and Postratification** [@gelman_using_2019] use a regularized model to predict the outcome, and poststratify.
+
+::: columns
+::: {.column width="50%"}
+#### Advantages
+
+-   Fit directly on outcome(s) of interest- often more efficient
+-   One set of weights regardless of outcome
+-   Prior/training information can be used
+:::
+
+::: {.column width="50%"}
+#### Disadvantages
+
+-   Sometimes you actually want the whole posterior!
+-   For most small area estimates, MRP is going to be more efficient
+-   More generally, greater variety and flexibility of regularization
+:::
+:::
+
+## Versus other modern options
+
+### Multilevel Calibration
+
+**Multilevel Calibration** [@ben-michael_multilevel_2023] also takes an optimization approach, requires exact matching on the marginals, more flexibility on interactions
+
+::: columns
+::: {.column width="50%"}
+#### Advantages
+
+-   RR comes with greater flexibility to define loss, regularization
+-   RR optimizes for explicit objective (don't need to back out implicit prior)
+:::
+
+::: {.column width="50%"}
+#### Disadvantages
+
+-   MC has nice theory connecting estimator to outcome model
+-   Implementation-wise, MC is probably more accessible as of today
+:::
+:::
+
 ## Regularized Raking in the Survey Weights Cinematic Universe
 
 I've only been talking about only weighting today, so want to emphasize:
@@ -838,5 +888,23 @@ That said, how you weight is entangled with these, as more flexible weighting
 gives you more options with the above.
 
 
-## Thanks!
+## Thank you! {.smaller}
+
+::: columns
+::: {.column width="50%"}
+#### Hire me!
+
+-   Currently looking political/non-profit data science roles.
+-   Experience as a data science manager, data scientist, and campaign staffer.
+-   keywords: Causal Inference, Bayes, HTE estimation, Surveys
+:::
+
+::: {.column width="50%"}
+#### Materials/Suggestions
+
+-   [@barratt_optimal_2021] for finer details of optimization behind talk today
+-   For perspective on challenges of modern survey weighting, highly recommend **A New Paradigm for Polling** [@bailey_new_2023]
+-   For how to think about picking targets and estimating them, I adore [@caughey_target_2020]- **Target Estimation and Adjustment Weighting for Survey Nonresponse and Sampling Bias**
+:::
+:::
 
