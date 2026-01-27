@@ -64,7 +64,7 @@ data + formula_spec + target_values → construct_admm_inputs() → design_matri
   - `survey_design` - survey package design objects
 - `balance` field: tidy data frame comparing achieved vs target values (columns: constraint, type, variable, level, achieved, target, residual) - ready for plotting/inspection
 - R CMD check: 0 errors, 0 warnings, 1 note (unrelated nyosp_regrake folder)
-- 516 tests passing
+- 529 tests passing
 
 **Known Limitations:**
 - Interactions with continuous variables not supported (e.g., `~ rr_mean(age):sex` will error)
