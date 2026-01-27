@@ -280,6 +280,30 @@ construct_admm_inputs <- function(
       # Remove intercept
       mm <- mm[, -1, drop = FALSE]
 
+      # Reorder targets to match model matrix column order
+      # Model matrix columns are named like "sexF", "sexM" or "sexF:regionN"
+      # Extract level names from column names and match to target names
+      mm_col_names <- colnames(mm)
+      if (is.null(term$interaction)) {
+        # Single variable: strip the variable name prefix
+        # "sexF" -> "F", "sexM" -> "M"
+        level_names <- sub(paste0("^", term$variables), "", mm_col_names)
+      } else {
+        # Interaction: column names are like "sexF:regionN"
+        # Need to convert to "F:N" format to match pop_data level names
+        # Split by ":", strip variable prefix from each part, rejoin
+        level_names <- vapply(mm_col_names, function(col_name) {
+          parts <- strsplit(col_name, ":")[[1]]
+          stripped <- character(length(parts))
+          for (i in seq_along(parts)) {
+            stripped[i] <- sub(paste0("^", term$variables[i]), "", parts[i])
+          }
+          paste(stripped, collapse = ":")
+        }, character(1), USE.NAMES = FALSE)
+      }
+      # Reorder targets to match design matrix row order
+      targets <- targets[level_names]
+
       # Convert to sparse matrix with correct dimensions
       # Each row is a constraint (level), each column is a sample
       nonzero <- which(mm != 0, arr.ind = TRUE)

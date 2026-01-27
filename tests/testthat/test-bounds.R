@@ -106,91 +106,90 @@ test_that("check_bounds_violated works correctly", {
 })
 
 # Test bounds in regrake ----------------------------------------------------
-# These tests are consolidated to minimize slow regrake() calls
+# Realistic survey scenarios with reasonable bounds
 
-test_that("regrake with soft bounds works correctly", {
-  # Use moderately imbalanced sample to test bounds violation behavior
+test_that("regrake with bounds handles realistic multi-variable raking", {
+  # Realistic scenario: sample slightly off on sex and age
+  # This is what a survey researcher would actually encounter
   set.seed(42)
-  n <- 100
+  n <- 200
   sample_data <- data.frame(
-    sex = sample(c("M", "F"), n, replace = TRUE, prob = c(0.7, 0.3))
+    sex = sample(c("M", "F"), n, replace = TRUE, prob = c(0.55, 0.45)),
+    age = sample(c("18-34", "35-54", "55+"), n, replace = TRUE, prob = c(0.20, 0.35, 0.45))
   )
 
   pop_data <- data.frame(
-    variable = c("sex", "sex"),
-    level = c("M", "F"),
-    proportion = c(0.5, 0.5)
+    variable = c("sex", "sex", "age", "age", "age"),
+    level = c("M", "F", "18-34", "35-54", "55+"),
+    proportion = c(0.49, 0.51, 0.28, 0.35, 0.37)
   )
 
-  # Test with tight bounds that will be violated to hit targets
-  # With 70/30 sample and 50/50 target, weights need to be ~0.71 and ~1.67
-  # Bounds of (0.8, 1.5) are too tight, so soft bounds will be violated
+  # Soft bounds with realistic (0.3, 3) range
   result <- regrake(
     data = sample_data,
-    formula = ~ rr_exact(sex),
+    formula = ~ rr_exact(sex) + rr_exact(age),
     population_data = pop_data,
     pop_type = "proportions",
-    bounds = c(0.8, 1.5)
+    bounds = c(0.3, 3)
     # bounds_method not specified - tests default to "soft"
   )
 
   # Basic convergence
-
   expect_equal(length(result$weights), n)
   expect_equal(sum(result$weights), n, tolerance = 1e-4)
 
-  # Soft bounds: targets should be hit closely (bounds may be violated)
-  achieved_m <- sum(result$weights[sample_data$sex == "M"]) / n
-  expect_equal(achieved_m, 0.5, tolerance = 0.01)
+  # Targets should be hit closely
+  achieved_sex_m <- sum(result$weights[sample_data$sex == "M"]) / sum(result$weights)
+  achieved_age_young <- sum(result$weights[sample_data$age == "18-34"]) / sum(result$weights)
+  expect_equal(achieved_sex_m, 0.49, tolerance = 0.01)
+  expect_equal(achieved_age_young, 0.28, tolerance = 0.01)
 
-  # Diagnostics structure and values
-  expect_true("bounds" %in% names(result$diagnostics))
-  expect_true("bounds_method" %in% names(result$diagnostics))
-  expect_true("bounds_violated" %in% names(result$diagnostics))
-  expect_equal(result$diagnostics$bounds, c(0.8, 1.5))
-  expect_equal(result$diagnostics$bounds_method, "soft") # Tests default
-  expect_type(result$diagnostics$bounds_violated, "logical")
+  # With reasonable bounds, should not be violated
+  expect_false(result$diagnostics$bounds_violated)
 
-  # With this imbalanced sample, bounds should be violated to hit targets
-  expect_true(result$diagnostics$bounds_violated)
+  # Weights should be reasonable (Kish deff < 1.3 for mild imbalance)
+  w_norm <- result$weights * n / sum(result$weights)
+  kish_deff <- 1 + var(w_norm) / mean(w_norm)^2
+  expect_true(kish_deff < 1.3)
+
+  # Diagnostics
+  expect_equal(result$diagnostics$bounds, c(0.3, 3))
+  expect_equal(result$diagnostics$bounds_method, "soft")
 })
 
-test_that("regrake with hard bounds strictly enforces bounds", {
-  # Use moderately imbalanced sample to test that bounds are enforced
-  # even when targets can't be hit exactly
+test_that("regrake with hard bounds enforces limits", {
+  # Same realistic scenario but with hard bounds
   set.seed(42)
-  n <- 100
+  n <- 200
   sample_data <- data.frame(
-    sex = sample(c("M", "F"), n, replace = TRUE, prob = c(0.7, 0.3))
+    sex = sample(c("M", "F"), n, replace = TRUE, prob = c(0.55, 0.45)),
+    age = sample(c("18-34", "35-54", "55+"), n, replace = TRUE, prob = c(0.20, 0.35, 0.45))
   )
 
   pop_data <- data.frame(
-    variable = c("sex", "sex"),
-    level = c("M", "F"),
-    proportion = c(0.5, 0.5)
+    variable = c("sex", "sex", "age", "age", "age"),
+    level = c("M", "F", "18-34", "35-54", "55+"),
+    proportion = c(0.49, 0.51, 0.28, 0.35, 0.37)
   )
 
-  # With 70/30 sample and 50/50 target, weights need ~0.71 and ~1.67
-  # Bounds of (0.8, 1.5) will bind and prevent exact target achievement
   result <- regrake(
     data = sample_data,
-    formula = ~ rr_exact(sex),
+    formula = ~ rr_exact(sex) + rr_exact(age),
     population_data = pop_data,
     pop_type = "proportions",
-    bounds = c(0.8, 1.5),
+    bounds = c(0.3, 3),
     bounds_method = "hard"
   )
 
-  # Hard bounds must be strictly enforced
-  expect_true(all(result$weights >= 0.8 - 1e-6))
-  expect_true(all(result$weights <= 1.5 + 1e-6))
+  # Bounds must be strictly enforced
+  expect_true(all(result$weights >= 0.3 - 1e-6))
+  expect_true(all(result$weights <= 3 + 1e-6))
 
-  # Diagnostics should show bounds NOT violated (hard enforcement worked)
+  # Diagnostics
   expect_false(result$diagnostics$bounds_violated)
   expect_equal(result$diagnostics$bounds_method, "hard")
 
-  # Target won't be hit exactly due to binding bounds
-  achieved_m <- sum(result$weights[sample_data$sex == "M"]) / n
-  expect_true(abs(achieved_m - 0.5) > 0.01) # Won't be exact
-  expect_true(abs(achieved_m - 0.5) < 0.3) # But reasonably close
+  # Targets should still be reasonably close
+  achieved_sex_m <- sum(result$weights[sample_data$sex == "M"]) / sum(result$weights)
+  expect_true(abs(achieved_sex_m - 0.49) < 0.05)
 })

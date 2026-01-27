@@ -588,3 +588,185 @@ test_that("construct_admm_inputs errors on multiple quantile targets", {
     "Quantile constraint requires exactly one target value"
   )
 })
+
+# =============================================================================
+# Tests for target ordering (bug fix verification)
+# =============================================================================
+# These tests verify that targets are correctly matched to design matrix rows
+# regardless of the order in which levels appear in population_data.
+# The design matrix rows follow R's alphabetical factor ordering.
+
+test_that("targets are correctly ordered when pop_data order differs from alphabetical", {
+
+  # Data with levels that would be ordered M, F alphabetically as F, M
+  data <- data.frame(
+    sex = factor(c("M", "F", "M", "F", "M"))
+  )
+
+  formula_spec <- list(
+    formula = ~sex,
+    terms = list(list(
+      type = "exact",
+      variables = "sex",
+      interaction = NULL
+    ))
+  )
+
+  # Pop_data style: M first, F second (non-alphabetical)
+  target_values <- list(
+    targets = list(
+      exact_sex = c(M = 0.49, F = 0.51)
+    )
+  )
+
+  result <- construct_admm_inputs(data, formula_spec, target_values)
+
+  # Design matrix rows should be in alphabetical order: F, M
+  # Row 1 = F (samples 2, 4), Row 2 = M (samples 1, 3, 5)
+  expect_equal(as.vector(result$design_matrix[1, ]), c(0, 1, 0, 1, 0)) # F
+  expect_equal(as.vector(result$design_matrix[2, ]), c(1, 0, 1, 0, 1)) # M
+
+  # Targets should be reordered to match: F=0.51, M=0.49
+  expect_equal(unname(result$losses[[1]]$target), c(0.51, 0.49))
+  expect_equal(names(result$losses[[1]]$target), c("F", "M"))
+})
+
+test_that("targets are correctly ordered for multi-level factors", {
+  data <- data.frame(
+    age = factor(c("55+", "18-34", "35-54", "18-34", "55+"))
+  )
+
+  formula_spec <- list(
+    formula = ~age,
+    terms = list(list(
+      type = "exact",
+      variables = "age",
+      interaction = NULL
+    ))
+  )
+
+  # Pop_data order: 18-34, 35-54, 55+ (happens to match alphabetical for these)
+  # But let's use a different order to test
+  target_values <- list(
+    targets = list(
+      exact_age = c("55+" = 0.37, "18-34" = 0.28, "35-54" = 0.35)
+    )
+  )
+
+  result <- construct_admm_inputs(data, formula_spec, target_values)
+
+  # Alphabetical order: 18-34, 35-54, 55+
+  expect_equal(names(result$losses[[1]]$target), c("18-34", "35-54", "55+"))
+  expect_equal(unname(result$losses[[1]]$target), c(0.28, 0.35, 0.37))
+})
+
+test_that("interaction targets are correctly ordered", {
+  data <- data.frame(
+    sex = factor(c("M", "F", "M", "F")),
+    region = factor(c("S", "N", "N", "S"))
+  )
+
+  formula_spec <- list(
+    formula = ~ sex:region,
+    terms = list(list(
+      type = "exact",
+      variables = c("sex", "region"),
+      interaction = TRUE
+    ))
+  )
+
+  # Pop_data order: M:N, M:S, F:N, F:S (non-alphabetical)
+  target_values <- list(
+    targets = list(
+      "exact_sex:region" = c("M:N" = 0.20, "M:S" = 0.30, "F:N" = 0.25, "F:S" = 0.25)
+    )
+  )
+
+  result <- construct_admm_inputs(data, formula_spec, target_values)
+
+  # R orders interactions by iterating through second var levels, then first var levels
+  # So: region N (sex F, M), region S (sex F, M) → F:N, M:N, F:S, M:S
+  expect_equal(names(result$losses[[1]]$target), c("F:N", "M:N", "F:S", "M:S"))
+  expect_equal(unname(result$losses[[1]]$target), c(0.25, 0.20, 0.25, 0.30))
+})
+
+test_that("end-to-end raking applies targets to correct levels", {
+  # This is the key test: verify that the achieved proportions match
+
+  # the INTENDED targets, not swapped targets
+  set.seed(123)
+  n <- 500
+
+  # Create sample with known imbalance
+  sample_data <- data.frame(
+    sex = sample(c("M", "F"), n, replace = TRUE, prob = c(0.7, 0.3))
+  )
+
+  # Target: M should be 40%, F should be 60% (opposite of sample)
+  pop_data <- data.frame(
+    variable = c("sex", "sex"),
+    level = c("M", "F"),  # M listed first
+    proportion = c(0.40, 0.60)
+  )
+
+  result <- regrake(
+    data = sample_data,
+    formula = ~ rr_exact(sex),
+    population_data = pop_data,
+    pop_type = "proportions"
+  )
+
+  # Verify achieved proportions match INTENDED targets
+  w <- result$weights
+  achieved_M <- sum(w[sample_data$sex == "M"]) / sum(w)
+  achieved_F <- sum(w[sample_data$sex == "F"]) / sum(w)
+
+  # M should be ~40% (down from ~70%), F should be ~60% (up from ~30%)
+  expect_equal(achieved_M, 0.40, tolerance = 1e-4)
+  expect_equal(achieved_F, 0.60, tolerance = 1e-4)
+
+  # Also verify via balance table
+  balance_M <- result$balance$achieved[result$balance$level == "M"]
+  balance_F <- result$balance$achieved[result$balance$level == "F"]
+  expect_equal(balance_M, 0.40, tolerance = 1e-4)
+  expect_equal(balance_F, 0.60, tolerance = 1e-4)
+})
+
+test_that("end-to-end raking with interactions applies targets correctly", {
+  set.seed(456)
+  n <- 500
+
+  sample_data <- data.frame(
+    sex = sample(c("M", "F"), n, replace = TRUE, prob = c(0.6, 0.4)),
+    region = sample(c("N", "S"), n, replace = TRUE, prob = c(0.7, 0.3))
+  )
+
+  # Targets with specific joint distribution
+  pop_data <- data.frame(
+    variable = c("sex", "sex", "region", "region", rep("sex:region", 4)),
+    level = c("M", "F", "N", "S", "M:N", "M:S", "F:N", "F:S"),
+    target = c(0.5, 0.5, 0.5, 0.5, 0.20, 0.30, 0.30, 0.20)
+  )
+
+  suppressWarnings({
+    result <- regrake(
+      data = sample_data,
+      formula = ~ sex + region + sex:region,
+      population_data = pop_data,
+      pop_type = "proportions"
+    )
+  })
+
+  w <- result$weights
+
+  # Verify joint distribution targets are hit correctly
+  achieved_MN <- sum(w[sample_data$sex == "M" & sample_data$region == "N"]) / sum(w)
+  achieved_MS <- sum(w[sample_data$sex == "M" & sample_data$region == "S"]) / sum(w)
+  achieved_FN <- sum(w[sample_data$sex == "F" & sample_data$region == "N"]) / sum(w)
+  achieved_FS <- sum(w[sample_data$sex == "F" & sample_data$region == "S"]) / sum(w)
+
+  expect_equal(achieved_MN, 0.20, tolerance = 1e-3)
+  expect_equal(achieved_MS, 0.30, tolerance = 1e-3)
+  expect_equal(achieved_FN, 0.30, tolerance = 1e-3)
+  expect_equal(achieved_FS, 0.20, tolerance = 1e-3)
+})

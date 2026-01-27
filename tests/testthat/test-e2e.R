@@ -93,23 +93,26 @@ test_that("basic raking workflow works end-to-end with categorical variables", {
   expect_equal(sum(result$weights), n)
 
   # Check that weighted proportions match targets
-  wtd_props_sex <- stats::aggregate(
+  agg_sex <- stats::aggregate(
     result$weights,
     list(sex = sample_data$sex),
     sum
-  )$x /
-    n
+  )
+  wtd_props_sex <- agg_sex$x / n
 
-  wtd_props_age <- stats::aggregate(
+  agg_age <- stats::aggregate(
     result$weights,
     list(age = sample_data$age),
     sum
-  )$x /
-    n
+  )
+  wtd_props_age <- agg_age$x / n
 
-  # Get target proportions in same order as weighted props
-  sex_targets <- pop_data$proportion[pop_data$variable == "sex"]
-  age_targets <- pop_data$proportion[pop_data$variable == "age"]
+  # Get target proportions in same order as aggregate results (alphabetical)
+  sex_pop <- pop_data[pop_data$variable == "sex", ]
+  sex_targets <- sex_pop$proportion[match(agg_sex$sex, sex_pop$level)]
+
+  age_pop <- pop_data[pop_data$variable == "age", ]
+  age_targets <- age_pop$proportion[match(agg_age$age, age_pop$level)]
 
   # Test that weighted proportions match targets within tolerance
   expect_equal(wtd_props_sex, sex_targets, tolerance = 1e-4)
@@ -440,7 +443,7 @@ test_that("balance data frame has correct structure and values", {
   # Check correct number of rows (2 sex levels + 2 age levels = 4)
   expect_equal(nrow(result$balance), 4)
 
-  # Check constraint types are correct
+  # Check constraint types are correct (alphabetical order: F, M, old, young)
   expect_equal(
     result$balance$type,
     c("exact", "exact", "l2", "l2")
@@ -458,10 +461,10 @@ test_that("balance data frame has correct structure and values", {
     c("sex", "sex", "age", "age")
   )
 
-  # Check levels are correct
+  # Check levels are correct (alphabetical order within each variable)
   expect_equal(
     result$balance$level,
-    c("M", "F", "young", "old")
+    c("F", "M", "old", "young")
   )
 
   # Check targets match population data input
