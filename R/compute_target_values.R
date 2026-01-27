@@ -310,11 +310,30 @@ process_anesrake_data <- function(data) {
       )
     }
 
-    if (abs(sum(props) - 1) > 1e-6) {
+    # Normalize target sum with tiered tolerance
+    s <- sum(props)
+    diff <- abs(s - 1)
+    if (diff <= 1e-3) {
+      # Silent normalization for floating point artifacts
+      props <- props / s
+    } else if (diff <= 0.05) {
+      # Warn for noticeable deviation, but still normalize
+      rlang::warn(
+        c(
+          paste0(
+            "Targets for '", var_name, "' sum to ",
+            format(s, digits = 4), ", normalizing to 1.0."
+          ),
+          i = "Verify your target values are correct."
+        ),
+        class = "regrake_target_normalized"
+      )
+      props <- props / s
+    } else {
+      # Error for large deviations
       stop(
-        "Targets for variable '",
-        var_name,
-        "' do not sum to 1",
+        "Targets for variable '", var_name, "' sum to ", round(s, 4),
+        " which is too far from 1.0 to auto-normalize. Please check your targets.",
         call. = FALSE
       )
     }
@@ -374,9 +393,32 @@ process_survey_data <- function(data) {
       )
     }
 
-    # Validate targets sum to 1
-    if (abs(sum(result[[i]]$target) - 1) > 1e-6) {
-      stop("Targets for margin '", margin, "' do not sum to 1", call. = FALSE)
+    # Normalize target sum with tiered tolerance
+    s <- sum(result[[i]]$target)
+    diff <- abs(s - 1)
+    if (diff <= 1e-3) {
+      # Silent normalization for floating point artifacts
+      result[[i]]$target <- result[[i]]$target / s
+    } else if (diff <= 0.05) {
+      # Warn for noticeable deviation, but still normalize
+      rlang::warn(
+        c(
+          paste0(
+            "Targets for '", margin, "' sum to ",
+            format(s, digits = 4), ", normalizing to 1.0."
+          ),
+          i = "Verify your target values are correct."
+        ),
+        class = "regrake_target_normalized"
+      )
+      result[[i]]$target <- result[[i]]$target / s
+    } else {
+      # Error for large deviations
+      stop(
+        "Targets for margin '", margin, "' sum to ", round(s, 4),
+        " which is too far from 1.0 to auto-normalize. Please check your targets.",
+        call. = FALSE
+      )
     }
   }
 
@@ -506,8 +548,33 @@ process_survey_design_data <- function(design, formula_spec) {
   ]]
 
   for (v in categorical_vars) {
-    if (abs(var_sums[v] - 1) > 1e-6) {
-      stop("Targets do not sum to 1 for variable: ", v, call. = FALSE)
+    s <- var_sums[v]
+    diff <- abs(s - 1)
+    var_rows <- result$variable == v
+
+    if (diff <= 1e-3) {
+      # Silent normalization for floating point artifacts
+      result$target[var_rows] <- result$target[var_rows] / s
+    } else if (diff <= 0.05) {
+      # Warn for noticeable deviation, but still normalize
+      rlang::warn(
+        c(
+          paste0(
+            "Targets for '", v, "' sum to ",
+            format(s, digits = 4), ", normalizing to 1.0."
+          ),
+          i = "Verify your target values are correct."
+        ),
+        class = "regrake_target_normalized"
+      )
+      result$target[var_rows] <- result$target[var_rows] / s
+    } else {
+      # Error for large deviations
+      stop(
+        "Targets for variable '", v, "' sum to ", round(s, 4),
+        " which is too far from 1.0 to auto-normalize. Please check your targets.",
+        call. = FALSE
+      )
     }
   }
 
@@ -584,21 +651,39 @@ compute_target_values <- function(
     }
   )
 
-  # Only validate categorical variables (those not identified as continuous)
+  # Only validate and normalize categorical variables (those not identified as continuous)
   categorical_vars <- names(is_continuous_var)[!is_continuous_var]
   if (length(categorical_vars) > 0) {
-    cat_data <- population_data[
-      population_data$variable %in% categorical_vars,
-    ]
-    var_sums <- tapply(cat_data$target, cat_data$variable, sum)
-    bad_vars <- names(var_sums)[abs(var_sums - 1) > 1e-6]
-    if (length(bad_vars) > 0) {
-      stop(
-        "Targets for variable '",
-        bad_vars[1],
-        "' do not sum to 1",
-        call. = FALSE
-      )
+    for (var_name in categorical_vars) {
+      var_rows <- population_data$variable == var_name
+      var_targets <- population_data$target[var_rows]
+      s <- sum(var_targets)
+      diff <- abs(s - 1)
+
+      if (diff <= 1e-3) {
+        # Silent normalization for floating point artifacts (e.g., 1/3+1/3+1/3)
+        population_data$target[var_rows] <- var_targets / s
+      } else if (diff <= 0.05) {
+        # Warn for noticeable deviation (0.99 or 1.01), but still normalize
+        rlang::warn(
+          c(
+            paste0(
+              "Targets for '", var_name, "' sum to ",
+              format(s, digits = 4), ", normalizing to 1.0."
+            ),
+            i = "Verify your target values are correct."
+          ),
+          class = "regrake_target_normalized"
+        )
+        population_data$target[var_rows] <- var_targets / s
+      } else {
+        # Error for large deviations (0.8, 1.2, etc.)
+        stop(
+          "Targets for variable '", var_name, "' sum to ", round(s, 4),
+          " which is too far from 1.0 to auto-normalize. Please check your targets.",
+          call. = FALSE
+        )
+      }
     }
   }
 

@@ -144,7 +144,9 @@ regrake <- function(
   }
 
   # Step 7: Process results and compute diagnostics
-  results <- process_admm_results(solution, admm_inputs, formula_spec, verbose, normalize)
+  results <- process_admm_results(
+    solution, admm_inputs, formula_spec, verbose, normalize, regularizer
+  )
 
   # Step 8: Add bounds information to diagnostics
   results$diagnostics$bounds <- bounds
@@ -259,12 +261,27 @@ process_admm_results <- function(
   admm_inputs,
   formula_spec,
   verbose,
-  normalize = TRUE
+  normalize = TRUE,
+  regularizer = "entropy"
 ) {
   # Extract best weights from solution and scale to sum to sample size
   weights <- solution$w_best
   n <- length(weights)
   weights <- weights * n # Scale up to sum to sample size
+
+  # Safety net: error if any weights are exactly zero (except for boolean regularizer)
+  if (regularizer != "boolean" && any(weights == 0)) {
+    n_zero <- sum(weights == 0)
+    zero_rows <- which(weights == 0)
+    stop(
+      n_zero, " observation(s) received zero weight (rows: ",
+      paste(utils::head(zero_rows, 10), collapse = ", "),
+      if (n_zero > 10) ", ..." else "",
+      "). This should not happen with valid data/targets. ",
+      "Please report this as a bug if you believe your inputs are correct.",
+      call. = FALSE
+    )
+  }
 
   # Calculate achieved values using design matrix
   # Result is weighted totals; divide by n to get proportions/means on same scale as targets

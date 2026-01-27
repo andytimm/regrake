@@ -19,7 +19,7 @@ test_that("compute_target_values handles basic validation", {
 
   expect_error(
     compute_target_values(pop_data, parse_raking_formula(~race)),
-    "Targets for variable 'race' do not sum to 1"
+    "too far from 1.0 to auto-normalize"
   )
 })
 
@@ -147,7 +147,7 @@ test_that("autumn format validates input correctly", {
   )
   expect_error(
     compute_target_values(pop_data, parse_raking_formula(~var)),
-    "Targets for variable 'var' do not sum to 1"
+    "too far from 1.0 to auto-normalize"
   )
 
   # Duplicate variable-level combinations
@@ -236,7 +236,7 @@ test_that("validation still catches categorical variables not summing to 1", {
   # Should error because sex targets don't sum to 1
   expect_error(
     compute_target_values(pop_data, formula_spec),
-    "Targets for variable 'sex' do not sum to 1"
+    "too far from 1.0 to auto-normalize"
   )
 })
 
@@ -470,7 +470,7 @@ test_that("process_anesrake_data errors when targets don't sum to 1", {
 
   expect_error(
     process_pop_data(bad_data, "anesrake", NULL),
-    "do not sum to 1"
+    "too far from 1.0 to auto-normalize"
   )
 })
 
@@ -525,7 +525,7 @@ test_that("process_survey_data errors when targets don't sum to 1", {
 
   expect_error(
     process_pop_data(bad_data, "survey", NULL),
-    "do not sum to 1"
+    "too far from 1.0 to auto-normalize"
   )
 })
 
@@ -714,4 +714,117 @@ test_that("regrake works end-to-end with survey_design format", {
   weighted_region <- tapply(w, sample_data$region, sum)
   expect_equal(unname(weighted_region["N"]), 0.5, tolerance = 0.01)
   expect_equal(unname(weighted_region["S"]), 0.5, tolerance = 0.01)
+})
+
+# =============================================================================
+# Tests for target sum normalization (tiered tolerance)
+# =============================================================================
+
+test_that("targets silently normalized for floating point artifacts", {
+  # 1/3 + 1/3 + 1/3 doesn't sum to exactly 1 due to floating point
+  pop_data <- data.frame(
+    variable = rep("race", 3),
+    level = c("A", "B", "C"),
+    target = c(1 / 3, 1 / 3, 1 / 3)
+  )
+
+  formula_spec <- parse_raking_formula(~ rr_exact(race))
+
+  # Should not warn or error
+  expect_silent(compute_target_values(pop_data, formula_spec))
+
+  # Targets should be normalized
+  result <- compute_target_values(pop_data, formula_spec)
+  target_sum <- sum(result$targets[[1]])
+  expect_equal(target_sum, 1.0)
+})
+
+test_that("targets warn and normalize for small deviations (within 5%)", {
+  # Sum = 1.01 (1% deviation)
+  pop_data <- data.frame(
+    variable = rep("sex", 2),
+    level = c("M", "F"),
+    target = c(0.505, 0.505) # Sum = 1.01
+  )
+
+  formula_spec <- parse_raking_formula(~ rr_exact(sex))
+
+  # Should warn but not error
+  expect_warning(
+    compute_target_values(pop_data, formula_spec),
+    "normalizing to 1.0"
+  )
+
+  # Targets should still be normalized
+  result <- suppressWarnings(compute_target_values(pop_data, formula_spec))
+  target_sum <- sum(result$targets[[1]])
+  expect_equal(target_sum, 1.0)
+})
+
+test_that("targets error for large deviations (beyond 5%)", {
+  # Sum = 0.8 (20% deviation)
+  pop_data <- data.frame(
+    variable = rep("sex", 2),
+    level = c("M", "F"),
+    target = c(0.4, 0.4) # Sum = 0.8
+  )
+
+  formula_spec <- parse_raking_formula(~ rr_exact(sex))
+
+  expect_error(
+    compute_target_values(pop_data, formula_spec),
+    "too far from 1.0"
+  )
+})
+
+test_that("targets error for large positive deviations", {
+  # Sum = 1.2 (20% deviation)
+  pop_data <- data.frame(
+    variable = rep("sex", 2),
+    level = c("M", "F"),
+    target = c(0.6, 0.6) # Sum = 1.2
+  )
+
+  formula_spec <- parse_raking_formula(~ rr_exact(sex))
+
+  expect_error(
+    compute_target_values(pop_data, formula_spec),
+    "too far from 1.0"
+  )
+})
+
+test_that("continuous variables are not affected by sum normalization", {
+  # Continuous targets don't need to sum to 1
+  pop_data <- data.frame(
+    variable = c("sex", "sex", "age"),
+    level = c("M", "F", "mean"),
+    target = c(0.5, 0.5, 35.5)
+  )
+
+  formula_spec <- parse_raking_formula(~ rr_exact(sex) + rr_mean(age))
+
+  # Should not error - continuous age doesn't need sum validation
+  expect_silent(compute_target_values(pop_data, formula_spec))
+})
+
+test_that("anesrake format normalizes targets silently", {
+  # Floating point sum
+  data <- list(
+    race = c(A = 1 / 3, B = 1 / 3, C = 1 / 3)
+  )
+
+  # Should not warn (within 1e-3 tolerance)
+  expect_silent(process_pop_data(data, "anesrake", NULL))
+})
+
+test_that("survey format normalizes targets silently", {
+  # Floating point sum
+  data <- data.frame(
+    margin = rep("race", 3),
+    category = c("A", "B", "C"),
+    value = c(1 / 3, 1 / 3, 1 / 3)
+  )
+
+  # Should not warn (within 1e-3 tolerance)
+  expect_silent(process_pop_data(data, "survey", NULL))
 })

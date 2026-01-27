@@ -770,3 +770,163 @@ test_that("end-to-end raking with interactions applies targets correctly", {
   expect_equal(achieved_FN, 0.30, tolerance = 1e-3)
   expect_equal(achieved_FS, 0.20, tolerance = 1e-3)
 })
+
+# =============================================================================
+# Tests for NA handling
+# =============================================================================
+
+test_that("construct_admm_inputs errors when data contains NAs", {
+  data <- data.frame(
+    sex = factor(c("M", "F", NA, "M")),
+    age = c(25, 35, 45, 30)
+  )
+
+  formula_spec <- list(
+    formula = ~ sex,
+    terms = list(list(
+      type = "exact",
+      variables = "sex",
+      interaction = NULL
+    ))
+  )
+
+  target_values <- list(
+    targets = list(exact_sex = c(M = 0.5, F = 0.5))
+  )
+
+  expect_error(
+    construct_admm_inputs(data, formula_spec, target_values),
+    "row.*contain missing values"
+  )
+})
+
+test_that("construct_admm_inputs error message identifies NA variables", {
+  data <- data.frame(
+    sex = factor(c("M", "F", "M")),
+    age = c(25, NA, 45)
+  )
+
+  formula_spec <- list(
+    formula = ~ sex + age,
+    terms = list(
+      list(type = "exact", variables = "sex", interaction = NULL),
+      list(type = "exact", variables = "age", interaction = NULL)
+    )
+  )
+
+  target_values <- list(
+    targets = list(
+      exact_sex = c(M = 0.6, F = 0.4),
+      exact_age = c(mean = 35)
+    )
+  )
+
+  expect_error(
+    construct_admm_inputs(data, formula_spec, target_values),
+    "age"
+  )
+})
+
+test_that("construct_admm_inputs works with complete data", {
+  data <- data.frame(
+    sex = factor(c("M", "F", "M")),
+    age = c(25, 35, 45)
+  )
+
+  formula_spec <- list(
+    formula = ~ sex,
+    terms = list(list(
+      type = "exact",
+      variables = "sex",
+      interaction = NULL
+    ))
+  )
+
+  target_values <- list(
+    targets = list(exact_sex = c(M = 0.6, F = 0.4))
+  )
+
+  # Should not error
+  result <- construct_admm_inputs(data, formula_spec, target_values)
+  expect_true("design_matrix" %in% names(result))
+})
+
+# =============================================================================
+# Tests for data/target level validation
+# =============================================================================
+
+test_that("construct_admm_inputs errors when data level has no target", {
+  data <- data.frame(
+    region = factor(c("N", "S", "E", "W")) # E and W exist in data
+  )
+
+  formula_spec <- list(
+    formula = ~ region,
+    terms = list(list(
+      type = "exact",
+      variables = "region",
+      interaction = NULL
+    ))
+  )
+
+  # Only N and S have targets
+  target_values <- list(
+    targets = list(exact_region = c(N = 0.5, S = 0.5))
+  )
+
+  expect_error(
+    construct_admm_inputs(data, formula_spec, target_values),
+    "Data contains level.*that have no targets.*E.*W"
+  )
+})
+
+test_that("construct_admm_inputs warns when target level not in data", {
+  data <- data.frame(
+    region = factor(c("N", "N", "S", "S")) # Only N and S
+  )
+
+  formula_spec <- list(
+    formula = ~ region,
+    terms = list(list(
+      type = "exact",
+      variables = "region",
+      interaction = NULL
+    ))
+  )
+
+  # Targets include E which doesn't exist in data
+  target_values <- list(
+    targets = list(exact_region = c(N = 0.4, S = 0.4, E = 0.2))
+  )
+
+  expect_warning(
+    construct_admm_inputs(data, formula_spec, target_values),
+    "levels not present in data.*E"
+  )
+})
+
+test_that("construct_admm_inputs validates interaction levels", {
+  data <- data.frame(
+    sex = factor(c("M", "F")),
+    region = factor(c("N", "S"))
+  )
+
+  formula_spec <- list(
+    formula = ~ sex:region,
+    terms = list(list(
+      type = "exact",
+      variables = c("sex", "region"),
+      interaction = TRUE
+    ))
+  )
+
+  # Missing M:S and F:N combinations in targets
+  target_values <- list(
+    targets = list("exact_sex:region" = c("M:N" = 0.5, "F:S" = 0.5))
+  )
+
+  expect_error(
+    construct_admm_inputs(data, formula_spec, target_values),
+    "that have no targets"
+  )
+})

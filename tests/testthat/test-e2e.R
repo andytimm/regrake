@@ -567,3 +567,81 @@ test_that("balance data frame works with continuous variables", {
     tolerance = 100
   )
 })
+
+# =============================================================================
+# Tests for zero weight handling
+# =============================================================================
+
+test_that("boolean regularizer allows zero weights", {
+  set.seed(42)
+  n <- 50
+  sample_data <- data.frame(
+    sex = factor(sample(c("M", "F"), n, replace = TRUE))
+  )
+
+  pop_data <- data.frame(
+    variable = rep("sex", 2),
+    level = c("M", "F"),
+    target = c(0.5, 0.5)
+  )
+
+  # Boolean regularizer with k < n will produce zero weights
+  result <- regrake(
+    data = sample_data,
+    formula = ~ rr_exact(sex),
+    population_data = pop_data,
+    pop_type = "proportions",
+    regularizer = "boolean",
+    k = 20
+  )
+
+  # Should have exactly 20 non-zero weights
+  expect_equal(sum(result$weights > 0), 20)
+  # Should have n - 20 zero weights
+  expect_equal(sum(result$weights == 0), n - 20)
+})
+
+test_that("regrake errors when data has NAs", {
+  sample_data <- data.frame(
+    sex = factor(c("M", "F", NA, "M", "F"))
+  )
+
+  pop_data <- data.frame(
+    variable = rep("sex", 2),
+    level = c("M", "F"),
+    target = c(0.5, 0.5)
+  )
+
+  expect_error(
+    regrake(
+      data = sample_data,
+      formula = ~ rr_exact(sex),
+      population_data = pop_data,
+      pop_type = "proportions"
+    ),
+    "missing values"
+  )
+})
+
+test_that("regrake errors when data has level not in targets", {
+  sample_data <- data.frame(
+    region = factor(c("N", "S", "E", "W", "N", "S"))
+  )
+
+  # Only N and S have targets
+  pop_data <- data.frame(
+    variable = rep("region", 2),
+    level = c("N", "S"),
+    target = c(0.5, 0.5)
+  )
+
+  expect_error(
+    regrake(
+      data = sample_data,
+      formula = ~ rr_exact(region),
+      population_data = pop_data,
+      pop_type = "proportions"
+    ),
+    "that have no targets"
+  )
+})

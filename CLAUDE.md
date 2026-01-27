@@ -69,11 +69,17 @@ data + formula_spec + target_values → construct_admm_inputs() → design_matri
 **Known Limitations:**
 - Interactions with continuous variables not supported (e.g., `~ rr_mean(age):sex` will error)
 
+**Strict Validation (added January 2025):**
+- **NAs:** Always errors if raking variables contain NAs (no silent dropping)
+- **Data/Target Mismatch:** Errors if data has levels with no corresponding targets
+- **Zero Weights:** Errors if non-boolean regularizer produces zero weights (indicates data issue)
+- **Target Sum:** Auto-normalizes targets within 5% of 1.0 (warns if 0.1-5% off, errors if >5% off)
+
 ## Building & Testing
 
 ```r
 devtools::load_all()    # Load package
-devtools::test()        # Run tests (529 pass)
+devtools::test()        # Run tests (548 pass)
 devtools::check()       # Full R CMD check (0 errors, 0 warnings)
 ```
 

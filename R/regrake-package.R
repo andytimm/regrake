@@ -8,7 +8,7 @@
 #' @aliases regrake-package
 "_PACKAGE"
 
-#' @importFrom stats as.formula contrasts model.frame model.matrix sd setNames
-#'   terms weights
+#' @importFrom stats as.formula complete.cases contrasts model.frame model.matrix
+#'   sd setNames terms weights
 #' @importFrom digest digest
 NULL

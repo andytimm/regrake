@@ -132,6 +132,24 @@ construct_admm_inputs <- function(
     t$variables
   })))
   clean_formula <- as.formula(paste("~", paste(all_vars, collapse = " + ")))
+
+  # Check for NAs in raking variables - always error, no silent dropping
+  na_mask <- !complete.cases(data[all_vars])
+  if (any(na_mask)) {
+    n_na <- sum(na_mask)
+    na_vars <- all_vars[vapply(
+      all_vars,
+      function(v) any(is.na(data[[v]])),
+      logical(1)
+    )]
+    stop(
+      n_na, " row(s) contain missing values in raking variable(s): ",
+      paste(na_vars, collapse = ", "), ". ",
+      "Remove rows with NAs before calling regrake().",
+      call. = FALSE
+    )
+  }
+
   mf <- model.frame(clean_formula, data = data)
 
   # Convert any character columns to factors
@@ -301,6 +319,33 @@ construct_admm_inputs <- function(
           paste(stripped, collapse = ":")
         }, character(1), USE.NAMES = FALSE)
       }
+      # Validate data levels have corresponding targets
+      target_levels <- names(targets)
+      missing_targets <- setdiff(level_names, target_levels)
+      if (length(missing_targets) > 0) {
+        stop(
+          "Data contains level(s) for '", term_name, "' that have no targets: ",
+          paste(missing_targets, collapse = ", "), ". ",
+          "Either add targets for these levels or remove them from the data.",
+          call. = FALSE
+        )
+      }
+
+      # Warn about target levels not in data
+      unused_targets <- setdiff(target_levels, level_names)
+      if (length(unused_targets) > 0) {
+        rlang::warn(
+          c(
+            paste0(
+              "Targets exist for '", term_name, "' levels not present in data: ",
+              paste(unused_targets, collapse = ", ")
+            ),
+            i = "These targets will be ignored."
+          ),
+          class = "regrake_unused_targets"
+        )
+      }
+
       # Reorder targets to match design matrix row order
       targets <- targets[level_names]
 
