@@ -14,6 +14,7 @@ regrake(
   lambda = 1,
   k = NULL,
   bounds = c(0.1, 10),
+  bounds_method = c("soft", "hard"),
   normalize = TRUE,
   control = list(),
   verbose = FALSE,
@@ -45,7 +46,19 @@ regrake(
 
 \item{k}{Number of samples to select (required for regularizer = "boolean")}
 
-\item{bounds}{Numeric vector of length 2 specifying (min, max) allowed weight values}
+\item{bounds}{Numeric vector of length 2 specifying (min, max) allowed weight values.
+Weights returned sum to n (sample size), so \code{bounds = c(0.3, 3)} means each weight
+is between 0.3 and 3 times the "average" weight of 1. Default is \code{c(0.1, 10)}.}
+
+\item{bounds_method}{How to enforce bounds:
+\describe{
+\item{"soft"}{(Default) Uses regularizer clipping. Fast but bounds may be
+slightly violated when targets conflict with bounds. Asymmetric bounds
+are approximated as symmetric.}
+\item{"hard"}{Uses bounded simplex projection. Bounds are strictly enforced
+but optimization may be slower and targets may be less closely matched
+when bounds are binding.}
+}}
 
 \item{normalize}{Logical. If TRUE (default), continuous variables are automatically
 scaled by their target value for numerical stability. The achieved values are
@@ -59,9 +72,12 @@ reported in original units. Set to FALSE to disable this behavior.}
 }
 \value{
 A list containing:
-\item{weights}{The optimal weights}
-\item{achieved}{The achieved margins}
+\item{weights}{The optimal weights (sum to n)}
+\item{balance}{Data frame comparing achieved vs target values with columns:
+constraint (e.g., "exact_sex"), type ("exact" or "l2"), variable,
+level, achieved, target, residual}
 \item{solution}{Full solution details from solver}
+\item{diagnostics}{Weight and margin matching diagnostics}
 }
 \description{
 Optimal representative sample weighting

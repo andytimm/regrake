@@ -18,6 +18,100 @@ projection_simplex <- function(v, z = 1) {
   pmax(v - theta, 0)
 }
 
+#' Project vector onto bounded probability simplex
+#'
+#' Projects a vector onto the probability simplex with per-element bounds.
+#' Uses a sorting-based algorithm that finds the exact threshold by binary
+#' search over breakpoints where elements transition between bounds.
+#'
+#' @param v Numeric vector to project
+#' @param lower Lower bound for each element (scalar or vector)
+#' @param upper Upper bound for each element (scalar or vector)
+#' @param z Target sum (default 1)
+#' @return Projected vector that sums to z with elements in `[lower, upper]`
+#' @keywords internal
+projection_bounded_simplex <- function(v, lower, upper, z = 1) {
+  n <- length(v)
+
+  # Handle scalar bounds
+  if (length(lower) == 1) lower <- rep(lower, n)
+  if (length(upper) == 1) upper <- rep(upper, n)
+
+  # Feasibility check: sum(lower) <= z <= sum(upper)
+  if (sum(lower) > z + 1e-10) {
+    rlang::warn(
+      c(
+        "Weight bounds are infeasible: sum of lower bounds exceeds target sum.",
+        i = "Returning best-effort projection with rescaled clipped values."
+      ),
+      class = "regrake_bounds_infeasible"
+    )
+    result <- pmax(pmin(rep(z / n, n), upper), lower)
+    return(result * z / sum(result))
+  }
+  if (sum(upper) < z - 1e-10) {
+    rlang::warn(
+      c(
+        "Weight bounds are infeasible: sum of upper bounds below target sum.",
+        i = "Returning best-effort projection with rescaled clipped values."
+      ),
+      class = "regrake_bounds_infeasible"
+    )
+    result <- pmax(pmin(rep(z / n, n), upper), lower)
+    return(result * z / sum(result))
+  }
+
+  # Quick check: if simple clipping satisfies sum constraint, we're done
+  w_clipped <- pmin(pmax(v, lower), upper)
+  if (abs(sum(w_clipped) - z) < 1e-10) {
+    return(w_clipped)
+  }
+
+  # Sorting-based approach: find threshold theta where sum(clip(v - theta)) = z
+  # The function f(theta) = sum(clip(v - theta, lower, upper)) is piecewise linear
+  # Breakpoints occur where elements hit their bounds
+
+  # Compute breakpoints: theta values where element i transitions
+  theta_upper <- v - upper # element i hits upper bound when theta < this
+
+  theta_lower <- v - lower # element i hits lower bound when theta > this
+
+  # Sort all breakpoints
+  breakpoints <- sort(c(theta_lower, theta_upper))
+
+  # Binary search for interval containing solution
+  # f(theta) is monotonically decreasing in theta
+  left <- 1L
+
+  right <- 2L * n
+
+  while (right - left > 1L) {
+    mid <- (left + right) %/% 2L
+    s <- sum(pmax(pmin(v - breakpoints[mid], upper), lower))
+    if (s > z) {
+      left <- mid
+    } else {
+      right <- mid
+    }
+  }
+
+  # Exact solution within interval [breakpoints[left], breakpoints[right]]
+  # f(theta) is linear here, so we can interpolate
+  theta_lo <- breakpoints[left]
+  theta_hi <- breakpoints[right]
+  s_lo <- sum(pmax(pmin(v - theta_lo, upper), lower))
+  s_hi <- sum(pmax(pmin(v - theta_hi, upper), lower))
+
+  # Linear interpolation to find exact theta
+  if (abs(s_lo - s_hi) < 1e-15) {
+    theta <- theta_lo
+  } else {
+    theta <- theta_lo + (s_lo - z) * (theta_hi - theta_lo) / (s_lo - s_hi)
+  }
+
+  pmax(pmin(v - theta, upper), lower)
+}
+
 #' Compute ADMM convergence metrics
 #'
 #' Computes primal and dual residual norms and their corresponding epsilon thresholds
@@ -106,11 +200,24 @@ compute_norms_and_epsilons <- function(
 #'   maxiter (max iterations, default 5000), eps_abs and eps_rel (convergence
 #'   tolerances, default 1e-5)
 #' @param verbose Print convergence progress (default FALSE)
+#' @param bounds Optional numeric vector of length 2 specifying (min, max) weight
+#'   bounds as ratios to uniform weight. Only used when bounds_method = "hard".
+#' @param bounds_method Method for enforcing bounds: "soft" (via regularizer limit,
+#'   default) or "hard" (via bounded simplex projection).
 #' @return List containing f (final f vector), w (final weights), w_bar
 #'   (projected weights), w_tilde (regularized weights), y/z/u (dual variables),
 #'   and w_best (best solution found)
 #' @export
-admm <- function(F, losses, reg, lam, control = list(), verbose = FALSE) {
+admm <- function(
+  F,
+  losses,
+  reg,
+  lam,
+  control = list(),
+  verbose = FALSE,
+  bounds = NULL,
+  bounds_method = "soft"
+) {
   # Set defaults for control parameters
   ctrl <- list(
     rho = 50,
@@ -186,7 +293,13 @@ admm <- function(F, losses, reg, lam, control = list(), verbose = FALSE) {
 
     # Update w_tilde and w_bar
     w_tilde <- reg$prox(w - z, lam / ctrl$rho)
-    w_bar <- projection_simplex(w - u)
+
+    # Use bounded simplex projection if hard bounds requested
+    if (!is.null(bounds) && bounds_method == "hard") {
+      w_bar <- projection_bounded_simplex(w - u, bounds[1] / n, bounds[2] / n)
+    } else {
+      w_bar <- projection_simplex(w - u)
+    }
 
     # Solve for w_new using cached factorization
     Ft_fy <- Matrix::crossprod(F, f + y)

@@ -51,6 +51,10 @@ data + formula_spec + target_values → construct_admm_inputs() → design_matri
 - Continuous variables auto-normalized by target for numerical stability (`normalize=TRUE` default)
 - All regularizers: entropy, zero, kl, sum_squares, boolean
 - Weighted least squares with `diag_weight` parameter
+- **Weight bounds** via `bounds` and `bounds_method` parameters:
+  - `bounds = c(0.3, 3)` means weights between 0.3x and 3x the average
+  - `bounds_method = "soft"` (default): Fast, uses regularizer clipping, bounds may be slightly violated when targets conflict
+  - `bounds_method = "hard"`: Strict enforcement via bounded simplex projection, targets may degrade when bounds conflict
 - **6 population data formats:**
   - `proportions` - "autumn" style (variable, level, target columns)
   - `raw` - unit-level data (computes means & proportions)
@@ -59,8 +63,8 @@ data + formula_spec + target_values → construct_admm_inputs() → design_matri
   - `survey` - margin/category/value columns
   - `survey_design` - survey package design objects
 - `balance` field: tidy data frame comparing achieved vs target values (columns: constraint, type, variable, level, achieved, target, residual) - ready for plotting/inspection
-- R CMD check: 0 errors, 0 warnings, 0 notes
-- 468 tests passing
+- R CMD check: 0 errors, 0 warnings, 1 note (unrelated nyosp_regrake folder)
+- 520 tests passing
 
 **Known Limitations:**
 - Interactions with continuous variables not supported (e.g., `~ rr_mean(age):sex` will error)
@@ -69,8 +73,8 @@ data + formula_spec + target_values → construct_admm_inputs() → design_matri
 
 ```r
 devtools::load_all()    # Load package
-devtools::test()        # Run tests (468 pass)
-devtools::check()       # Full R CMD check (0 errors, 0 warnings, 0 notes)
+devtools::test()        # Run tests (520 pass)
+devtools::check()       # Full R CMD check (0 errors, 0 warnings)
 ```
 
 ## Windows Environment Note
@@ -180,6 +184,8 @@ For typical survey raking problems (< 10K samples, reasonable constraint counts)
 - ✅ Code formatted with air 0.8.1
 - ✅ Fix `survey_design` format - now uses formula_spec instead of requiring terms component
 - ✅ Simplified result structure - replaced `achieved`/`targets` lists with single `balance` data frame for easy plotting/inspection
+- ✅ Weight bounds support (`bounds` + `bounds_method` parameters) with soft/hard enforcement
+- ✅ Optimized bounded simplex projection using sorting-based algorithm (~1.5x faster than bisection)
 
 ## Adding New Features
 

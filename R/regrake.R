@@ -14,7 +14,18 @@
 #' @param regularizer Regularization method ("entropy", "zero", "kl", or "boolean")
 #' @param lambda Regularization strength (default = 1)
 #' @param k Number of samples to select (required for regularizer = "boolean")
-#' @param bounds Numeric vector of length 2 specifying (min, max) allowed weight values
+#' @param bounds Numeric vector of length 2 specifying (min, max) allowed weight values.
+#'   Weights returned sum to n (sample size), so `bounds = c(0.3, 3)` means each weight
+#'   is between 0.3 and 3 times the "average" weight of 1. Default is `c(0.1, 10)`.
+#' @param bounds_method How to enforce bounds:
+#'   \describe{
+#'     \item{"soft"}{(Default) Uses regularizer clipping. Fast but bounds may be
+#'       slightly violated when targets conflict with bounds. Asymmetric bounds
+#'       are approximated as symmetric.}
+#'     \item{"hard"}{Uses bounded simplex projection. Bounds are strictly enforced
+#'       but optimization may be slower and targets may be less closely matched
+#'       when bounds are binding.}
+#'   }
 #' @param normalize Logical. If TRUE (default), continuous variables are automatically
 #'   scaled by their target value for numerical stability. The achieved values are
 #'   reported in original units. Set to FALSE to disable this behavior.
@@ -40,6 +51,7 @@ regrake <- function(
   lambda = 1,
   k = NULL,
   bounds = c(0.1, 10),
+  bounds_method = c("soft", "hard"),
   normalize = TRUE,
   control = list(),
   verbose = FALSE,
@@ -47,6 +59,7 @@ regrake <- function(
 ) {
   # Early input validation
   pop_type <- match.arg(pop_type)
+  bounds_method <- match.arg(bounds_method)
   validate_inputs(formula, population_data, pop_type, pop_weights, bounds)
 
   # Step 1: Parse formula into specification
@@ -97,7 +110,19 @@ regrake <- function(
   )
   ctrl[names(control)] <- control
 
-  # Step 5: Call solver
+  # Step 5: Convert bounds to limit for soft method
+  limit <- NULL
+  if (bounds_method == "soft" && !is.null(bounds)) {
+    limit <- convert_bounds_to_limit(bounds)
+    if (verbose && !is_symmetric_bounds(bounds)) {
+      message(
+        "Note: Asymmetric bounds approximated for soft method. ",
+        "Use bounds_method='hard' for exact enforcement."
+      )
+    }
+  }
+
+  # Step 6: Call solver
   if (verbose) {
     start_time <- proc.time()
   }
@@ -105,10 +130,12 @@ regrake <- function(
   solution <- admm(
     F = admm_inputs$design_matrix,
     losses = admm_inputs$losses,
-    reg = create_regularizer(regularizer, k = k),
+    reg = create_regularizer(regularizer, k = k, limit = limit),
     lam = lambda,
     control = ctrl,
-    verbose = verbose
+    verbose = verbose,
+    bounds = if (bounds_method == "hard") bounds else NULL,
+    bounds_method = bounds_method
   )
 
   if (verbose) {
@@ -116,8 +143,20 @@ regrake <- function(
     cat(sprintf("ADMM took %.3f seconds\n", (end_time - start_time)["elapsed"]))
   }
 
-  # Step 6: Process results and compute diagnostics
+  # Step 7: Process results and compute diagnostics
   results <- process_admm_results(solution, admm_inputs, formula_spec, verbose, normalize)
+
+  # Step 8: Add bounds information to diagnostics
+  results$diagnostics$bounds <- bounds
+  results$diagnostics$bounds_method <- bounds_method
+  results$diagnostics$bounds_violated <- check_bounds_violated(results$weights, bounds)
+
+  if (verbose && results$diagnostics$bounds_violated) {
+    message(
+      "Note: Some weights violate the specified bounds. ",
+      "This can happen with bounds_method='soft' when targets conflict with bounds."
+    )
+  }
 
   # Return results with appropriate class for methods dispatch
   structure(
@@ -338,4 +377,22 @@ build_balance_df <- function(formula_spec, losses, achieved_values, targets_flat
   balance$residual <- balance$achieved - balance$target
   rownames(balance) <- NULL
   balance
+}
+
+# Helper to convert user-specified bounds to regularizer limit
+# Bounds are [min, max] where weights sum to n (so "average" weight is 1)
+# Limit is symmetric: weights clipped to [1/limit, limit] * (1/n)
+# To cover both bounds: limit >= max AND limit >= 1/min
+convert_bounds_to_limit <- function(bounds) {
+  max(bounds[2], 1 / bounds[1])
+}
+
+# Check if bounds are symmetric around 1 (e.g., c(0.5, 2) or c(0.33, 3))
+is_symmetric_bounds <- function(bounds) {
+  abs(bounds[1] * bounds[2] - 1) < 1e-6
+}
+
+# Check if any weights violate bounds (for diagnostics)
+check_bounds_violated <- function(weights, bounds) {
+  any(weights < bounds[1] - 1e-6) || any(weights > bounds[2] + 1e-6)
 }

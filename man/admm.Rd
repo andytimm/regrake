@@ -4,7 +4,16 @@
 \alias{admm}
 \title{ADMM solver for regularized survey weighting}
 \usage{
-admm(F, losses, reg, lam, control = list(), verbose = FALSE)
+admm(
+  F,
+  losses,
+  reg,
+  lam,
+  control = list(),
+  verbose = FALSE,
+  bounds = NULL,
+  bounds_method = "soft"
+)
 }
 \arguments{
 \item{F}{Design matrix (converted to sparse internally)}
@@ -23,6 +32,12 @@ maxiter (max iterations, default 5000), eps_abs and eps_rel (convergence
 tolerances, default 1e-5)}
 
 \item{verbose}{Print convergence progress (default FALSE)}
+
+\item{bounds}{Optional numeric vector of length 2 specifying (min, max) weight
+bounds as ratios to uniform weight. Only used when bounds_method = "hard".}
+
+\item{bounds_method}{Method for enforcing bounds: "soft" (via regularizer limit,
+default) or "hard" (via bounded simplex projection).}
 }
 \value{
 List containing f (final f vector), w (final weights), w_bar
