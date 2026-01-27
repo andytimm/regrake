@@ -73,7 +73,7 @@ data + formula_spec + target_values → construct_admm_inputs() → design_matri
 
 ```r
 devtools::load_all()    # Load package
-devtools::test()        # Run tests (516 pass)
+devtools::test()        # Run tests (529 pass)
 devtools::check()       # Full R CMD check (0 errors, 0 warnings)
 ```
 
@@ -150,11 +150,12 @@ Benchmark results comparing R solver to Python implementations (January 2025):
 **Optimizations applied:**
 - Pre-allocate f vector in ADMM loop (~25% improvement on 10K)
 - Compute norms directly without vector concatenation (~3-14% improvement)
+- **Consolidate mat-vec products**: Compute `F %*% w` once per iteration and index results instead of repeated `F[idx,] %*% w` calls. This is 20% faster for narrow problems, **2-4x faster for wide problems** (many constraints).
 
 **What didn't help:**
-- Consolidating mat-vec products (row-sliced sparse mat-vec is already efficient)
 - `as.numeric()` vs `drop(as.matrix())` (made things slower)
 - Lazy convergence checking (minimal benefit after norm optimization)
+- **Rcpp for projections/norms**: Explored but not worth it. The simplex projection and norm computation are dominated by R's already-optimized vectorized operations (sort, exp, sqrt). Rcpp call overhead negates algorithmic gains, and the remaining bottlenecks (Lambert W, sort) are already C underneath.
 
 **What's not easily portable from JAX:**
 - JIT compilation
@@ -186,6 +187,9 @@ For typical survey raking problems (< 10K samples, reasonable constraint counts)
 - ✅ Simplified result structure - replaced `achieved`/`targets` lists with single `balance` data frame for easy plotting/inspection
 - ✅ Weight bounds support (`bounds` + `bounds_method` parameters) with soft/hard enforcement
 - ✅ Optimized bounded simplex projection using sorting-based algorithm (~1.5x faster than bisection)
+- ✅ Fix target-to-design-matrix ordering bug (targets now correctly matched to alphabetically-ordered factor levels)
+- ✅ Optimized ADMM loop mat-vec products (20% faster narrow, 2-4x faster wide problems)
+- ✅ Explored Rcpp optimization (not worth it - see "What didn't help" above)
 
 ## Adding New Features
 
