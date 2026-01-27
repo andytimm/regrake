@@ -278,12 +278,15 @@ admm <- function(
   w_best <- NULL
   best_objective_value <- Inf
 
+  # Pre-compute F %*% w for first iteration's f update
+  Fw_all <- drop(as.matrix(F %*% w))
+
   for (k in seq_len(ctrl$maxiter)) {
-    # Updated f block - fill in place to avoid allocation
+    # f update - use pre-computed Fw_all and index (much faster than row extraction)
     for (i in seq_along(losses)) {
       l <- losses[[i]]
       idx <- seq(l$start, l$end)
-      Fw <- drop(as.matrix(F[idx, , drop = FALSE] %*% w))
+      Fw <- Fw_all[idx]
       if (!is.null(l$lower) || !is.null(l$upper)) {
         f[idx] <- l$prox(Fw - y[idx], l$target, 1 / ctrl$rho, l$lower, l$upper)
       } else {
@@ -310,15 +313,15 @@ admm <- function(
     w_old <- w
     w <- w_new
 
-    # Cache Fw after updating w
-    Fw <- drop(as.matrix(F %*% w))
+    # Compute F %*% w once - used for dual updates, convergence, and next iteration's f update
+    Fw_all <- drop(as.matrix(F %*% w))
 
-    # Dual updates using the cached Fw
-    y <- f - Fw + y
+    # Dual updates
+    y <- f - Fw_all + y
     z <- z + (w_tilde - w)
     u <- u + (w_bar - w)
 
-    # Check convergence, passing the cached Fw
+    # Check convergence, passing the cached Fw_all
     norms <- compute_norms_and_epsilons(
       f = f,
       w = w,
@@ -330,7 +333,7 @@ admm <- function(
       rho = ctrl$rho,
       eps_abs = ctrl$eps_abs,
       eps_rel = ctrl$eps_rel,
-      Fw = Fw
+      Fw = Fw_all
     )
 
     if (verbose && k %% 50 == 0) {
