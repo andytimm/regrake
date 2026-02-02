@@ -46,7 +46,7 @@ data + formula_spec + target_values → construct_admm_inputs() → design_matri
 
 **Working:**
 - ADMM solver (core optimization)
-- Formula parsing for `rr_exact()`, `rr_l2()`, `rr_kl()`, `rr_mean()`, `rr_var()`, `rr_quantile()`, and interactions
+- Formula parsing for `rr_exact()`, `rr_l2()`, `rr_kl()`, `rr_mean()`, `rr_var()`, `rr_quantile()`, `rr_range()`/`rr_between()`, and interactions
 - Categorical and continuous variable raking
 - Continuous variables auto-normalized by target for numerical stability (`normalize=TRUE` default)
 - All regularizers: entropy, zero, kl, sum_squares, boolean
@@ -55,6 +55,11 @@ data + formula_spec + target_values → construct_admm_inputs() → design_matri
   - `bounds = c(0.3, 3)` means weights between 0.3x and 3x the average
   - `bounds_method = "soft"` (default): Fast, uses regularizer clipping, bounds may be slightly violated when targets conflict
   - `bounds_method = "hard"`: Strict enforcement via bounded simplex projection, targets may degrade when bounds conflict
+- **Range/inequality constraints** via `rr_range()` or `rr_between()`:
+  - `rr_range(sex, 0.02)` - margin mode: each level within ±2% of target
+  - `rr_range(sex, c(Female=0.02, Male=0.03))` - named vector for level-specific margins
+  - `rr_range(age, 40, 45)` - explicit bounds mode: mean age between 40 and 45
+  - Works with categorical variables, continuous variables, and categorical interactions
 - **6 population data formats:**
   - `proportions` - "autumn" style (variable, level, target columns)
   - `raw` - unit-level data (computes means & proportions)
@@ -64,7 +69,7 @@ data + formula_spec + target_values → construct_admm_inputs() → design_matri
   - `survey_design` - survey package design objects
 - `balance` field: tidy data frame comparing achieved vs target values (columns: constraint, type, variable, level, achieved, target, residual) - ready for plotting/inspection
 - R CMD check: 0 errors, 0 warnings, 1 note (unrelated nyosp_regrake folder)
-- 529 tests passing
+- 635 tests passing
 
 **Known Limitations:**
 - Interactions with continuous variables not supported (e.g., `~ rr_mean(age):sex` will error)
@@ -79,7 +84,7 @@ data + formula_spec + target_values → construct_admm_inputs() → design_matri
 
 ```r
 devtools::load_all()    # Load package
-devtools::test()        # Run tests (548 pass)
+devtools::test()        # Run tests (635 pass)
 devtools::check()       # Full R CMD check (0 errors, 0 warnings)
 ```
 
@@ -197,6 +202,9 @@ For typical survey raking problems (< 10K samples, reasonable constraint counts)
 - ✅ Optimized ADMM loop mat-vec products (20% faster narrow, 2-4x faster wide problems)
 - ✅ Explored Rcpp optimization (not worth it - see "What didn't help" above)
 
+**Completed (February 2025):**
+- ✅ Range/inequality constraints via `rr_range()` / `rr_between()` - soft bounds on weighted statistics
+
 ## Adding New Features
 
 When implementing new loss functions, regularizers, or solver features:
@@ -224,6 +232,14 @@ parse_raking_formula(~ rr_exact(sex) + rr_l2(age))
 result <- regrake(
   data = sample_data,
   formula = ~ rr_exact(sex) + rr_mean(age),
+  population_data = pop_targets,
+  pop_type = "proportions"
+)
+
+# Range constraint example (soft bounds)
+result <- regrake(
+  data = sample_data,
+  formula = ~ rr_range(sex, 0.02) + rr_range(age, 38, 42),  # sex ±2%, age between 38-42
   population_data = pop_targets,
   pop_type = "proportions"
 )

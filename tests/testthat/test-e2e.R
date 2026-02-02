@@ -645,3 +645,190 @@ test_that("regrake errors when data has level not in targets", {
     "that have no targets"
   )
 })
+
+# =============================================================================
+# Tests for rr_range (inequality constraints)
+# =============================================================================
+
+test_that("regrake handles rr_range with categorical variable (margin mode)", {
+  set.seed(42)
+  n <- 500
+
+  # Sample: heavily skewed toward M (70%)
+  sample_data <- data.frame(
+    sex = sample(c("M", "F"), n, replace = TRUE, prob = c(0.7, 0.3))
+  )
+
+  # Target: M=0.49, F=0.51, but with margin ±0.05
+  # So M should be in [0.44, 0.54], F should be in [0.46, 0.56]
+  pop_data <- data.frame(
+    variable = c("sex", "sex"),
+    level = c("M", "F"),
+    target = c(0.49, 0.51)
+  )
+
+  result <- regrake(
+    data = sample_data,
+    formula = ~ rr_range(sex, 0.05),
+    population_data = pop_data,
+    pop_type = "proportions"
+  )
+
+  # Check weights exist and are reasonable
+  expect_length(result$weights, n)
+  expect_true(all(result$weights >= 0))
+
+  # Check achieved proportions are within bounds
+  w <- result$weights / sum(result$weights)
+  weighted_sex <- tapply(w, sample_data$sex, sum)
+
+  # M should be in [0.44, 0.54]
+  expect_true(weighted_sex["M"] >= 0.44 - 0.01)
+  expect_true(weighted_sex["M"] <= 0.54 + 0.01)
+
+  # F should be in [0.46, 0.56]
+  expect_true(weighted_sex["F"] >= 0.46 - 0.01)
+  expect_true(weighted_sex["F"] <= 0.56 + 0.01)
+})
+
+test_that("regrake handles rr_range with continuous variable (margin mode)", {
+  set.seed(42)
+  n <- 500
+
+  # Sample: age mean around 35
+  survey <- data.frame(
+    sex = sample(c("M", "F"), n, replace = TRUE, prob = c(0.5, 0.5)),
+    age = rnorm(n, mean = 35, sd = 10)
+  )
+
+  # Target: mean age 40, but allow ±3 margin
+  pop <- data.frame(
+    variable = c("sex", "sex", "age"),
+    level = c("M", "F", "mean"),
+    target = c(0.5, 0.5, 40)
+  )
+
+  result <- regrake(
+    data = survey,
+    formula = ~ rr_exact(sex) + rr_range(age, 3),
+    population_data = pop,
+    pop_type = "proportions"
+  )
+
+  # Check weights exist
+  expect_length(result$weights, n)
+  expect_true(all(result$weights >= 0))
+
+  # Check weighted mean age is within bounds [37, 43]
+  w <- result$weights / sum(result$weights)
+  weighted_age_mean <- sum(w * survey$age)
+  expect_true(weighted_age_mean >= 37 - 0.5)
+  expect_true(weighted_age_mean <= 43 + 0.5)
+})
+
+test_that("regrake handles rr_range with continuous variable (explicit bounds)", {
+  set.seed(42)
+  n <- 500
+
+  # Sample: income mean around 50000
+  survey <- data.frame(
+    sex = sample(c("M", "F"), n, replace = TRUE, prob = c(0.5, 0.5)),
+    income = rnorm(n, mean = 50000, sd = 10000)
+  )
+
+  # Target: income should be between 55000 and 60000
+  pop <- data.frame(
+    variable = c("sex", "sex", "income"),
+    level = c("M", "F", "mean"),
+    target = c(0.5, 0.5, 57500) # midpoint of bounds
+  )
+
+  result <- regrake(
+    data = survey,
+    formula = ~ rr_exact(sex) + rr_range(income, 55000, 60000),
+    population_data = pop,
+    pop_type = "proportions"
+  )
+
+  # Check weights exist
+  expect_length(result$weights, n)
+  expect_true(all(result$weights >= 0))
+
+  # Check weighted mean income is within bounds [55000, 60000]
+  w <- result$weights / sum(result$weights)
+  weighted_income_mean <- sum(w * survey$income)
+  expect_true(weighted_income_mean >= 55000 - 500)
+  expect_true(weighted_income_mean <= 60000 + 500)
+})
+
+test_that("regrake handles rr_range with categorical interaction", {
+  set.seed(42)
+  n <- 500
+
+  sample_data <- data.frame(
+    sex = sample(c("M", "F"), n, replace = TRUE, prob = c(0.6, 0.4)),
+    region = sample(c("N", "S"), n, replace = TRUE, prob = c(0.7, 0.3))
+  )
+
+  # Target joint distribution with ±0.03 margin
+  pop_data <- data.frame(
+    variable = c(rep("sex:region", 4)),
+    level = c("F:N", "F:S", "M:N", "M:S"),
+    target = c(0.25, 0.25, 0.25, 0.25)
+  )
+
+  result <- regrake(
+    data = sample_data,
+    formula = ~ rr_range(sex:region, 0.03),
+    population_data = pop_data,
+    pop_type = "proportions"
+  )
+
+  # Check weights exist
+  expect_length(result$weights, n)
+  expect_true(all(result$weights >= 0))
+
+  # Check achieved proportions are within bounds [0.22, 0.28] for each cell
+  w <- result$weights / sum(result$weights)
+  for (s in c("M", "F")) {
+    for (r in c("N", "S")) {
+      achieved <- sum(w[sample_data$sex == s & sample_data$region == r])
+      expect_true(achieved >= 0.22 - 0.01, label = paste(s, r, "lower"))
+      expect_true(achieved <= 0.28 + 0.01, label = paste(s, r, "upper"))
+    }
+  }
+})
+
+test_that("rr_between works as alias for rr_range", {
+  set.seed(42)
+  n <- 500
+
+  survey <- data.frame(
+    sex = sample(c("M", "F"), n, replace = TRUE, prob = c(0.5, 0.5)),
+    age = rnorm(n, mean = 35, sd = 10)
+  )
+
+  pop <- data.frame(
+    variable = c("sex", "sex", "age"),
+    level = c("M", "F", "mean"),
+    target = c(0.5, 0.5, 40)
+  )
+
+  # rr_between should work exactly like rr_range
+  result <- regrake(
+    data = survey,
+    formula = ~ rr_exact(sex) + rr_between(age, 38, 42),
+    population_data = pop,
+    pop_type = "proportions"
+  )
+
+  # Check weights exist
+  expect_length(result$weights, n)
+  expect_true(all(result$weights >= 0))
+
+  # Check weighted mean age is within bounds [38, 42]
+  w <- result$weights / sum(result$weights)
+  weighted_age_mean <- sum(w * survey$age)
+  expect_true(weighted_age_mean >= 38 - 0.5)
+  expect_true(weighted_age_mean <= 42 + 0.5)
+})

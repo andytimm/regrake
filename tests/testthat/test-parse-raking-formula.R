@@ -129,6 +129,87 @@ test_that("rr_quantile() parses correctly for quantile constraints", {
   )
 })
 
+test_that("rr_range() parses correctly for range/inequality constraints", {
+  # Margin mode with single numeric (positional)
+  f1 <- parse_raking_formula(~ rr_range(age, 0.02))
+  expect_equal(f1$terms[[1]]$type, "range")
+  expect_equal(f1$terms[[1]]$variables, "age")
+  expect_equal(f1$terms[[1]]$params$mode, "margin")
+  expect_equal(f1$terms[[1]]$params$margin, 0.02)
+  expect_null(f1$terms[[1]]$interaction)
+
+  # Margin mode with named argument
+  f2 <- parse_raking_formula(~ rr_range(income, margin = 1000))
+  expect_equal(f2$terms[[1]]$type, "range")
+  expect_equal(f2$terms[[1]]$variables, "income")
+  expect_equal(f2$terms[[1]]$params$mode, "margin")
+  expect_equal(f2$terms[[1]]$params$margin, 1000)
+
+  # Explicit bounds mode (positional)
+  f3 <- parse_raking_formula(~ rr_range(age, 40, 45))
+  expect_equal(f3$terms[[1]]$type, "range")
+  expect_equal(f3$terms[[1]]$variables, "age")
+  expect_equal(f3$terms[[1]]$params$mode, "bounds")
+  expect_equal(f3$terms[[1]]$params$lower, 40)
+  expect_equal(f3$terms[[1]]$params$upper, 45)
+
+  # Explicit bounds mode (named)
+  f4 <- parse_raking_formula(~ rr_range(income, lower = 45000, upper = 55000))
+  expect_equal(f4$terms[[1]]$type, "range")
+  expect_equal(f4$terms[[1]]$params$mode, "bounds")
+  expect_equal(f4$terms[[1]]$params$lower, 45000)
+  expect_equal(f4$terms[[1]]$params$upper, 55000)
+
+  # Named vector margin for level-specific constraints
+  f5 <- parse_raking_formula(~ rr_range(sex, c(Female = 0.02, Male = 0.03)))
+  expect_equal(f5$terms[[1]]$type, "range")
+  expect_equal(f5$terms[[1]]$params$mode, "margin")
+  expect_equal(f5$terms[[1]]$params$margin, c(Female = 0.02, Male = 0.03))
+
+  # rr_between is an alias
+  f6 <- parse_raking_formula(~ rr_between(age, 40, 45))
+  expect_equal(f6$terms[[1]]$type, "range")
+  expect_equal(f6$terms[[1]]$params$mode, "bounds")
+  expect_equal(f6$terms[[1]]$params$lower, 40)
+  expect_equal(f6$terms[[1]]$params$upper, 45)
+
+  # Interaction with margin
+  f7 <- parse_raking_formula(~ rr_range(sex:region, 0.02))
+  expect_equal(f7$terms[[1]]$type, "range")
+  expect_equal(sort(f7$terms[[1]]$variables), c("region", "sex"))
+  expect_equal(length(f7$terms[[1]]$interaction), 2)
+  expect_equal(f7$terms[[1]]$params$mode, "margin")
+  expect_equal(f7$terms[[1]]$params$margin, 0.02)
+
+  # Combined with other constraint types
+  f8 <- parse_raking_formula(~ rr_exact(sex) + rr_range(age, 40, 45))
+  expect_equal(length(f8$terms), 2)
+  expect_equal(f8$terms[[1]]$type, "exact")
+  expect_equal(f8$terms[[2]]$type, "range")
+
+  # Errors on missing arguments
+  expect_error(
+    parse_raking_formula(~ rr_range(age)),
+    "rr_range requires at least 2 arguments"
+  )
+
+  # Errors on invalid margin (must be positive)
+  expect_error(
+    parse_raking_formula(~ rr_range(age, -0.02)),
+    "margin must be a positive number"
+  )
+
+  # Errors on lower >= upper
+  expect_error(
+    parse_raking_formula(~ rr_range(age, 45, 40)),
+    "lower must be less than upper"
+  )
+  expect_error(
+    parse_raking_formula(~ rr_range(age, 40, 40)),
+    "lower must be less than upper"
+  )
+})
+
 test_that("interactions are handled correctly", {
   # Simple interaction
   f1 <- parse_raking_formula(~ race:age)

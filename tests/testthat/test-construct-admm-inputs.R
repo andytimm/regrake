@@ -930,3 +930,171 @@ test_that("construct_admm_inputs validates interaction levels", {
     "that have no targets"
   )
 })
+
+# =============================================================================
+# Tests for range (inequality) constraints
+# =============================================================================
+
+test_that("construct_admm_inputs handles range constraint for continuous variable (margin mode)", {
+  data <- data.frame(income = c(50000, 75000, 45000, 80000, 55000))
+
+  formula_spec <- list(
+    formula = ~income,
+    terms = list(list(
+      type = "range",
+      variables = "income",
+      interaction = NULL,
+      params = list(mode = "margin", margin = 5000)
+    ))
+  )
+
+  target_values <- list(targets = list(range_income = c(mean = 60000)))
+
+  # With normalization (default)
+  result <- construct_admm_inputs(data, formula_spec, target_values)
+
+  # Verify loss uses inequality prox
+  expect_equal(result$losses[[1]]$fn, inequality_loss)
+  expect_equal(result$losses[[1]]$prox, prox_inequality)
+
+  # Verify lower/upper bounds are set (scaled by target)
+  # Original: lower = -5000, upper = 5000
+  # Normalized: lower = -5000/60000, upper = 5000/60000
+  expect_equal(unname(result$losses[[1]]$lower), -5000 / 60000, tolerance = 1e-10)
+  expect_equal(unname(result$losses[[1]]$upper), 5000 / 60000, tolerance = 1e-10)
+
+  # Target should be normalized to 1.0
+  expect_equal(unname(result$losses[[1]]$target), 1.0)
+})
+
+test_that("construct_admm_inputs handles range constraint for continuous variable (bounds mode)", {
+  data <- data.frame(age = c(30, 35, 40, 45, 50))
+
+  formula_spec <- list(
+    formula = ~age,
+    terms = list(list(
+      type = "range",
+      variables = "age",
+      interaction = NULL,
+      params = list(mode = "bounds", lower = 35, upper = 45)
+    ))
+  )
+
+  # Target from population data
+  target_values <- list(targets = list(range_age = c(mean = 40)))
+
+  result <- construct_admm_inputs(data, formula_spec, target_values, normalize = FALSE)
+
+  # Verify bounds are computed as offsets from target
+  # lower = 35 - 40 = -5, upper = 45 - 40 = 5
+  expect_equal(unname(result$losses[[1]]$lower), -5)
+  expect_equal(unname(result$losses[[1]]$upper), 5)
+  expect_equal(unname(result$losses[[1]]$target), 40)
+})
+
+test_that("construct_admm_inputs handles range constraint for categorical variable (margin mode)", {
+  data <- data.frame(sex = factor(c("M", "F", "M", "F", "M")))
+
+  formula_spec <- list(
+    formula = ~sex,
+    terms = list(list(
+      type = "range",
+      variables = "sex",
+      interaction = NULL,
+      params = list(mode = "margin", margin = 0.05)
+    ))
+  )
+
+  target_values <- list(targets = list(range_sex = c(F = 0.51, M = 0.49)))
+
+  result <- construct_admm_inputs(data, formula_spec, target_values)
+
+  # Verify loss uses inequality prox
+  expect_equal(result$losses[[1]]$fn, inequality_loss)
+  expect_equal(result$losses[[1]]$prox, prox_inequality)
+
+  # Verify lower/upper bounds (same for all levels with single margin)
+  # Targets are reordered to F, M (alphabetical)
+  expect_equal(result$losses[[1]]$lower, c(-0.05, -0.05))
+  expect_equal(result$losses[[1]]$upper, c(0.05, 0.05))
+  expect_equal(unname(result$losses[[1]]$target), c(0.51, 0.49))
+})
+
+test_that("construct_admm_inputs handles range constraint with named vector margin", {
+  data <- data.frame(sex = factor(c("M", "F", "M", "F", "M")))
+
+  formula_spec <- list(
+    formula = ~sex,
+    terms = list(list(
+      type = "range",
+      variables = "sex",
+      interaction = NULL,
+      params = list(mode = "margin", margin = c(F = 0.02, M = 0.03))
+    ))
+  )
+
+  target_values <- list(targets = list(range_sex = c(F = 0.51, M = 0.49)))
+
+  result <- construct_admm_inputs(data, formula_spec, target_values)
+
+  # Verify level-specific bounds (reordered to F, M)
+  expect_equal(unname(result$losses[[1]]$lower), c(-0.02, -0.03))
+  expect_equal(unname(result$losses[[1]]$upper), c(0.02, 0.03))
+})
+
+test_that("construct_admm_inputs handles range constraint for interaction", {
+  data <- data.frame(
+    sex = factor(c("M", "F", "M", "F")),
+    region = factor(c("N", "S", "S", "N"))
+  )
+
+  formula_spec <- list(
+    formula = ~ sex:region,
+    terms = list(list(
+      type = "range",
+      variables = c("sex", "region"),
+      interaction = TRUE,
+      params = list(mode = "margin", margin = 0.02)
+    ))
+  )
+
+  target_values <- list(
+    targets = list("range_sex:region" = c(
+      "F:N" = 0.25, "F:S" = 0.25,
+      "M:N" = 0.25, "M:S" = 0.25
+    ))
+  )
+
+  result <- construct_admm_inputs(data, formula_spec, target_values)
+
+  # Verify loss uses inequality prox
+  expect_equal(result$losses[[1]]$fn, inequality_loss)
+  expect_equal(result$losses[[1]]$prox, prox_inequality)
+
+  # Verify bounds are set for all 4 interaction levels
+  expect_length(result$losses[[1]]$lower, 4)
+  expect_length(result$losses[[1]]$upper, 4)
+  expect_true(all(result$losses[[1]]$lower == -0.02))
+  expect_true(all(result$losses[[1]]$upper == 0.02))
+})
+
+test_that("construct_admm_inputs errors on named vector margin with missing levels", {
+  data <- data.frame(region = factor(c("N", "S", "E")))
+
+  formula_spec <- list(
+    formula = ~region,
+    terms = list(list(
+      type = "range",
+      variables = "region",
+      interaction = NULL,
+      params = list(mode = "margin", margin = c(N = 0.02, S = 0.02))
+    ))
+  )
+
+  target_values <- list(targets = list(range_region = c(N = 0.4, S = 0.4, E = 0.2)))
+
+  expect_error(
+    construct_admm_inputs(data, formula_spec, target_values),
+    "Named margin vector missing levels"
+  )
+})

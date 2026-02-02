@@ -122,6 +122,10 @@ construct_admm_inputs <- function(
     quantile = list(
       fn = equality_loss,
       prox = prox_equality
+    ),
+    range = list(
+      fn = inequality_loss,
+      prox = prox_inequality
     )
   )
 
@@ -180,6 +184,10 @@ construct_admm_inputs <- function(
     }
     targets <- target_values$targets[[target_key]]
 
+    # Initialize range bounds (only used for range constraints)
+    range_lower <- NULL
+    range_upper <- NULL
+
     # Check for unsupported continuous + interaction
     if (!is.null(term$interaction)) {
       for (var in term$variables) {
@@ -235,6 +243,34 @@ construct_admm_inputs <- function(
 
         if (normalize && abs(targets) > .Machine$double.eps) {
           values <- values / targets
+          scale_factors[[length(scale_factors) + 1]] <- list(
+            index = current_row,
+            scale = targets,
+            variable = term$variables
+          )
+          original_target <- targets
+          targets <- 1.0
+        }
+      } else if (term$type == "range") {
+        # Range (inequality) constraint for continuous variable
+        # Constraint: lower <= sum(wi * xi) - target <= upper
+        values <- raw_values
+
+        if (term$params$mode == "margin") {
+          # Margin mode: target ± margin
+          range_lower <- -term$params$margin
+          range_upper <- term$params$margin
+        } else {
+          # Explicit bounds: compute offsets from population_data target
+          range_lower <- term$params$lower - targets
+          range_upper <- term$params$upper - targets
+        }
+
+        if (normalize && abs(targets) > .Machine$double.eps) {
+          values <- values / targets
+          # Scale bounds by the same factor
+          range_lower <- range_lower / targets
+          range_upper <- range_upper / targets
           scale_factors[[length(scale_factors) + 1]] <- list(
             index = current_row,
             scale = targets,
@@ -364,6 +400,40 @@ construct_admm_inputs <- function(
 
       # For categorical, original_target is same as targets
       original_target <- targets
+
+      # Handle range constraints for categorical variables
+      if (term$type == "range") {
+        n_levels <- length(targets)
+        if (term$params$mode == "margin") {
+          margin <- term$params$margin
+          if (length(margin) == 1) {
+            # Single margin: same for all levels
+            range_lower <- rep(-margin, n_levels)
+            range_upper <- rep(margin, n_levels)
+          } else if (!is.null(names(margin))) {
+            # Named vector: match to level names
+            if (!all(level_names %in% names(margin))) {
+              missing <- setdiff(level_names, names(margin))
+              stop(
+                "Named margin vector missing levels: ",
+                paste(missing, collapse = ", "),
+                call. = FALSE
+              )
+            }
+            range_lower <- -margin[level_names]
+            range_upper <- margin[level_names]
+          } else {
+            stop(
+              "Margin must be a single number or a named vector matching level names",
+              call. = FALSE
+            )
+          }
+        } else {
+          # Explicit bounds mode for categorical
+          range_lower <- rep(term$params$lower, n_levels) - targets
+          range_upper <- rep(term$params$upper, n_levels) - targets
+        }
+      }
     }
 
     # Create loss function based on term type
@@ -376,7 +446,9 @@ construct_admm_inputs <- function(
     # Use local() to properly capture values for closures
     loss_fn <- loss_types[[term$type]]$fn
     loss_target <- targets
-    losses[[term_idx]] <- list(
+
+    # Build loss entry
+    loss_entry <- list(
       fn = loss_fn,
       target = targets,
       original_target = original_target,
@@ -387,6 +459,23 @@ construct_admm_inputs <- function(
         function(x) sum(fn(x, tgt))
       })
     )
+
+    # Add lower/upper for range constraints
+    if (term$type == "range") {
+      loss_entry$lower <- range_lower
+      loss_entry$upper <- range_upper
+
+      # Update evaluate function for inequality loss
+      loss_entry$evaluate <- local({
+        fn <- loss_fn
+        tgt <- loss_target
+        lo <- range_lower
+        hi <- range_upper
+        function(x) sum(fn(x, tgt, lo, hi))
+      })
+    }
+
+    losses[[term_idx]] <- loss_entry
   }
 
   # Combine design matrix blocks

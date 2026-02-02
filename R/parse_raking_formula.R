@@ -214,6 +214,75 @@ parse_formula_terms <- function(expr) {
       )
     }
     list(create_quantile_term(args[[1]], p))
+  } else if (fun %in% c("rr_range", "rr_between")) {
+    # rr_range(x, margin) or rr_range(x, lower, upper)
+    # Also supports: rr_range(x, margin = 0.02), rr_range(x, lower = 0.4, upper = 0.6)
+    if (length(args) < 2) {
+      stop(
+        "rr_range requires at least 2 arguments: variable and margin, or lower/upper bounds",
+        call. = FALSE
+      )
+    }
+
+    # Helper to safely evaluate an argument (handles c() expressions, etc.)
+    eval_arg <- function(arg) {
+      if (is.numeric(arg)) {
+        arg
+      } else if (is.call(arg)) {
+        tryCatch(
+          eval(arg, envir = baseenv()),
+          error = function(e) arg
+        )
+      } else {
+        arg
+      }
+    }
+
+    # Check for named arguments first
+    arg_names <- names(args)
+    has_lower <- !is.null(arg_names) && "lower" %in% arg_names
+    has_upper <- !is.null(arg_names) && "upper" %in% arg_names
+    has_margin <- !is.null(arg_names) && "margin" %in% arg_names
+
+    if (has_lower && has_upper) {
+      # Named bounds: rr_range(x, lower = 0.4, upper = 0.6)
+      lower <- eval_arg(args$lower)
+      upper <- eval_arg(args$upper)
+      if (!is.numeric(lower) || !is.numeric(upper)) {
+        stop("rr_range lower and upper must be numeric", call. = FALSE)
+      }
+      if (any(lower >= upper)) {
+        stop("rr_range lower must be less than upper", call. = FALSE)
+      }
+      list(create_range_term(args[[1]], lower = lower, upper = upper))
+    } else if (has_margin) {
+      # Named margin: rr_range(x, margin = 0.02)
+      margin <- eval_arg(args$margin)
+      if (!is.numeric(margin) || any(margin <= 0)) {
+        stop("rr_range margin must be a positive number", call. = FALSE)
+      }
+      list(create_range_term(args[[1]], margin = margin))
+    } else if (length(args) == 2) {
+      # Positional margin: rr_range(x, 0.02) or rr_range(x, c(A=0.02, B=0.03))
+      margin <- eval_arg(args[[2]])
+      if (!is.numeric(margin) || any(margin <= 0)) {
+        stop("rr_range margin must be a positive number (or named vector of positive numbers)", call. = FALSE)
+      }
+      list(create_range_term(args[[1]], margin = margin))
+    } else if (length(args) >= 3) {
+      # Positional bounds: rr_range(x, 0.4, 0.6)
+      lower <- eval_arg(args[[2]])
+      upper <- eval_arg(args[[3]])
+      if (!is.numeric(lower) || !is.numeric(upper)) {
+        stop("rr_range lower and upper must be numeric", call. = FALSE)
+      }
+      if (any(lower >= upper)) {
+        stop("rr_range lower must be less than upper", call. = FALSE)
+      }
+      list(create_range_term(args[[1]], lower = lower, upper = upper))
+    } else {
+      stop("rr_range requires margin or lower/upper bounds", call. = FALSE)
+    }
   } else if (fun == ":") {
     # Handle interactions by recursively collecting all variables
     list(create_interaction_term(collect_interaction_vars(expr)))
@@ -311,6 +380,59 @@ create_quantile_term <- function(expr, p) {
       interaction = NULL,
       params = list(p = p),
       term_id = create_term_id("quantile", expr)
+    ),
+    class = "raking_term"
+  )
+}
+
+#' Create a term specification for range (inequality) constraints
+#' @param expr Variable expression
+#' @param margin Symmetric margin around target (mode = "margin")
+#' @param lower Lower bound (mode = "bounds")
+#' @param upper Upper bound (mode = "bounds")
+#' @keywords internal
+create_range_term <- function(expr, margin = NULL, lower = NULL, upper = NULL) {
+  # Handle interactions
+  if (rlang::is_call(expr, ":")) {
+    vars <- collect_interaction_vars(expr)
+    var_names <- unname(vapply(vars, as.character, character(1)))
+
+    params <- if (!is.null(margin)) {
+      list(mode = "margin", margin = margin)
+    } else {
+      list(mode = "bounds", lower = lower, upper = upper)
+    }
+
+    return(structure(
+      list(
+        type = "range",
+        variables = var_names,
+        interaction = vars,
+        params = params,
+        term_id = create_term_id("range", expr)
+      ),
+      class = "raking_term"
+    ))
+  }
+
+  # Handle nested functions by getting the innermost expression
+  while (rlang::is_call(expr)) {
+    expr <- rlang::call_args(expr)[[1]]
+  }
+
+  params <- if (!is.null(margin)) {
+    list(mode = "margin", margin = margin)
+  } else {
+    list(mode = "bounds", lower = lower, upper = upper)
+  }
+
+  structure(
+    list(
+      type = "range",
+      variables = as.character(expr),
+      interaction = NULL,
+      params = params,
+      term_id = create_term_id("range", expr)
     ),
     class = "raking_term"
   )
@@ -433,6 +555,22 @@ rr_var <- function(x) {
 #' @rdname rr_constraints
 #' @export
 rr_quantile <- function(x, p) {
+  x
+}
+
+#' @rdname rr_constraints
+#' @param ... For `rr_range`/`rr_between`: either a single margin value (or named
+#'   vector for level-specific margins), or separate lower and upper bounds.
+#'   Examples: `rr_range(x, 0.02)`, `rr_range(x, c(A=0.01, B=0.02))`,
+#'   `rr_range(x, 40, 45)`, `rr_range(x, lower=40, upper=45)`
+#' @export
+rr_range <- function(x, ...) {
+  x
+}
+
+#' @rdname rr_constraints
+#' @export
+rr_between <- function(x, ...) {
   x
 }
 
