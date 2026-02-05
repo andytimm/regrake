@@ -32,6 +32,12 @@
 #'   must be within +/- 2 percentage points of targets, and continuous means within
 #'   +/- 0.02 of targets. Use `rr_range()` directly in the formula for per-variable
 #'   control. Default is NULL (exact constraints enforced strictly).
+#' @param margin_tol Optional margin-based convergence tolerance. When set, the ADMM
+#'   solver uses a tolerance that scales with problem size to achieve approximately
+#'   this level of margin accuracy (e.g., `margin_tol = 0.001` targets ~0.1% max
+#'   margin error). This overrides `eps_abs` and `eps_rel` in `control`. The scaling
+#'   formula is `eps = margin_tol / sqrt(m + 2*n)` where m is the number of
+#'   constraints and n is the sample size. Default is NULL (use eps_abs/eps_rel).
 #' @param normalize Logical. If TRUE (default), continuous variables are automatically
 #'   scaled by their target value for numerical stability. The achieved values are
 #'   reported in original units. Set to FALSE to disable this behavior.
@@ -59,6 +65,7 @@ regrake <- function(
   bounds = c(0.1, 10),
   bounds_method = c("soft", "hard"),
   exact_tol = NULL,
+  margin_tol = NULL,
   normalize = TRUE,
   control = list(),
   verbose = FALSE,
@@ -72,6 +79,12 @@ regrake <- function(
   if (!is.null(exact_tol)) {
     if (!is.numeric(exact_tol) || length(exact_tol) != 1 || exact_tol <= 0) {
       stop("exact_tol must be a single positive number or NULL", call. = FALSE)
+    }
+  }
+
+  if (!is.null(margin_tol)) {
+    if (!is.numeric(margin_tol) || length(margin_tol) != 1 || margin_tol <= 0) {
+      stop("margin_tol must be a single positive number or NULL", call. = FALSE)
     }
   }
 
@@ -139,6 +152,23 @@ regrake <- function(
     eps_abs = 1e-5
   )
   ctrl[names(control)] <- control
+
+  # Apply margin_tol scaling if specified
+  # This scales eps_abs/eps_rel to achieve consistent margin accuracy across problem sizes
+  if (!is.null(margin_tol)) {
+    n_samples <- nrow(data)
+    n_constraints <- nrow(admm_inputs$design_matrix)
+    p <- n_constraints + 2 * n_samples
+    scaled_eps <- margin_tol / sqrt(p)
+    ctrl$eps_abs <- scaled_eps
+    ctrl$eps_rel <- scaled_eps
+    if (verbose) {
+      cat(sprintf(
+        "margin_tol=%.1e -> scaled eps=%.2e (p=%d, sqrt(p)=%.1f)\n",
+        margin_tol, scaled_eps, p, sqrt(p)
+      ))
+    }
+  }
 
   # Step 5: Convert bounds to limit for soft method
   limit <- NULL
@@ -210,6 +240,7 @@ regrake <- function(
       regularizer = regularizer,
       lambda = lambda,
       exact_tol = exact_tol,
+      margin_tol = margin_tol,
       call = match.call()
     ),
     class = "regrake"

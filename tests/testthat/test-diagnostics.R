@@ -306,3 +306,93 @@ test_that("exact_tol does not affect non-exact constraints", {
   age_rows <- result$balance[result$balance$variable == "age", ]
   expect_true(all(age_rows$type == "l2"))
 })
+
+# margin_tol parameter tests ---------------------------------------------------
+
+test_that("margin_tol scales eps_abs/eps_rel based on problem size", {
+  set.seed(42)
+  n <- 1000
+  sample_data <- data.frame(
+    sex = sample(c("M", "F"), n, replace = TRUE, prob = c(0.6, 0.4))
+  )
+
+  pop_data <- data.frame(
+    variable = "sex",
+    level = c("M", "F"),
+    proportion = c(0.49, 0.51)
+  )
+
+  # With margin_tol, should converge to good accuracy
+
+  result <- regrake(
+    data = sample_data,
+    formula = ~ rr_exact(sex),
+    population_data = pop_data,
+    pop_type = "proportions",
+    margin_tol = 0.001
+  )
+
+  expect_true(result$diagnostics$converged)
+  expect_lt(max(abs(result$balance$residual)), 0.001)  # should be well under 0.1%
+})
+
+test_that("margin_tol is stored on result object", {
+  result <- make_test_result()
+  expect_null(result$margin_tol)
+
+  set.seed(42)
+  n <- 500
+  sample_data <- data.frame(
+    sex = sample(c("M", "F"), n, replace = TRUE, prob = c(0.6, 0.4))
+  )
+
+  pop_data <- data.frame(
+    variable = "sex",
+    level = c("M", "F"),
+    proportion = c(0.49, 0.51)
+  )
+
+  result <- regrake(
+    data = sample_data,
+    formula = ~ rr_exact(sex),
+    population_data = pop_data,
+    pop_type = "proportions",
+    margin_tol = 0.001
+  )
+
+  expect_equal(result$margin_tol, 0.001)
+})
+
+test_that("invalid margin_tol values are rejected", {
+  set.seed(42)
+  n <- 100
+  sample_data <- data.frame(
+    sex = sample(c("M", "F"), n, replace = TRUE)
+  )
+
+  pop_data <- data.frame(
+    variable = "sex",
+    level = c("M", "F"),
+    proportion = c(0.5, 0.5)
+  )
+
+  expect_error(
+    regrake(sample_data, ~ rr_exact(sex), pop_data, "proportions", margin_tol = -0.01),
+    "margin_tol must be a single positive number"
+  )
+
+  expect_error(
+    regrake(sample_data, ~ rr_exact(sex), pop_data, "proportions", margin_tol = 0),
+    "margin_tol must be a single positive number"
+  )
+
+  expect_error(
+    regrake(sample_data, ~ rr_exact(sex), pop_data, "proportions", margin_tol = c(0.01, 0.02)),
+    "margin_tol must be a single positive number"
+  )
+
+  expect_error(
+    regrake(sample_data, ~ rr_exact(sex), pop_data, "proportions", margin_tol = "0.01"),
+    "margin_tol must be a single positive number"
+  )
+})
