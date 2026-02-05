@@ -277,6 +277,7 @@ admm <- function(
 
   w_best <- NULL
   best_objective_value <- Inf
+  converged <- FALSE
 
   # Pre-compute F %*% w for first iteration's f update
   Fw_all <- drop(as.matrix(F %*% w))
@@ -370,6 +371,7 @@ admm <- function(
 
     # Check convergence
     if (norms$r_norm <= norms$eps_pri && norms$s_norm <= norms$eps_dual) {
+      converged <- TRUE
       break
     }
 
@@ -395,6 +397,10 @@ admm <- function(
     y = y,
     z = z,
     u = u,
-    w_best = w_best
+    w_best = w_best,
+    converged = converged,
+    iterations = k,
+    primal_residual = norms$r_norm,
+    dual_residual = norms$s_norm
   )
 }
