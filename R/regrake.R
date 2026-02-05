@@ -319,8 +319,10 @@ process_admm_results <- function(
       n_zero, " observation(s) received zero weight (rows: ",
       paste(utils::head(zero_rows, 10), collapse = ", "),
       if (n_zero > 10) ", ..." else "",
-      "). This should not happen with valid data/targets. ",
-      "Please report this as a bug if you believe your inputs are correct.",
+      "). Possible causes: (1) tolerance too loose for problem size ",
+      "(try smaller eps_abs/eps_rel in control), ",
+      "(2) data has observations with no overlap with targets, ",
+      "(3) targets are infeasible given the data.",
       call. = FALSE
     )
   }
