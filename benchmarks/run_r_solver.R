@@ -41,9 +41,13 @@ load_test_case <- function(case_name) {
 make_losses <- function(losses_spec) {
   # Handle case where jsonlite simplifies single-row arrays to data frames
   if (is.data.frame(losses_spec)) {
-    # Convert data frame rows to list
+    # Convert data frame rows to list, preserving all fields
     losses_list <- lapply(seq_len(nrow(losses_spec)), function(i) {
-      list(type = losses_spec$type[i], target = losses_spec$target[[i]])
+      row <- list(type = losses_spec$type[i], target = losses_spec$target[[i]])
+      if ("lower" %in% names(losses_spec)) row$lower <- losses_spec$lower[[i]]
+      if ("upper" %in% names(losses_spec)) row$upper <- losses_spec$upper[[i]]
+      if ("scale" %in% names(losses_spec)) row$scale <- losses_spec$scale[[i]]
+      row
     })
   } else {
     losses_list <- losses_spec
@@ -55,12 +59,26 @@ make_losses <- function(losses_spec) {
       "equality" = list(
         fn = equality_loss,
         target = target,
-        prox = prox_equality
+        prox = prox_equality,
+        evaluate = function(x) sum(equality_loss(x, target))
       ),
       "least_squares" = list(
         fn = least_squares_loss,
         target = target,
         prox = prox_least_squares
+      ),
+      "inequality" = list(
+        fn = inequality_loss,
+        target = target,
+        prox = prox_inequality,
+        lower = spec$lower,
+        upper = spec$upper
+      ),
+      "kl" = list(
+        fn = function(x, t) kl_loss(x, t),
+        target = target,
+        prox = function(x, t, rho) prox_kl(x, t, rho, scale = if (!is.null(spec$scale)) spec$scale else 1),
+        evaluate = function(x) sum(kl_loss(x, target))
       ),
       stop("Unknown loss type: ", spec$type)
     )
@@ -78,6 +96,23 @@ make_regularizer <- function(reg_spec) {
       fn = zero_regularizer,
       prox = prox_equality_reg
     ),
+    "kl" = {
+      prior <- reg_spec$prior
+      list(
+        fn = function(w, lambda) kl_regularizer(w, lambda, prior, limit = NULL),
+        prox = function(w, lambda) prox_kl_reg(w, lambda, prior = prior, limit = NULL)
+      )
+    },
+    "boolean" = {
+      k <- reg_spec$k
+      structure(
+        list(
+          fn = function(w, lambda) w,
+          prox = function(w, lambda) prox_boolean_reg(w, lambda, k)
+        ),
+        class = "BooleanRegularizer"
+      )
+    },
     stop("Unknown regularizer type: ", reg_spec$type)
   )
 }

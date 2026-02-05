@@ -16,8 +16,8 @@ from pathlib import Path
 # Try to import both implementations
 try:
     import rswjax
-    from rswjax import EqualityLoss, LeastSquaresLoss, KLLoss
-    from rswjax import ZeroRegularizer, EntropyRegularizer, KLRegularizer
+    from rswjax import EqualityLoss, LeastSquaresLoss, KLLoss, InequalityLoss
+    from rswjax import ZeroRegularizer, EntropyRegularizer, KLRegularizer, BooleanRegularizer
     from rswjax import rsw
     HAS_RSWJAX = True
 except ImportError:
@@ -30,8 +30,12 @@ try:
     sys.path.insert(0, str(Path(__file__).parent.parent / "ai_context" / "rsw_original"))
     from rsw import EqualityLoss as OrigEqualityLoss
     from rsw import LeastSquaresLoss as OrigLeastSquaresLoss
+    from rsw import InequalityLoss as OrigInequalityLoss
+    from rsw import KLLoss as OrigKLLoss
     from rsw import ZeroRegularizer as OrigZeroRegularizer
     from rsw import EntropyRegularizer as OrigEntropyRegularizer
+    from rsw import KLRegularizer as OrigKLRegularizer
+    from rsw import BooleanRegularizer as OrigBooleanRegularizer
     from rsw.solver import admm as orig_admm
     HAS_ORIGINAL_RSW = True
 except ImportError as e:
@@ -669,6 +673,198 @@ def generate_100k_scale():
     print("Generated: 09_100k_scale")
 
 
+def generate_inequality_constraints():
+    """Test case 13: Inequality (range) constraints on categorical variable."""
+    np.random.seed(60)
+    n = 1000
+
+    # Two categories: sample 60/40, target 50/50 with +/-0.03 margin
+    categories = np.random.choice([0, 1], size=n, p=[0.6, 0.4])
+
+    F = np.zeros((2, n))
+    F[0, categories == 0] = 1
+    F[1, categories == 1] = 1
+
+    targets = np.array([0.5, 0.5])
+    lower = np.array([-0.03, -0.03])
+    upper = np.array([0.03, 0.03])
+
+    losses_spec = [{"type": "inequality", "target": targets.tolist(),
+                     "lower": lower.tolist(), "upper": upper.tolist()}]
+    regularizer_spec = {"type": "entropy", "limit": None}
+    lam = 1.0
+
+    results = {}
+    if HAS_RSWJAX:
+        losses = [InequalityLoss(targets, lower, upper)]
+        regularizer = EntropyRegularizer()
+        results["rswjax"] = run_rswjax(F, losses, regularizer, lam)
+
+    if HAS_ORIGINAL_RSW:
+        orig_losses = [OrigInequalityLoss(targets, lower, upper)]
+        orig_regularizer = OrigEntropyRegularizer()
+        results["rsw_original"] = run_original_rsw(F, orig_losses, orig_regularizer, lam)
+
+    save_test_case("13_inequality", F, losses_spec, regularizer_spec, lam, results)
+    print("Generated: 13_inequality")
+
+
+def generate_mixed_equality_inequality():
+    """Test case 14: Mixed equality and inequality constraints."""
+    np.random.seed(61)
+    n = 1000
+
+    sex = np.random.choice([0, 1], size=n, p=[0.6, 0.4])
+    age = np.random.choice([0, 1, 2], size=n, p=[0.5, 0.3, 0.2])
+
+    F = np.zeros((5, n))
+    F[0, sex == 0] = 1
+    F[1, sex == 1] = 1
+    F[2, age == 0] = 1
+    F[3, age == 1] = 1
+    F[4, age == 2] = 1
+
+    sex_targets = np.array([0.5, 0.5])
+    age_targets = np.array([0.3, 0.4, 0.3])
+    age_lower = np.array([-0.02, -0.02, -0.02])
+    age_upper = np.array([0.02, 0.02, 0.02])
+
+    losses_spec = [
+        {"type": "equality", "target": sex_targets.tolist()},
+        {"type": "inequality", "target": age_targets.tolist(),
+         "lower": age_lower.tolist(), "upper": age_upper.tolist()}
+    ]
+    regularizer_spec = {"type": "entropy", "limit": None}
+    lam = 1.0
+
+    results = {}
+    if HAS_RSWJAX:
+        losses = [EqualityLoss(sex_targets), InequalityLoss(age_targets, age_lower, age_upper)]
+        regularizer = EntropyRegularizer()
+        results["rswjax"] = run_rswjax(F, losses, regularizer, lam)
+
+    if HAS_ORIGINAL_RSW:
+        orig_losses = [OrigEqualityLoss(sex_targets),
+                       OrigInequalityLoss(age_targets, age_lower, age_upper)]
+        orig_regularizer = OrigEntropyRegularizer()
+        results["rsw_original"] = run_original_rsw(F, orig_losses, orig_regularizer, lam)
+
+    save_test_case("14_mixed_eq_ineq", F, losses_spec, regularizer_spec, lam, results)
+    print("Generated: 14_mixed_eq_ineq")
+
+
+def generate_kl_loss():
+    """Test case 15: KL divergence loss."""
+    np.random.seed(62)
+    n = 1000
+
+    categories = np.random.choice([0, 1, 2], size=n, p=[0.5, 0.3, 0.2])
+    F = np.zeros((3, n))
+    for i in range(3):
+        F[i, categories == i] = 1
+
+    targets = np.array([0.33, 0.33, 0.34])
+
+    losses_spec = [{"type": "kl", "target": targets.tolist(), "scale": 1.0}]
+    regularizer_spec = {"type": "entropy", "limit": None}
+    lam = 1.0
+
+    results = {}
+    if HAS_RSWJAX:
+        losses = [KLLoss(targets, scale=1.0)]
+        regularizer = EntropyRegularizer()
+        results["rswjax"] = run_rswjax(F, losses, regularizer, lam)
+
+    if HAS_ORIGINAL_RSW:
+        orig_losses = [OrigKLLoss(targets, scale=1.0)]
+        orig_regularizer = OrigEntropyRegularizer()
+        results["rsw_original"] = run_original_rsw(F, orig_losses, orig_regularizer, lam)
+
+    save_test_case("15_kl_loss", F, losses_spec, regularizer_spec, lam, results)
+    print("Generated: 15_kl_loss")
+
+
+def generate_kl_regularizer():
+    """Test case 16: KL regularizer with non-uniform prior."""
+    np.random.seed(63)
+    n = 1000
+
+    categories = np.random.choice([0, 1], size=n, p=[0.6, 0.4])
+    F = np.zeros((2, n))
+    F[0, categories == 0] = 1
+    F[1, categories == 1] = 1
+
+    targets = np.array([0.5, 0.5])
+
+    # Non-uniform prior: favor first 200 samples
+    prior = np.ones(n)
+    prior[:200] = 3.0
+    prior = prior / prior.sum()
+
+    losses_spec = [{"type": "equality", "target": targets.tolist()}]
+    regularizer_spec = {"type": "kl", "prior": prior.tolist()}
+    lam = 1.0
+
+    results = {}
+    if HAS_RSWJAX:
+        losses = [EqualityLoss(targets)]
+        regularizer = KLRegularizer(prior)
+        results["rswjax"] = run_rswjax(F, losses, regularizer, lam)
+
+    if HAS_ORIGINAL_RSW:
+        # rsw_original KLRegularizer has a bug (passes w_min/w_max to
+        # EntropyRegularizer which only takes limit), so skip it
+        try:
+            orig_losses = [OrigEqualityLoss(targets)]
+            orig_regularizer = OrigKLRegularizer(prior)
+            results["rsw_original"] = run_original_rsw(F, orig_losses, orig_regularizer, lam)
+        except TypeError:
+            print("  Note: rsw_original KLRegularizer has a constructor bug, skipping")
+
+    save_test_case("16_kl_regularizer", F, losses_spec, regularizer_spec, lam, results)
+    print("Generated: 16_kl_regularizer")
+
+
+def generate_boolean_regularizer():
+    """Test case 17: Boolean regularizer (select k samples)."""
+    np.random.seed(64)
+    n = 500
+    k = 50
+
+    categories = np.random.choice([0, 1], size=n, p=[0.6, 0.4])
+    F = np.zeros((2, n))
+    F[0, categories == 0] = 1
+    F[1, categories == 1] = 1
+
+    targets = np.array([0.5, 0.5])
+
+    losses_spec = [{"type": "equality", "target": targets.tolist()}]
+    regularizer_spec = {"type": "boolean", "k": k}
+    lam = 1.0
+
+    results = {}
+    # Boolean regularizer requires .evaluate() on losses, which some
+    # implementations may not support on all loss types
+    if HAS_RSWJAX:
+        try:
+            losses = [EqualityLoss(targets)]
+            regularizer = BooleanRegularizer(k)
+            results["rswjax"] = run_rswjax(F, losses, regularizer, lam)
+        except AttributeError as e:
+            print(f"  Note: rswjax boolean+equality lacks evaluate(), skipping ({e})")
+
+    if HAS_ORIGINAL_RSW:
+        try:
+            orig_losses = [OrigEqualityLoss(targets)]
+            orig_regularizer = OrigBooleanRegularizer(k)
+            results["rsw_original"] = run_original_rsw(F, orig_losses, orig_regularizer, lam)
+        except AttributeError as e:
+            print(f"  Note: rsw_original boolean+equality lacks evaluate(), skipping ({e})")
+
+    save_test_case("17_boolean_reg", F, losses_spec, regularizer_spec, lam, results)
+    print("Generated: 17_boolean_reg")
+
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Generate test cases for R vs Python comparison")
@@ -699,6 +895,14 @@ if __name__ == "__main__":
     print("\nGenerating continuous variable tests...")
     generate_continuous_variable()
     generate_mixed_continuous_categorical()
+
+    # Extended loss/regularizer tests
+    print("\nGenerating extended loss/regularizer tests...")
+    generate_inequality_constraints()
+    generate_mixed_equality_inequality()
+    generate_kl_loss()
+    generate_kl_regularizer()
+    generate_boolean_regularizer()
 
     if args.include_100k:
         print("\nGenerating 100K test (this may take a while)...")

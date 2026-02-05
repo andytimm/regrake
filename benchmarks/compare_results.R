@@ -79,16 +79,24 @@ load_results <- function(case_name) {
 
   # Determine if this is an exact-only case (all equality losses)
   results$all_exact <- all(results$loss_types == "equality")
-  results$has_soft <- any(results$loss_types == "least_squares")
+  results$has_soft <- any(results$loss_types %in% c("least_squares", "kl", "inequality"))
 
   # Count constraints for tolerance adjustment
   results$n_constraints <- length(results$targets)
+
+  # Load regularizer type for tolerance adjustment
+  reg <- fromJSON(file.path(case_dir, "regularizer.json"))
+  results$reg_type <- reg$type
 
   results
 }
 
 # Determine appropriate tolerance based on problem characteristics
 get_tolerance <- function(results, base_tol = 1e-4) {
+  # Boolean regularizer: discrete solution, cross-implementation differences expected
+  if (!is.null(results$reg_type) && results$reg_type == "boolean") {
+    return(base_tol * 100)  # 1e-2 for boolean
+  }
   # High constraint cases need looser tolerance
   if (results$n_constraints >= 50) {
     return(base_tol * 5)  # 5e-4 for 50+ constraints
@@ -114,7 +122,8 @@ compare_case <- function(case_name, base_tol = 1e-4) {
     has_soft = results$has_soft,
     n_constraints = results$n_constraints,
     tolerance_used = tol,
-    overconstrained = is_overconstrained(results)
+    overconstrained = is_overconstrained(results),
+    is_boolean = !is.null(results$reg_type) && results$reg_type == "boolean"
   )
 
   # R vs rswjax (weights should always match)
@@ -216,17 +225,17 @@ main <- function(base_tol = 1e-4) {
     # Achieved vs targets - interpret based on constraint type
     if (!is.null(comp$r_vs_targets)) {
       if (comp$overconstrained) {
-        # Over-constrained: can't satisfy all targets, just report
         note <- "(over-constrained - infeasible)"
         print_comparison(comp$r_vs_targets, "R achieved vs targets", note)
+      } else if (comp$is_boolean) {
+        note <- "(boolean reg - discrete solution)"
+        print_comparison(comp$r_vs_targets, "R achieved vs targets", note)
       } else if (comp$all_exact) {
-        # Exact constraints should hit targets
         print_comparison(comp$r_vs_targets, "R achieved vs targets")
         if (!comp$r_vs_targets$pass) {
           all_pass <- FALSE
         }
       } else {
-        # Soft constraints: just report, don't fail
         note <- "(soft constraints - expected gap)"
         print_comparison(comp$r_vs_targets, "R achieved vs targets", note)
       }
