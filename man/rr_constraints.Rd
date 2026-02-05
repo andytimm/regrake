@@ -8,6 +8,8 @@
 \alias{rr_mean}
 \alias{rr_var}
 \alias{rr_quantile}
+\alias{rr_range}
+\alias{rr_between}
 \title{Raking Constraint Functions}
 \usage{
 rr_l2(x)
@@ -21,11 +23,20 @@ rr_mean(x)
 rr_var(x)
 
 rr_quantile(x, p)
+
+rr_range(x, ...)
+
+rr_between(x, ...)
 }
 \arguments{
 \item{x}{Variable name (unquoted) to apply the constraint to}
 
 \item{p}{For \code{rr_quantile}, the quantile probability (0 to 1, e.g., 0.5 for median)}
+
+\item{...}{For \code{rr_range}/\code{rr_between}: either a single margin value (or named
+vector for level-specific margins), or separate lower and upper bounds.
+Examples: \code{rr_range(x, 0.02)}, \code{rr_range(x, c(A=0.01, B=0.02))},
+\code{rr_range(x, 40, 45)}, \code{rr_range(x, lower=40, upper=45)}}
 }
 \value{
 The input variable (these functions are markers for the formula parser)

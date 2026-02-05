@@ -574,27 +574,7 @@ rr_between <- function(x, ...) {
   x
 }
 
-#' Validate raking formula inputs
-#'
-#' @description
-#' Validates that a raking formula and the associated data meet all requirements.
-#' This function performs comprehensive checks on both the formula structure and the data,
-#' ensuring that the parsing process can proceed without errors.
-#'
-#' @details
-#' The validation process includes:
-#' \itemize{
-#'   \item Checking that the formula has the correct structure and types
-#'   \item Verifying that all variables referenced in the formula exist in the data
-#'   \item Validating that all variables have supported types (numeric, factor, or character)
-#'   \item Ensuring that no variables contain missing values
-#'   \item Warning about empty factor levels
-#' }
-#'
-#' @param formula A raking formula or term
-#' @param data A data frame containing the variables
-#' @return Invisibly returns TRUE if validation passes, otherwise stops with an error
-#' @keywords internal
+# Legacy validate_inputs for raking_term objects (unused in current pipeline)
 validate_inputs <- function(formula, data) {
   if (!is.data.frame(data)) {
     stop("'data' must be a data.frame or tibble", call. = FALSE)

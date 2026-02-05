@@ -15,6 +15,7 @@ regrake(
   k = NULL,
   bounds = c(0.1, 10),
   bounds_method = c("soft", "hard"),
+  exact_tol = NULL,
   normalize = TRUE,
   control = list(),
   verbose = FALSE,
@@ -60,6 +61,13 @@ but optimization may be slower and targets may be less closely matched
 when bounds are binding.}
 }}
 
+\item{exact_tol}{Optional tolerance for exact constraints. When non-NULL, all
+\code{rr_exact()} (and \code{rr_mean()}) constraints are converted to \code{rr_range()}
+with this margin. For example, \code{exact_tol = 0.02} means categorical proportions
+must be within +/- 2 percentage points of targets, and continuous means within
++/- 0.02 of targets. Use \code{rr_range()} directly in the formula for per-variable
+control. Default is NULL (exact constraints enforced strictly).}
+
 \item{normalize}{Logical. If TRUE (default), continuous variables are automatically
 scaled by their target value for numerical stability. The achieved values are
 reported in original units. Set to FALSE to disable this behavior.}
@@ -71,13 +79,13 @@ reported in original units. Set to FALSE to disable this behavior.}
 \item{...}{Additional arguments passed to methods}
 }
 \value{
-A list containing:
+An object of class \code{"regrake"} containing:
 \item{weights}{The optimal weights (sum to n)}
 \item{balance}{Data frame comparing achieved vs target values with columns:
 constraint (e.g., "exact_sex"), type ("exact" or "l2"), variable,
 level, achieved, target, residual}
 \item{solution}{Full solution details from solver}
-\item{diagnostics}{Weight and margin matching diagnostics}
+\item{diagnostics}{Weight, convergence, and margin matching diagnostics}
 }
 \description{
 Optimal representative sample weighting

@@ -3,7 +3,6 @@
 \docType{package}
 \name{regrake-package}
 \alias{regrake-package}
-\alias{_PACKAGE}
 \title{regrake: Regularized Raking for Survey Weighting}
 \description{
 A modern implementation of regularized survey raking based on the

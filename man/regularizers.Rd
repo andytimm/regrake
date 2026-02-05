@@ -42,17 +42,17 @@ These functions implement different regularization methods:
 }
 \section{Functions}{
 \itemize{
-\item \code{zero_regularizer}: No regularization (identity function)
+\item \code{zero_regularizer()}: No regularization (identity function)
 
-\item \code{entropy_regularizer}: Negative entropy regularization
+\item \code{entropy_regularizer()}: Negative entropy regularization
 
-\item \code{kl_regularizer}: KL divergence from prior regularization
+\item \code{kl_regularizer()}: KL divergence from prior regularization
 
-\item \code{equality_regularizer}: Equality regularization
+\item \code{equality_regularizer()}: Equality regularization
 
-\item \code{sum_squares_regularizer}: Least squares regularization
+\item \code{sum_squares_regularizer()}: Least squares regularization
+
 }}
-
 \examples{
 zero_regularizer(c(0.1, 0.2), 0.5)
 entropy_regularizer(c(0.1, 0.2), 0.5)

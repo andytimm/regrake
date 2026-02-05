@@ -586,14 +586,15 @@ test_that("boolean regularizer allows zero weights", {
   )
 
   # Boolean regularizer with k < n will produce zero weights
-  result <- regrake(
+  # (boolean problems often don't fully converge, suppress that warning)
+  result <- suppressWarnings(regrake(
     data = sample_data,
     formula = ~ rr_exact(sex),
     population_data = pop_data,
     pop_type = "proportions",
     regularizer = "boolean",
     k = 20
-  )
+  ))
 
   # Should have exactly 20 non-zero weights
   expect_equal(sum(result$weights > 0), 20)

@@ -26,6 +26,12 @@
 #'       but optimization may be slower and targets may be less closely matched
 #'       when bounds are binding.}
 #'   }
+#' @param exact_tol Optional tolerance for exact constraints. When non-NULL, all
+#'   `rr_exact()` (and `rr_mean()`) constraints are converted to `rr_range()`
+#'   with this margin. For example, `exact_tol = 0.02` means categorical proportions
+#'   must be within +/- 2 percentage points of targets, and continuous means within
+#'   +/- 0.02 of targets. Use `rr_range()` directly in the formula for per-variable
+#'   control. Default is NULL (exact constraints enforced strictly).
 #' @param normalize Logical. If TRUE (default), continuous variables are automatically
 #'   scaled by their target value for numerical stability. The achieved values are
 #'   reported in original units. Set to FALSE to disable this behavior.
@@ -33,13 +39,13 @@
 #' @param verbose Whether to print progress information
 #' @param ... Additional arguments passed to methods
 #'
-#' @return A list containing:
+#' @return An object of class `"regrake"` containing:
 #'   \item{weights}{The optimal weights (sum to n)}
 #'   \item{balance}{Data frame comparing achieved vs target values with columns:
 #'     constraint (e.g., "exact_sex"), type ("exact" or "l2"), variable,
 #'     level, achieved, target, residual}
 #'   \item{solution}{Full solution details from solver}
-#'   \item{diagnostics}{Weight and margin matching diagnostics}
+#'   \item{diagnostics}{Weight, convergence, and margin matching diagnostics}
 #' @export
 regrake <- function(
   data,
@@ -52,6 +58,7 @@ regrake <- function(
   k = NULL,
   bounds = c(0.1, 10),
   bounds_method = c("soft", "hard"),
+  exact_tol = NULL,
   normalize = TRUE,
   control = list(),
   verbose = FALSE,
@@ -62,12 +69,35 @@ regrake <- function(
   bounds_method <- match.arg(bounds_method)
   validate_inputs(formula, population_data, pop_type, pop_weights, bounds)
 
+  if (!is.null(exact_tol)) {
+    if (!is.numeric(exact_tol) || length(exact_tol) != 1 || exact_tol <= 0) {
+      stop("exact_tol must be a single positive number or NULL", call. = FALSE)
+    }
+  }
+
   # Step 1: Parse formula into specification
   # This step determines what variables and interactions we need
   # and what type of constraints they represent
   formula_spec <- parse_raking_formula(formula)
   if (verbose) {
     cat("Formula parsed with", length(formula_spec$terms), "raking terms\n")
+  }
+
+  # Step 1b: Convert exact constraints to range if exact_tol is specified
+  if (!is.null(exact_tol)) {
+    for (i in seq_along(formula_spec$terms)) {
+      if (formula_spec$terms[[i]]$type == "exact") {
+        formula_spec$terms[[i]]$type <- "range"
+        formula_spec$terms[[i]]$params <- list(mode = "margin", margin = exact_tol)
+      }
+    }
+    if (verbose) {
+      cat(sprintf(
+        "exact_tol = %g: exact constraints converted to range (+/- %g)\n",
+        exact_tol,
+        exact_tol
+      ))
+    }
   }
 
   # Step 2: Process population data based on formula requirements
@@ -143,6 +173,14 @@ regrake <- function(
     cat(sprintf("ADMM took %.3f seconds\n", (end_time - start_time)["elapsed"]))
   }
 
+  if (!solution$converged) {
+    warning(
+      "ADMM solver did not converge within ", ctrl$maxiter, " iterations. ",
+      "Results may be unreliable. Consider increasing maxiter or adjusting lambda/rho.",
+      call. = FALSE
+    )
+  }
+
   # Step 7: Process results and compute diagnostics
   results <- process_admm_results(
     solution, admm_inputs, formula_spec, verbose, normalize, regularizer
@@ -168,7 +206,11 @@ regrake <- function(
       balance = results$balance,
       solution = solution,
       diagnostics = results$diagnostics,
-      call = match.call() # Store call for reproducibility
+      formula = formula,
+      regularizer = regularizer,
+      lambda = lambda,
+      exact_tol = exact_tol,
+      call = match.call()
     ),
     class = "regrake"
   )
@@ -307,11 +349,20 @@ process_admm_results <- function(
   balance <- build_balance_df(formula_spec, admm_inputs$losses, achieved_values, targets_flat)
 
   # Compute diagnostics
+  kish_deff <- 1 + stats::var(weights) / mean(weights)^2
   diagnostics <- list(
     # Weight properties
     weight_range = range(weights),
     weight_mean = mean(weights),
     weight_sd = sd(weights),
+    kish_deff = kish_deff,
+    kish_ess = length(weights) / kish_deff,
+
+    # Convergence
+    converged = solution$converged,
+    iterations = solution$iterations,
+    primal_residual = solution$primal_residual,
+    dual_residual = solution$dual_residual,
 
     # Margin matching quality (achieved_values already on proportion/mean scale)
     max_abs_diff = max(abs(achieved_values - targets_flat)),
@@ -412,4 +463,101 @@ is_symmetric_bounds <- function(bounds) {
 # Check if any weights violate bounds (for diagnostics)
 check_bounds_violated <- function(weights, bounds) {
   any(weights < bounds[1] - 1e-6) || any(weights > bounds[2] + 1e-6)
+}
+
+#' Print method for regrake objects
+#'
+#' @param x A regrake object
+#' @param ... Additional arguments (ignored)
+#' @return Invisibly returns the object
+#' @export
+print.regrake <- function(x, ...) {
+  d <- x$diagnostics
+  n <- length(x$weights)
+
+  # Constraint type summary
+  types <- x$balance$type
+  type_counts <- table(types)
+  type_str <- paste(
+    vapply(
+      names(type_counts),
+      function(t) sprintf("%d %s", type_counts[[t]], t),
+      character(1)
+    ),
+    collapse = ", "
+  )
+  n_constraints <- nrow(x$balance)
+
+  cat("Regrake result\n")
+  cat(sprintf("  Sample size:      %d\n", n))
+  cat(sprintf("  Constraints:      %d (%s)\n", n_constraints, type_str))
+  cat(sprintf("  Regularizer:      %s (lambda = %g)\n", x$regularizer, x$lambda))
+  if (!is.null(x$exact_tol)) {
+    cat(sprintf("  Exact tolerance:  %g\n", x$exact_tol))
+  }
+  if (d$converged) {
+    cat(sprintf("  Converged:        Yes (%d iterations)\n", d$iterations))
+  } else {
+    cat(sprintf("  Converged:        No (hit %d iterations)\n", d$iterations))
+  }
+  cat(sprintf(
+    "  Weight range:     [%.3f, %.3f]\n",
+    d$weight_range[1],
+    d$weight_range[2]
+  ))
+  cat(sprintf(
+    "  Kish ESS:         %.0f / %d (deff = %.2f)\n",
+    d$kish_ess,
+    n,
+    d$kish_deff
+  ))
+  cat(sprintf("  Max margin diff:  %.2e\n", d$max_abs_diff))
+
+  invisible(x)
+}
+
+#' Summary method for regrake objects
+#'
+#' @param object A regrake object
+#' @param ... Additional arguments (ignored)
+#' @return Invisibly returns the object
+#' @export
+summary.regrake <- function(object, ...) {
+  # Print compact overview first
+  print.regrake(object)
+
+  d <- object$diagnostics
+  w <- object$weights
+
+  # Weight distribution
+  wq <- stats::quantile(w, probs = c(0, 0.25, 0.5, 0.75, 1))
+  cat("\nWeight distribution:\n")
+  cat(sprintf(
+    "  Min.   Q1     Median Q3     Max.\n  %-6.3f %-6.3f %-6.3f %-6.3f %.3f\n",
+    wq[1], wq[2], wq[3], wq[4], wq[5]
+  ))
+
+  # Bounds info
+  if (!is.null(d$bounds)) {
+    cat(sprintf(
+      "\nBounds: [%.2f, %.2f] (%s)",
+      d$bounds[1],
+      d$bounds[2],
+      d$bounds_method
+    ))
+    if (d$bounds_violated) {
+      cat(" -- VIOLATED")
+    }
+    cat("\n")
+  }
+
+  # Balance table
+  cat("\nBalance:\n")
+  bal <- object$balance
+  bal$achieved <- round(bal$achieved, 6)
+  bal$target <- round(bal$target, 6)
+  bal$residual <- round(bal$residual, 6)
+  print(bal, row.names = FALSE)
+
+  invisible(object)
 }

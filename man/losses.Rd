@@ -51,15 +51,15 @@ Returns Inf for non-positive values and NA for NA/NaN inputs.
 }
 \section{Functions}{
 \itemize{
-\item \code{equality_loss}: Absolute difference loss for exact matching constraints
+\item \code{equality_loss()}: Absolute difference loss for exact matching constraints
 
-\item \code{least_squares_loss}: Squared error (least squares) loss
+\item \code{least_squares_loss()}: Squared error (least squares) loss
 
-\item \code{inequality_loss}: Inequality constraint loss
+\item \code{inequality_loss()}: Inequality constraint loss
 
-\item \code{kl_loss}: Kullback-Leibler divergence loss
+\item \code{kl_loss()}: Kullback-Leibler divergence loss
+
 }}
-
 \examples{
 equality_loss(c(0.1, 0.2), c(0.15, 0.25))
 least_squares_loss(c(0.1, 0.2), c(0.15, 0.25))
