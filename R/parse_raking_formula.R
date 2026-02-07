@@ -392,16 +392,16 @@ create_quantile_term <- function(expr, p) {
 #' @param upper Upper bound (mode = "bounds")
 #' @keywords internal
 create_range_term <- function(expr, margin = NULL, lower = NULL, upper = NULL) {
+  params <- if (!is.null(margin)) {
+    list(mode = "margin", margin = margin)
+  } else {
+    list(mode = "bounds", lower = lower, upper = upper)
+  }
+
   # Handle interactions
   if (rlang::is_call(expr, ":")) {
     vars <- collect_interaction_vars(expr)
     var_names <- unname(vapply(vars, as.character, character(1)))
-
-    params <- if (!is.null(margin)) {
-      list(mode = "margin", margin = margin)
-    } else {
-      list(mode = "bounds", lower = lower, upper = upper)
-    }
 
     return(structure(
       list(
@@ -418,12 +418,6 @@ create_range_term <- function(expr, margin = NULL, lower = NULL, upper = NULL) {
   # Handle nested functions by getting the innermost expression
   while (rlang::is_call(expr)) {
     expr <- rlang::call_args(expr)[[1]]
-  }
-
-  params <- if (!is.null(margin)) {
-    list(mode = "margin", margin = margin)
-  } else {
-    list(mode = "bounds", lower = lower, upper = upper)
   }
 
   structure(
