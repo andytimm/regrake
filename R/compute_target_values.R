@@ -145,7 +145,7 @@ process_pop_data <- function(population_data, pop_type, pop_weights = NULL, form
   }
 
   # Process based on format
-  switch(
+  result <- switch(
     format,
     proportions = process_proportions_data(population_data),
     weighted = process_weighted_data(population_data, pop_weights),
@@ -154,6 +154,23 @@ process_pop_data <- function(population_data, pop_type, pop_weights = NULL, form
     survey_design = process_survey_design_data(population_data, formula_spec),
     raw = process_raw_data(population_data)
   )
+
+  # Normalize categorical variable targets (centralized here, not in each processor)
+  continuous_stat_levels <- c(
+    "mean", "var", "sd", "median", "min", "max",
+    "q10", "q25", "q50", "q75", "q90", "variance", "quantile"
+  )
+  is_continuous <- tapply(
+    result$level, result$variable,
+    function(lvls) all(lvls %in% continuous_stat_levels)
+  )
+  categorical_vars <- names(is_continuous)[!is_continuous]
+  for (var_name in categorical_vars) {
+    var_rows <- result$variable == var_name
+    result$target[var_rows] <- normalize_target_sum(result$target[var_rows], var_name)
+  }
+
+  result
 }
 
 #' Process data already in proportions format
@@ -349,8 +366,6 @@ process_anesrake_data <- function(data) {
       )
     }
 
-    props <- normalize_target_sum(props, var_name)
-
     result[[i]] <- tibble::tibble(
       variable = var_name,
       level = names(props),
@@ -395,7 +410,6 @@ process_survey_data <- function(data) {
       target = margin_data$value
     )
 
-    result[[i]]$target <- normalize_target_sum(result[[i]]$target, margin)
   }
 
   do.call(rbind, result)
@@ -516,18 +530,6 @@ process_survey_design_data <- function(design, formula_spec) {
   # Combine all results
   result <- do.call(rbind, result_list)
 
-  # Validate targets sum to 1 for categorical variables
-  # (skip continuous variables which have "mean" level)
-  var_sums <- tapply(result$target, result$variable, sum)
-  categorical_vars <- names(var_sums)[!names(var_sums) %in% names(result_list)[
-    vapply(result_list, function(x) any(x$level == "mean"), logical(1))
-  ]]
-
-  for (v in categorical_vars) {
-    var_rows <- result$variable == v
-    result$target[var_rows] <- normalize_target_sum(result$target[var_rows], v)
-  }
-
   result
 }
 
@@ -576,41 +578,7 @@ compute_target_values <- function(
     stop("Duplicate variable-level combination", call. = FALSE)
   }
 
-  # Validate targets sum to 1 for each variable (categorical variables only)
-  # Skip validation for continuous targets (level contains statistic names like "mean", "var", etc.)
-  continuous_stat_levels <- c(
-    "mean",
-    "var",
-    "sd",
-    "median",
-    "min",
-    "max",
-    "q10",
-    "q25",
-    "q50",
-    "q75",
-    "q90"
-  )
-
-  # Identify which variables are continuous (have statistic-like levels)
-  is_continuous_var <- tapply(
-    population_data$level,
-    population_data$variable,
-    function(lvls) {
-      all(lvls %in% continuous_stat_levels)
-    }
-  )
-
-  # Only validate and normalize categorical variables (those not identified as continuous)
-  categorical_vars <- names(is_continuous_var)[!is_continuous_var]
-  if (length(categorical_vars) > 0) {
-    for (var_name in categorical_vars) {
-      var_rows <- population_data$variable == var_name
-      population_data$target[var_rows] <- normalize_target_sum(
-        population_data$target[var_rows], var_name
-      )
-    }
-  }
+  # Normalization already done in process_pop_data()
 
   # Process each term in the formula
   targets <- vector("list", length(formula_spec$terms))
