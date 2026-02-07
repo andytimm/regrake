@@ -569,6 +569,200 @@ test_that("regrake errors when data has level not in targets", {
 })
 
 # =============================================================================
+# Input validation tests
+# =============================================================================
+
+test_that("regrake errors on NULL formula", {
+  sample_data <- data.frame(sex = c("M", "F", "M"))
+  pop_data <- data.frame(
+    variable = "sex",
+    level = c("M", "F"),
+    target = c(0.5, 0.5)
+  )
+
+  expect_error(
+    regrake(
+      data = sample_data,
+      formula = NULL,
+      population_data = pop_data,
+      pop_type = "proportions"
+    ),
+    "Formula must be specified"
+  )
+})
+
+test_that("regrake errors on NULL population_data", {
+  sample_data <- data.frame(sex = c("M", "F", "M"))
+
+  expect_error(
+    regrake(
+      data = sample_data,
+      formula = ~ sex,
+      population_data = NULL,
+      pop_type = "proportions"
+    ),
+    "Population data must be provided"
+  )
+})
+
+test_that("regrake errors when pop_type = 'weighted' without pop_weights", {
+  sample_data <- data.frame(sex = c("M", "F", "M"))
+  pop_data <- data.frame(sex = c("M", "F"), wt = c(1, 1))
+
+  expect_error(
+    regrake(
+      data = sample_data,
+      formula = ~ sex,
+      population_data = pop_data,
+      pop_type = "weighted"
+    ),
+    "pop_weights must be specified"
+  )
+})
+
+test_that("regrake errors on invalid bounds", {
+  sample_data <- data.frame(sex = c("M", "F", "M"))
+  pop_data <- data.frame(
+    variable = "sex",
+    level = c("M", "F"),
+    target = c(0.5, 0.5)
+  )
+
+  # min >= max
+  expect_error(
+    regrake(
+      data = sample_data,
+      formula = ~ sex,
+      population_data = pop_data,
+      pop_type = "proportions",
+      bounds = c(5, 2)
+    ),
+    "bounds must be a vector"
+  )
+
+  # min <= 0
+  expect_error(
+    regrake(
+      data = sample_data,
+      formula = ~ sex,
+      population_data = pop_data,
+      pop_type = "proportions",
+      bounds = c(0, 10)
+    ),
+    "bounds must be a vector"
+  )
+
+  # wrong length
+  expect_error(
+    regrake(
+      data = sample_data,
+      formula = ~ sex,
+      population_data = pop_data,
+      pop_type = "proportions",
+      bounds = c(0.1, 5, 10)
+    ),
+    "bounds must be a vector"
+  )
+})
+
+test_that("regrake errors on invalid exact_tol", {
+  sample_data <- data.frame(sex = c("M", "F", "M"))
+  pop_data <- data.frame(
+    variable = "sex",
+    level = c("M", "F"),
+    target = c(0.5, 0.5)
+  )
+
+  expect_error(
+    regrake(
+      data = sample_data,
+      formula = ~ sex,
+      population_data = pop_data,
+      pop_type = "proportions",
+      exact_tol = -0.01
+    ),
+    "exact_tol must be a single positive number"
+  )
+
+  expect_error(
+    regrake(
+      data = sample_data,
+      formula = ~ sex,
+      population_data = pop_data,
+      pop_type = "proportions",
+      exact_tol = "abc"
+    ),
+    "exact_tol must be a single positive number"
+  )
+})
+
+test_that("regrake errors when regularizer = 'kl' without prior", {
+  set.seed(42)
+  sample_data <- data.frame(
+    sex = sample(c("M", "F"), 100, replace = TRUE)
+  )
+  pop_data <- data.frame(
+    variable = "sex",
+    level = c("M", "F"),
+    target = c(0.5, 0.5)
+  )
+
+  expect_error(
+    regrake(
+      data = sample_data,
+      formula = ~ sex,
+      population_data = pop_data,
+      pop_type = "proportions",
+      regularizer = "kl"
+    ),
+    "Prior weights must be provided"
+  )
+})
+
+test_that("regrake errors when regularizer = 'boolean' without k", {
+  set.seed(42)
+  sample_data <- data.frame(
+    sex = sample(c("M", "F"), 100, replace = TRUE)
+  )
+  pop_data <- data.frame(
+    variable = "sex",
+    level = c("M", "F"),
+    target = c(0.5, 0.5)
+  )
+
+  expect_error(
+    regrake(
+      data = sample_data,
+      formula = ~ sex,
+      population_data = pop_data,
+      pop_type = "proportions",
+      regularizer = "boolean"
+    ),
+    "k.*must be provided"
+  )
+})
+
+test_that("regrake errors on invalid regularizer name", {
+  sample_data <- data.frame(sex = c("M", "F", "M"))
+  pop_data <- data.frame(
+    variable = "sex",
+    level = c("M", "F"),
+    target = c(0.5, 0.5)
+  )
+
+  expect_error(
+    regrake(
+      data = sample_data,
+      formula = ~ sex,
+      population_data = pop_data,
+      pop_type = "proportions",
+      regularizer = "bogus"
+    ),
+    "'arg' should be one of"
+  )
+})
+
+# =============================================================================
 # Tests for rr_range (inequality constraints)
 # =============================================================================
 
