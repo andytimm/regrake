@@ -267,7 +267,6 @@ construct_admm_inputs <- function(
             range_lower <- range_lower / targets
             range_upper <- range_upper / targets
           }
-          original_target <- targets
           targets <- 1.0
         }
       }

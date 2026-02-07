@@ -152,12 +152,14 @@ compute_norms_and_epsilons <- function(
   diff_fw <- Fw - f
   diff_w <- w - w_old
 
+  # Cache shared computation
+  ss_fw <- sum(diff_fw^2)
+
   # Dual residual: ||rho * [Fw-f, w-w_old, w-w_old]||
-  # Compute directly without concatenation
-  s_norm <- rho * sqrt(sum(diff_fw^2) + 2 * sum(diff_w^2))
+  s_norm <- rho * sqrt(ss_fw + 2 * sum(diff_w^2))
 
   # Primal residual: ||[f-Fw, 0, 0]|| - zeros don't contribute
-  r_norm <- sqrt(sum(diff_fw^2))
+  r_norm <- sqrt(ss_fw)
 
   # Total number of residual components
   p <- length(f) + 2 * length(w)
@@ -308,7 +310,6 @@ admm <- function(
     # Solve for w_new using cached factorization
     Ft_fy <- Matrix::crossprod(F, f + y)
     rhs[1:n] <- Ft_fy + w_tilde + z + w_bar + u
-    rhs[(n + 1):(n + m)] <- 0
     w_new <- Matrix::solve(Q_factor, rhs)[1:n]
 
     w_old <- w
@@ -369,18 +370,18 @@ admm <- function(
       }
     }
 
-    # Check convergence
-    if (norms$r_norm <= norms$eps_pri && norms$s_norm <= norms$eps_dual) {
-      converged <- TRUE
-      break
-    }
-
-    # Check for numerical issues
+    # Check for numerical issues (before convergence so NaN doesn't slip through)
     if (is.nan(norms$r_norm) || is.nan(norms$s_norm)) {
       stop(
         "Numerical error in optimization. This usually indicates a poorly formulated ",
         "problem. Common causes include excessively high or low values of lambda or rho."
       )
+    }
+
+    # Check convergence
+    if (norms$r_norm <= norms$eps_pri && norms$s_norm <= norms$eps_dual) {
+      converged <- TRUE
+      break
     }
   }
 
