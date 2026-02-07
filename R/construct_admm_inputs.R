@@ -313,13 +313,7 @@ construct_admm_inputs <- function(
         as.formula(paste("~", paste(term$variables, collapse = ":")))
       }
 
-      # Create subset of model frame with only needed variables
-      needed_vars <- if (is.null(term$interaction)) {
-        term$variables
-      } else {
-        term$variables
-      }
-      mf_subset <- mf[, needed_vars, drop = FALSE]
+      mf_subset <- mf[, term$variables, drop = FALSE]
 
       # Create model matrix with all levels (no reference level)
       mm <- model.matrix(

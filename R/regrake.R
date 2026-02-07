@@ -388,10 +388,6 @@ process_admm_results <- function(
 
   # Extract targets in the same order as achieved values (original, un-normalized)
   targets_flat <- unlist(lapply(admm_inputs$losses, function(l) l$original_target))
-  # Fallback to target if original_target not present (for backwards compatibility)
-  if (is.null(targets_flat)) {
-    targets_flat <- unlist(lapply(admm_inputs$losses, function(l) l$target))
-  }
 
   # Build balance data frame
   balance <- build_balance_df(formula_spec, admm_inputs$losses, achieved_values, targets_flat)

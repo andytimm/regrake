@@ -389,22 +389,11 @@ process_survey_data <- function(data) {
     margin <- margins[i]
     margin_data <- data[data$margin == margin, ]
 
-    # Check if this is a two-way margin (contains ":")
-    if (grepl(":", margin)) {
-      # Keep as is - already in interaction format
-      result[[i]] <- tibble::tibble(
-        variable = margin,
-        level = margin_data$category,
-        target = margin_data$value
-      )
-    } else {
-      # Single variable margin
-      result[[i]] <- tibble::tibble(
-        variable = margin,
-        level = margin_data$category,
-        target = margin_data$value
-      )
-    }
+    result[[i]] <- tibble::tibble(
+      variable = margin,
+      level = margin_data$category,
+      target = margin_data$value
+    )
 
     result[[i]]$target <- normalize_target_sum(result[[i]]$target, margin)
   }
