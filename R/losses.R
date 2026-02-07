@@ -11,12 +11,8 @@
 #' @name losses
 NULL
 
-#' @describeIn losses Absolute difference loss for exact matching constraints
-#' @return Numeric vector of absolute differences between x and target
-#' @export
-#' @examples
-#' equality_loss(c(0.1, 0.2), c(0.15, 0.25))
-equality_loss <- function(x, target) {
+# Internal helper for length validation
+check_loss_lengths <- function(x, target) {
   if (length(x) != length(target)) {
     rlang::abort(
       "Inputs must have equal lengths",
@@ -24,6 +20,15 @@ equality_loss <- function(x, target) {
       class = "regrake_length_error"
     )
   }
+}
+
+#' @describeIn losses Absolute difference loss for exact matching constraints
+#' @return Numeric vector of absolute differences between x and target
+#' @export
+#' @examples
+#' equality_loss(c(0.1, 0.2), c(0.15, 0.25))
+equality_loss <- function(x, target) {
+  check_loss_lengths(x, target)
   abs(x - target)
 }
 
@@ -45,13 +50,7 @@ prox_equality <- function(x, target, rho) {
 #' least_squares_loss(c(0.1, 0.2), c(0.15, 0.25))
 #' least_squares_loss(c(0.1, 0.2), c(0.15, 0.25), diag_weight = c(2, 1))
 least_squares_loss <- function(x, target, diag_weight = 1) {
-  if (length(x) != length(target)) {
-    rlang::abort(
-      "Inputs must have equal lengths",
-      i = "x has length {length(x)}, but target has length {length(target)}",
-      class = "regrake_length_error"
-    )
-  }
+  check_loss_lengths(x, target)
   (diag_weight * (x - target))^2
 }
 
@@ -100,28 +99,8 @@ prox_inequality <- function(x, target, rho, lower, upper) {
 #' @examples
 #' kl_loss(c(0.1, 0.2), c(0.15, 0.25))
 kl_loss <- function(x, target) {
-  if (length(x) != length(target)) {
-    rlang::abort(
-      "Inputs must have equal lengths",
-      i = "x has length {length(x)}, but target has length {length(target)}",
-      class = "regrake_length_error"
-    )
-  }
-
-  # Handle NA/NaN values first
-  na_vals <- is.na(x) | is.na(target)
-  result <- numeric(length(x))
-  result[na_vals] <- NA_real_
-
-  # Process non-NA values
-  valid_idx <- !na_vals & x > 0 & target > 0
-  result[!valid_idx & !na_vals] <- Inf
-  result[valid_idx] <- x[valid_idx] *
-    log(x[valid_idx] / target[valid_idx]) -
-    x[valid_idx] +
-    target[valid_idx]
-
-  result
+  check_loss_lengths(x, target)
+  ifelse(x > 0 & target > 0, x * log(x / target) - x + target, Inf)
 }
 
 #' Proximal operator for KL divergence loss
@@ -132,13 +111,7 @@ kl_loss <- function(x, target) {
 #' @return Updated vector minimizing KL divergence plus proximal term
 #' @export
 prox_kl <- function(x, target, rho, scale = 0.5) {
-  if (length(x) != length(target)) {
-    rlang::abort(
-      "Inputs must have equal lengths",
-      i = "x has length {length(x)}, but target has length {length(target)}",
-      class = "regrake_length_error"
-    )
-  }
+  check_loss_lengths(x, target)
 
   if (any(target <= 0, na.rm = TRUE)) {
     rlang::abort(
