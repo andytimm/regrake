@@ -63,8 +63,8 @@ test_that("ADMM converges with dummy regularizer", {
     eps_abs = 1e-5,
     eps_rel = 1e-5
   )
-  expect_true(norms$r_norm <= norms$eps_pri)
-  expect_true(norms$s_norm <= norms$eps_dual)
+  expect_lte(norms$r_norm, norms$eps_pri)
+  expect_lte(norms$s_norm, norms$eps_dual)
 
   # Also check that the weight vector is a probability distribution.
   expect_true(all(sol$w_best >= 0))

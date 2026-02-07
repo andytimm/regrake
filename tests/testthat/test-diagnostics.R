@@ -46,12 +46,12 @@ test_that("admm() returns convergence diagnostics", {
 
   expect_true(result$converged)
   expect_true(is.numeric(result$iterations))
-  expect_true(result$iterations > 0)
-  expect_true(result$iterations <= 5000)
+  expect_gt(result$iterations, 0)
+  expect_lte(result$iterations, 5000)
   expect_true(is.numeric(result$primal_residual))
   expect_true(is.numeric(result$dual_residual))
-  expect_true(result$primal_residual >= 0)
-  expect_true(result$dual_residual >= 0)
+  expect_gte(result$primal_residual, 0)
+  expect_gte(result$dual_residual, 0)
 })
 
 test_that("admm() reports non-convergence when maxiter is too low", {
@@ -110,7 +110,7 @@ test_that("diagnostics contain convergence info", {
 
   expect_true(d$converged)
   expect_true(is.numeric(d$iterations))
-  expect_true(d$iterations > 0)
+  expect_gt(d$iterations, 0)
   expect_true(is.numeric(d$primal_residual))
   expect_true(is.numeric(d$dual_residual))
 })
@@ -123,9 +123,9 @@ test_that("diagnostics contain Kish deff and ESS", {
 
   expect_true(is.numeric(d$kish_deff))
   expect_true(is.numeric(d$kish_ess))
-  expect_true(d$kish_deff >= 1)
-  expect_true(d$kish_ess <= length(result$weights))
-  expect_true(d$kish_ess > 0)
+  expect_gte(d$kish_deff, 1)
+  expect_lte(d$kish_ess, length(result$weights))
+  expect_gt(d$kish_ess, 0)
 })
 
 test_that("Kish deff/ESS are computed correctly", {

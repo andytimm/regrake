@@ -1,5 +1,3 @@
-library(testthat)
-
 test_that("equality loss matches optimization solution", {
   set.seed(605)
   m <- 10

@@ -25,7 +25,7 @@ test_that("projection_simplex handles edge cases", {
   # Single very large value
   v3 <- c(100, 0.1, 0.1)
   result3 <- projection_simplex(v3)
-  expect_true(result3[1] > result3[2])
+  expect_gt(result3[1], result3[2])
   expect_equal(sum(result3), 1)
 })
 
@@ -70,10 +70,10 @@ test_that("compute_norms_and_epsilons basic functionality", {
   expect_named(result, c("s_norm", "r_norm", "eps_pri", "eps_dual"))
 
   # Test values are non-negative
-  expect_true(result$s_norm >= 0)
-  expect_true(result$r_norm >= 0)
-  expect_true(result$eps_pri >= 0)
-  expect_true(result$eps_dual >= 0)
+  expect_gte(result$s_norm, 0)
+  expect_gte(result$r_norm, 0)
+  expect_gte(result$eps_pri, 0)
+  expect_gte(result$eps_dual, 0)
 
   # Test manual calculations
   Fw <- drop(as.matrix(F %*% w))
@@ -115,8 +115,8 @@ test_that("compute_norms_and_epsilons handles edge cases", {
 
   expect_equal(zero_result$s_norm, 0)
   expect_equal(zero_result$r_norm, 0)
-  expect_true(zero_result$eps_pri > 0) # Should still be positive due to eps_abs
-  expect_true(zero_result$eps_dual > 0)
+  expect_gt(zero_result$eps_pri, 0) # Should still be positive due to eps_abs
+  expect_gt(zero_result$eps_dual, 0)
 
   # Test with sparse matrix input
   sparse_F <- Matrix::Matrix(matrix(c(1, 0, 0, 1), nrow = 2), sparse = TRUE)
@@ -351,8 +351,8 @@ test_that("ADMM solver converges with different regularizers", {
       eps_abs = 1e-5,
       eps_rel = 1e-5
     )
-    expect_true(norms$r_norm <= norms$eps_pri)
-    expect_true(norms$s_norm <= norms$eps_dual)
+    expect_lte(norms$r_norm, norms$eps_pri)
+    expect_lte(norms$s_norm, norms$eps_dual)
   }
 })
 
@@ -451,8 +451,8 @@ test_that("Cholesky solver is stable with different condition numbers", {
     )
     expect_false(any(is.na(norms$r_norm)))
     expect_false(any(is.na(norms$s_norm)))
-    expect_true(norms$r_norm <= norms$eps_pri)
-    expect_true(norms$s_norm <= norms$eps_dual)
+    expect_lte(norms$r_norm, norms$eps_pri)
+    expect_lte(norms$s_norm, norms$eps_dual)
   }
 })
 
@@ -497,7 +497,7 @@ test_that("Solver performance scales with sparsity levels", {
   # Instead of checking timing (which can be unreliable),
   # verify that we can solve problems at different sparsity levels
   for (r in results) {
-    expect_true(r$time > 0) # Ensure timing is positive
+    expect_gt(r$time, 0) # Ensure timing is positive
     expect_equal(r$nnz, round(r$density * m * n), tolerance = 10) # Verify density
   }
 })

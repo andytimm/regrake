@@ -1,5 +1,3 @@
-library(testthat)
-
 test_that("zero regularizer returns input unchanged", {
   set.seed(605)
   w <- rnorm(10)

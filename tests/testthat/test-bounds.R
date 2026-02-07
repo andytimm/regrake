@@ -150,7 +150,7 @@ test_that("regrake with bounds handles realistic multi-variable raking", {
   # Weights should be reasonable (Kish deff < 1.3 for mild imbalance)
   w_norm <- result$weights * n / sum(result$weights)
   kish_deff <- 1 + var(w_norm) / mean(w_norm)^2
-  expect_true(kish_deff < 1.3)
+  expect_lt(kish_deff, 1.3)
 
   # Diagnostics
   expect_equal(result$diagnostics$bounds, c(0.3, 3))
