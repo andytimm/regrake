@@ -7,7 +7,7 @@
 parse_raking_formula(formula)
 }
 \arguments{
-\item{formula}{A formula specifying raking constraints (e.g., ~ race + l2(age:educ))}
+\item{formula}{A formula specifying raking constraints (e.g., \code{~ race + rr_l2(age:educ)})}
 }
 \value{
 A list containing:

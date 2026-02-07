@@ -25,9 +25,9 @@ regrake(
 \arguments{
 \item{data}{A data.frame or tibble containing the sample data}
 
-\item{formula}{A formula specifying the raking constraints using exact() and l2() terms}
+\item{formula}{A formula specifying the raking constraints (e.g., \code{~ rr_exact(sex) + rr_l2(age)})}
 
-\item{population_data}{A data.frame containing population data, or pre-computed target proportions}
+\item{population_data}{Population data: a data.frame, list, or survey.design object (see \code{pop_type})}
 
 \item{pop_type}{How population data is specified:
 \itemize{

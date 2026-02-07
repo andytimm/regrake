@@ -42,6 +42,7 @@ These functions implement different loss metrics for survey weight optimization:
 \itemize{
 \item equality_loss: Absolute difference for exact matching
 \item least_squares_loss: Squared error loss
+\item inequality_loss: Hinge loss for range/inequality constraints
 \item kl_loss: Kullback-Leibler divergence
 }
 }

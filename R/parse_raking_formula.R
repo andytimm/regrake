@@ -5,7 +5,7 @@
 #' a natural R-like syntax for specifying both main effects and interactions, with
 #' optional constraint types for each term.
 #'
-#' @param formula A formula specifying raking constraints (e.g., ~ race + l2(age:educ))
+#' @param formula A formula specifying raking constraints (e.g., `~ race + rr_l2(age:educ)`)
 #' @return A list containing:
 #'   \item{terms}{List of parsed terms, each with type and variables}
 #'   \item{variables}{Character vector of all required variables}

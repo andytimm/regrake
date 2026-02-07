@@ -20,9 +20,9 @@
 #'     \item \code{formula}: The model formula
 #'     \item \code{terms}: List of term specifications, each containing:
 #'       \itemize{
-#'         \item \code{type}: Term type ("exact" or "l2")
+#'         \item \code{type}: Term type ("exact", "l2", "kl", "var", "quantile", or "range")
 #'         \item \code{variables}: Variable names
-#'         \item \code{interaction}: Logical indicating if term is an interaction
+#'         \item \code{interaction}: List of variable expressions (NULL for main effects)
 #'       }
 #'   }
 #' @param target_values List containing target values computed from population data,
@@ -57,43 +57,6 @@
 #' format. Column sums of the design matrix should equal 1 for each sample,
 #' indicating that each sample belongs to exactly one level of each factor.
 #'
-#' @examples
-#' \dontrun{
-#' # Basic usage with a single factor
-#' data <- data.frame(x = factor(c("a", "b", "a")))
-#' formula_spec <- list(
-#'   formula = ~ x,
-#'   terms = list(list(
-#'     type = "exact",
-#'     variables = "x",
-#'     interaction = NULL
-#'   ))
-#' )
-#' target_values <- list(
-#'   targets = list(exact_x = c(a = 0.6, b = 0.4))
-#' )
-#' result <- construct_admm_inputs(data, formula_spec, target_values)
-#'
-#' # Usage with interactions
-#' data <- data.frame(
-#'   x = factor(c("a", "b", "a")),
-#'   y = factor(c("1", "2", "1"))
-#' )
-#' formula_spec <- list(
-#'   formula = ~ x:y,
-#'   terms = list(list(
-#'     type = "exact",
-#'     variables = c("x", "y"),
-#'     interaction = TRUE
-#'   ))
-#' )
-#' target_values <- list(
-#'   targets = list(
-#'     "exact_x:y" = c("a:1" = 0.3, "a:2" = 0.3,
-#'                     "b:1" = 0.2, "b:2" = 0.2)
-#' )
-#' result <- construct_admm_inputs(data, formula_spec, target_values)
-#' }
 #'
 #' @param normalize Logical. If TRUE, continuous variables are scaled by their
 #'   target value for numerical stability.

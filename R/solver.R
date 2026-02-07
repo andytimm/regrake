@@ -195,8 +195,7 @@ compute_norms_and_epsilons <- function(
 #' @param losses List of loss functions, each containing fn (loss function),
 #'   target (target values), prox (proximal operator), and optionally
 #'   lower/upper (bounds for inequality constraints)
-#' @param reg Regularizer object with fn (regularization function) and
-#'   prox (proximal operator)
+#' @param reg Regularizer object with prox (proximal operator function)
 #' @param lam Regularization strength parameter
 #' @param control List of control parameters: rho (ADMM penalty, default 50),
 #'   maxiter (max iterations, default 5000), eps_abs and eps_rel (convergence

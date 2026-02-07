@@ -3,6 +3,7 @@
 #' These functions implement different loss metrics for survey weight optimization:
 #' - equality_loss: Absolute difference for exact matching
 #' - least_squares_loss: Squared error loss
+#' - inequality_loss: Hinge loss for range/inequality constraints
 #' - kl_loss: Kullback-Leibler divergence
 #'
 #' @param x Numeric vector of values
@@ -107,7 +108,7 @@ kl_loss <- function(x, target) {
 #' @param x Input vector
 #' @param target Target vector
 #' @param rho Proximal parameter
-#' @param scale Scale factor for KL divergence (default 0.5 to match test)
+#' @param scale Scale factor for KL divergence (default 0.5, matching the Python reference)
 #' @return Updated vector minimizing KL divergence plus proximal term
 #' @export
 prox_kl <- function(x, target, rho, scale = 0.5) {

@@ -1,30 +1,16 @@
-#' @title Target Value Computation for Raking
-#' @description
-#' This file contains functions for computing target values used in raking.
-#' The main workflow is:
-#' 1. User provides population data in one of several supported formats
-#' 2. Data is converted to a standardized "autumn" format (which I think is most elegant)
-#' 3. Target values are computed for each term in the raking formula based on the formula specification
-#'
-#' Supported formats:
-#' - proportions: "autumn" style data frame with variable, level, target columns
-#' - weighted: Unit-level data with weights column
-#' - anesrake: List of named vectors (anesrake package format)
-#' - survey: Data frame with margin, category, value columns
-#' - survey_design: survey package design object
-#' - raw: Unit-level data to compute targets from
-#'
-#' The autumn format is a standardized data frame with columns:
-#' - variable: Name of the variable or interaction (e.g., "age" or "race:age")
-#' - level: Level within the variable (for categorical) or statistic name (for continuous, e.g., "mean")
-#' - target: Target value for that level (proportion for categorical, value for continuous)
-#'
-#' @section File Structure:
-#' - process_pop_data: Main entry point for format detection and conversion
-#' - process_proportions_data: Proportions/autumn format processor
-#' - process_*_data functions: Other format processors (weighted, raw, anesrake, survey, survey_design)
-#' - compute_target_values: Main function to compute raking targets
-#' - expand_joint_distribution: Helper for computing joint distributions
+# Target Value Computation for Raking
+#
+# Workflow: population data (any of 6 formats) -> "autumn" format -> targets per formula term
+#
+# The autumn format is a standardized data frame with columns:
+#   variable: Name of the variable or interaction (e.g., "age" or "race:age")
+#   level: Level within the variable (for categorical) or statistic name (for continuous)
+#   target: Target value (proportion for categorical, value for continuous)
+#
+# Key functions:
+#   process_pop_data()       - Entry point: detects format, dispatches to processor, normalizes
+#   process_*_data()         - Format-specific processors (proportions, raw, weighted, etc.)
+#   compute_target_values()  - Converts autumn-format data into per-term targets for the solver
 
 #' Normalize target proportions to sum to 1
 #'
@@ -555,7 +541,8 @@ process_survey_design_data <- function(design, formula_spec) {
 #'   For interactions, specify joint distributions by combining variable names with ":"
 #'   e.g., "race:age" for a race by age interaction.
 #' @param formula_spec A parsed raking formula specification from parse_raking_formula
-#' @param pop_type How population data is specified ("raw", "weighted", "proportions")
+#' @param pop_type How population data is specified ("proportions", "raw", "weighted",
+#'   "anesrake", "survey", or "survey_design")
 #' @param pop_weights Column name in population_data containing weights (if pop_type = "weighted")
 #'
 #' @return A list containing:

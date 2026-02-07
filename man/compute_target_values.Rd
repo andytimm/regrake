@@ -23,7 +23,8 @@ e.g., "race:age" for a race by age interaction.
 
 \item{formula_spec}{A parsed raking formula specification from parse_raking_formula}
 
-\item{pop_type}{How population data is specified ("raw", "weighted", "proportions")}
+\item{pop_type}{How population data is specified ("proportions", "raw", "weighted",
+"anesrake", "survey", or "survey_design")}
 
 \item{pop_weights}{Column name in population_data containing weights (if pop_type = "weighted")}
 }

@@ -1,8 +1,8 @@
 #' Optimal representative sample weighting
 #'
 #' @param data A data.frame or tibble containing the sample data
-#' @param formula A formula specifying the raking constraints using exact() and l2() terms
-#' @param population_data A data.frame containing population data, or pre-computed target proportions
+#' @param formula A formula specifying the raking constraints (e.g., `~ rr_exact(sex) + rr_l2(age)`)
+#' @param population_data Population data: a data.frame, list, or survey.design object (see `pop_type`)
 #' @param pop_type How population data is specified:
 #'   - "raw": Raw population data (one row per unit)
 #'   - "weighted": Population data with weights column

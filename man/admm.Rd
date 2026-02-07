@@ -22,8 +22,7 @@ admm(
 target (target values), prox (proximal operator), and optionally
 lower/upper (bounds for inequality constraints)}
 
-\item{reg}{Regularizer object with fn (regularization function) and
-prox (proximal operator)}
+\item{reg}{Regularizer object with prox (proximal operator function)}
 
 \item{lam}{Regularization strength parameter}
 

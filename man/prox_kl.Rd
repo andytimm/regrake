@@ -13,7 +13,7 @@ prox_kl(x, target, rho, scale = 0.5)
 
 \item{rho}{Proximal parameter}
 
-\item{scale}{Scale factor for KL divergence (default 0.5 to match test)}
+\item{scale}{Scale factor for KL divergence (default 0.5, matching the Python reference)}
 }
 \value{
 Updated vector minimizing KL divergence plus proximal term
