@@ -249,7 +249,7 @@ process_raw_data <- function(data) {
   }
 
   # Combine all results
-  do.call(rbind, result[!sapply(result, is.null)])
+  do.call(rbind, result[!vapply(result, is.null, logical(1))])
 }
 
 #' Process weighted data
@@ -323,7 +323,7 @@ process_weighted_data <- function(data, weights) {
   }
 
   # Combine all results
-  do.call(rbind, result[!sapply(result, is.null)])
+  do.call(rbind, result[!vapply(result, is.null, logical(1))])
 }
 
 #' Process anesrake format data

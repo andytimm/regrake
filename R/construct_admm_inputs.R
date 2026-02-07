@@ -291,7 +291,7 @@ construct_admm_inputs <- function(
         term_formula,
         mf_subset,
         contrasts.arg = lapply(
-          mf_subset[sapply(mf_subset, is.factor)],
+          mf_subset[vapply(mf_subset, is.factor, logical(1))],
           contrasts,
           contrasts = FALSE
         )
