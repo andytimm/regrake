@@ -2,28 +2,10 @@
 
 # Helper: create a minimal regrake result for reuse
 make_test_result <- function(exact_tol = NULL, maxiter = 5000) {
-  set.seed(42)
-  n <- 500
-  sample_data <- data.frame(
-    sex = sample(c("M", "F"), n, replace = TRUE, prob = c(0.6, 0.4)),
-    age = sample(
-      c("18-34", "35-54", "55+"),
-      n,
-      replace = TRUE,
-      prob = c(0.5, 0.3, 0.2)
-    )
-  )
-
-  pop_data <- data.frame(
-    variable = c(rep("sex", 2), rep("age", 3)),
-    level = c("M", "F", "18-34", "35-54", "55+"),
-    proportion = c(0.49, 0.51, 0.3, 0.4, 0.3)
-  )
-
   regrake(
-    data = sample_data,
+    data = make_sample_sex_age(),
     formula = ~ rr_exact(sex) + rr_exact(age),
-    population_data = pop_data,
+    population_data = make_pop_sex_age(),
     pop_type = "proportions",
     exact_tol = exact_tol,
     control = list(maxiter = maxiter)
@@ -270,29 +252,11 @@ test_that("result object contains formula, regularizer, and lambda", {
 })
 
 test_that("exact_tol does not affect non-exact constraints", {
-  set.seed(42)
-  n <- 500
-  sample_data <- data.frame(
-    sex = sample(c("M", "F"), n, replace = TRUE, prob = c(0.6, 0.4)),
-    age = sample(
-      c("18-34", "35-54", "55+"),
-      n,
-      replace = TRUE,
-      prob = c(0.5, 0.3, 0.2)
-    )
-  )
-
-  pop_data <- data.frame(
-    variable = c(rep("sex", 2), rep("age", 3)),
-    level = c("M", "F", "18-34", "35-54", "55+"),
-    proportion = c(0.49, 0.51, 0.3, 0.4, 0.3)
-  )
-
   # Use l2 for age, exact for sex. exact_tol should only affect sex.
   result <- regrake(
-    data = sample_data,
+    data = make_sample_sex_age(),
     formula = ~ rr_exact(sex) + rr_l2(age),
-    population_data = pop_data,
+    population_data = make_pop_sex_age(),
     pop_type = "proportions",
     exact_tol = 0.02
   )

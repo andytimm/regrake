@@ -1,34 +1,17 @@
 test_that("basic raking workflow works end-to-end with categorical variables", {
-  # Create synthetic sample data
-  set.seed(42)
-  n <- 1000
-  sample_data <- data.frame(
-    sex = sample(c("M", "F"), n, replace = TRUE, prob = c(0.6, 0.4)),
-    age = sample(
-      c("18-34", "35-54", "55+"),
-      n,
-      replace = TRUE,
-      prob = c(0.5, 0.3, 0.2)
-    )
-  )
-
-  # Create population targets in autumn format
-  pop_data <- data.frame(
-    variable = c(rep("sex", 2), rep("age", 3)),
-    level = c("M", "F", "18-34", "35-54", "55+"),
-    proportion = c(0.49, 0.51, 0.3, 0.4, 0.3)
-  )
+  sample_data <- make_sample_sex_age(n = 1000)
+  pop_data <- make_pop_sex_age()
 
   # Run raking
   result <- regrake(
     data = sample_data,
     population = pop_data,
     formula = ~ sex + age,
-    pop_type = "proportions" # Explicitly specify pop_type
+    pop_type = "proportions"
   )
 
   # Check that weights sum to n
-  expect_equal(sum(result$weights), n)
+  expect_equal(sum(result$weights), nrow(sample_data))
 
   # Check that weighted proportions match targets
   agg_sex <- stats::aggregate(
@@ -36,14 +19,14 @@ test_that("basic raking workflow works end-to-end with categorical variables", {
     list(sex = sample_data$sex),
     sum
   )
-  wtd_props_sex <- agg_sex$x / n
+  wtd_props_sex <- agg_sex$x / nrow(sample_data)
 
   agg_age <- stats::aggregate(
     result$weights,
     list(age = sample_data$age),
     sum
   )
-  wtd_props_age <- agg_age$x / n
+  wtd_props_age <- agg_age$x / nrow(sample_data)
 
   # Get target proportions in same order as aggregate results (alphabetical)
   sex_pop <- pop_data[pop_data$variable == "sex", ]
@@ -87,7 +70,7 @@ test_that("regrake handles continuous variables with rr_mean", {
 
   # Check achieved values are close to targets
   # Sex proportions
-  weighted_sex <- tapply(result$weights, survey$sex, sum) / sum(result$weights)
+  weighted_sex <- weighted_props(result$weights, survey, "sex")
   expect_equal(unname(weighted_sex["M"]), 0.5, tolerance = 0.01)
   expect_equal(unname(weighted_sex["F"]), 0.5, tolerance = 0.01)
 
@@ -127,7 +110,7 @@ test_that("regrake handles variance constraints with rr_var", {
   expect_true(all(result$weights >= 0))
 
   # Check sex proportions
-  weighted_sex <- tapply(result$weights, survey$sex, sum) / sum(result$weights)
+  weighted_sex <- weighted_props(result$weights, survey, "sex")
   expect_equal(unname(weighted_sex["M"]), 0.5, tolerance = 0.01)
   expect_equal(unname(weighted_sex["F"]), 0.5, tolerance = 0.01)
 
@@ -174,7 +157,7 @@ test_that("regrake handles quantile constraints with rr_quantile", {
   expect_true(all(result$weights >= 0))
 
   # Check sex proportions
-  weighted_sex <- tapply(result$weights, survey$sex, sum) / sum(result$weights)
+  weighted_sex <- weighted_props(result$weights, survey, "sex")
   expect_equal(unname(weighted_sex["M"]), 0.5, tolerance = 0.01)
   expect_equal(unname(weighted_sex["F"]), 0.5, tolerance = 0.01)
 
