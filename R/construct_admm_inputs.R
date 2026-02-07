@@ -115,6 +115,10 @@ construct_admm_inputs <- function(
       fn = least_squares_loss,
       prox = prox_least_squares
     ),
+    kl = list(
+      fn = kl_loss,
+      prox = prox_kl
+    ),
     var = list(
       fn = equality_loss,
       prox = prox_equality
@@ -433,10 +437,9 @@ construct_admm_inputs <- function(
       # Update evaluate function for inequality loss
       loss_entry$evaluate <- local({
         fn <- loss_fn
-        tgt <- loss_target
         lo <- range_lower
         hi <- range_upper
-        function(x) sum(fn(x, tgt, lo, hi))
+        function(x) sum(fn(x, lo, hi))
       })
     }
 
