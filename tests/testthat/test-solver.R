@@ -238,8 +238,7 @@ test_that("ADMM solver basic convergence", {
     )
   )
   reg <- list(
-    fn = kl_loss,
-    prox = function(w, lam) prox_kl_reg(w, lam, tau = rho / lam)
+    prox = function(w, lam) prox_kl_reg(w, lam)
   )
 
   # Run solver
@@ -293,8 +292,7 @@ test_that("ADMM solver handles edge cases", {
     )
   )
   reg <- list(
-    fn = kl_loss,
-    prox = function(w, lam) prox_kl_reg(w, lam, tau = rho / lam)
+    prox = function(w, lam) prox_kl_reg(w, lam)
   )
 
   sol_zero <- admm(F_zero, losses, reg, lam = 1, verbose = FALSE)
@@ -326,11 +324,11 @@ test_that("ADMM solver converges with different regularizers", {
 
   # Test different regularizers
   regs <- list(
-    list(fn = kl_loss, prox = function(w, lam) {
-      prox_kl_reg(w, lam, tau = rho / lam)
+    list(prox = function(w, lam) {
+      prox_kl_reg(w, lam)
     }),
-    list(fn = equality_regularizer, prox = prox_equality_reg),
-    list(fn = sum_squares_regularizer, prox = prox_sum_squares_reg)
+    list(prox = prox_equality_reg),
+    list(prox = prox_sum_squares_reg)
   )
 
   for (reg in regs) {
@@ -380,8 +378,7 @@ test_that("Cholesky solver handles different matrix structures", {
     prox = prox_least_squares
   ))
   reg <- list(
-    fn = kl_loss,
-    prox = function(w, lam) prox_kl_reg(w, lam, tau = 50 / lam)
+    prox = function(w, lam) prox_kl_reg(w, lam)
   )
 
   sol_block <- admm(F_block, losses, reg, lam = 1)
@@ -422,7 +419,7 @@ test_that("Cholesky solver is stable with different condition numbers", {
     ))
     reg <- list(
       fn = kl_loss,
-      prox = function(w, lam) prox_kl_reg(w, lam, tau = 50 / lam)
+      prox = function(w, lam) prox_kl_reg(w, lam)
     )
 
     # Run solver with error checking
@@ -474,7 +471,7 @@ test_that("Solver performance scales with sparsity levels", {
     ))
     reg <- list(
       fn = kl_loss,
-      prox = function(w, lam) prox_kl_reg(w, lam, tau = 50 / lam)
+      prox = function(w, lam) prox_kl_reg(w, lam)
     )
 
     # Time the solver with control list
@@ -517,8 +514,7 @@ test_that("Solver handles regularization fallback gracefully", {
     prox = prox_least_squares
   ))
   reg <- list(
-    fn = kl_loss,
-    prox = function(w, lam) prox_kl_reg(w, lam, tau = 50 / lam)
+    prox = function(w, lam) prox_kl_reg(w, lam)
   )
 
   # Should complete without error due to damping

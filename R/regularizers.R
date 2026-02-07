@@ -84,12 +84,11 @@ sum_squares_regularizer <- function(w, lambda) {
 #' Proximal operator for KL regularizer
 #' @param w Input vector
 #' @param lam Regularization parameter
-#' @param tau Proximal parameter
 #' @param prior Prior weights (default uniform)
 #' @param limit Optional upper bound on weight magnitudes
 #' @return Updated vector minimizing KL divergence plus proximal term
 #' @export
-prox_kl_reg <- function(w, lam, tau = 1, prior = NULL, limit = NULL) {
+prox_kl_reg <- function(w, lam, prior = NULL, limit = NULL) {
   if (is.null(prior)) {
     prior <- rep(1 / length(w), length(w))
   }

@@ -38,7 +38,6 @@ test_that("admm() returns convergence diagnostics", {
   )
 
   reg <- list(
-    fn = function(w, lambda) entropy_regularizer(w, lambda, limit = NULL),
     prox = function(w, lambda) prox_kl_reg(w, lambda, prior = NULL, limit = NULL)
   )
 
@@ -78,7 +77,6 @@ test_that("admm() reports non-convergence when maxiter is too low", {
   )
 
   reg <- list(
-    fn = function(w, lambda) entropy_regularizer(w, lambda, limit = NULL),
     prox = function(w, lambda) prox_kl_reg(w, lambda, prior = NULL, limit = NULL)
   )
 

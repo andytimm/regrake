@@ -74,7 +74,7 @@ prox_least_squares <- function(x, target, tau, diag_weight = 1) {
 #' @param lower Lower bound
 #' @param upper Upper bound
 #' @export
-inequality_loss <- function(x, target, lower, upper) {
+inequality_loss <- function(x, lower, upper) {
   pmax(pmax(lower - x, x - upper), 0)
 }
 

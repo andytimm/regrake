@@ -307,11 +307,9 @@ create_regularizer <- function(
   switch(
     regularizer,
     "zero" = list(
-      fn = zero_regularizer,
       prox = prox_equality_reg # zero regularizer uses equality prox
     ),
     "entropy" = list(
-      fn = function(w, lambda) entropy_regularizer(w, lambda, limit),
       prox = function(w, lambda) {
         prox_kl_reg(w, lambda, prior = NULL, limit = limit)
       }
@@ -321,7 +319,6 @@ create_regularizer <- function(
         stop("Prior weights must be provided for KL regularization")
       }
       list(
-        fn = function(w, lambda) kl_regularizer(w, lambda, prior, limit),
         prox = function(w, lambda) {
           prox_kl_reg(w, lambda, prior = prior, limit = limit)
         }
@@ -334,7 +331,6 @@ create_regularizer <- function(
         )
       }
       reg <- list(
-        fn = function(w, lambda) prox_boolean_reg(w, lambda, k),
         prox = function(w, lambda) prox_boolean_reg(w, lambda, k)
       )
       class(reg) <- c("BooleanRegularizer", class(reg))
