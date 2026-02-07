@@ -17,13 +17,6 @@ NULL
 #' @examples
 #' zero_regularizer(c(0.1, 0.2), 0.5)
 zero_regularizer <- function(w, lambda) {
-  if (!is.numeric(w)) {
-    rlang::abort(
-      "Input must be numeric",
-      i = "w is of class {class(w)}",
-      class = "regrake_type_error"
-    )
-  }
   w
 }
 
@@ -33,13 +26,6 @@ zero_regularizer <- function(w, lambda) {
 #' @examples
 #' entropy_regularizer(c(0.1, 0.2), 0.5)
 entropy_regularizer <- function(w, lambda, limit = NULL) {
-  if (!is.numeric(w)) {
-    rlang::abort(
-      "Input must be numeric",
-      i = "w is of class {class(w)}",
-      class = "regrake_type_error"
-    )
-  }
   if (!is.null(limit) && limit <= 1) {
     rlang::abort(
       "Limit must be greater than 1",
@@ -67,12 +53,6 @@ kl_regularizer <- function(w, lambda, prior, limit = NULL) {
     rlang::abort("Prior must sum to 1", class = "regrake_value_error")
   }
   entropy_regularizer(w + lambda * log(prior), lambda, limit)
-}
-
-#' @describeIn regularizers Equality regularization
-#' @export
-equality_regularizer <- function(w, lambda) {
-  w
 }
 
 #' @describeIn regularizers Least squares regularization
@@ -132,7 +112,7 @@ prox_sum_squares_reg <- function(w, lam) {
 prox_boolean_reg <- function(w, lam, k) {
   n <- length(w)
   if (k < 1 || k > n) {
-    stop("k must be between 1 and length(w)", call. = FALSE)
+    rlang::abort("k must be between 1 and length(w)")
   }
   result <- rep(0, n)
   top_k_idx <- order(w, decreasing = TRUE)[1:k]

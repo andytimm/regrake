@@ -2,7 +2,7 @@
 % Please edit documentation in R/compute_target_values.R
 \name{process_pop_data}
 \alias{process_pop_data}
-\title{Target Value Computation for Raking}
+\title{Process population data into target values}
 \usage{
 process_pop_data(
   population_data,
@@ -21,46 +21,9 @@ process_pop_data(
 \item{formula_spec}{Parsed formula specification (required for survey_design format)}
 }
 \description{
-This file contains functions for computing target values used in raking.
-The main workflow is:
-\enumerate{
-\item User provides population data in one of several supported formats
-\item Data is converted to a standardized "autumn" format (which I think is most elegant)
-\item Target values are computed for each term in the raking formula based on the formula specification
-}
-
-Supported formats:
-\itemize{
-\item proportions: "autumn" style data frame with variable, level, target columns
-\item weighted: Unit-level data with weights column
-\item anesrake: List of named vectors (anesrake package format)
-\item survey: Data frame with margin, category, value columns
-\item survey_design: survey package design object
-\item raw: Unit-level data to compute targets from
-}
-
-The autumn format is a standardized data frame with columns:
-\itemize{
-\item variable: Name of the variable or interaction (e.g., "age" or "race:age")
-\item level: Level within the variable (for categorical) or statistic name (for continuous, e.g., "mean")
-\item target: Target value for that level (proportion for categorical, value for continuous)
-}
-
 Main entry point for converting population data into the autumn format.
 Detects the input format and dispatches to the appropriate processor.
 }
-\section{File Structure}{
-
-\itemize{
-\item process_pop_data: Main entry point for format detection and conversion
-\item process_proportions_data: Proportions/autumn format processor
-\item process_*_data functions: Other format processors (weighted, raw, anesrake, survey, survey_design)
-\item compute_target_values: Main function to compute raking targets
-\item expand_joint_distribution: Helper for computing joint distributions
-Process population data into target values
-}
-}
-
 \section{Format Detection Rules}{
 
 \itemize{

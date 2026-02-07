@@ -5,7 +5,6 @@
 \alias{zero_regularizer}
 \alias{entropy_regularizer}
 \alias{kl_regularizer}
-\alias{equality_regularizer}
 \alias{sum_squares_regularizer}
 \title{Regularizers for Survey Weight Optimization}
 \usage{
@@ -14,8 +13,6 @@ zero_regularizer(w, lambda)
 entropy_regularizer(w, lambda, limit = NULL)
 
 kl_regularizer(w, lambda, prior, limit = NULL)
-
-equality_regularizer(w, lambda)
 
 sum_squares_regularizer(w, lambda)
 }
@@ -47,8 +44,6 @@ These functions implement different regularization methods:
 \item \code{entropy_regularizer()}: Negative entropy regularization
 
 \item \code{kl_regularizer()}: KL divergence from prior regularization
-
-\item \code{equality_regularizer()}: Equality regularization
 
 \item \code{sum_squares_regularizer()}: Least squares regularization
 

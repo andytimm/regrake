@@ -4,14 +4,12 @@
 \alias{prox_kl_reg}
 \title{Proximal operator for KL regularizer}
 \usage{
-prox_kl_reg(w, lam, tau = 1, prior = NULL, limit = NULL)
+prox_kl_reg(w, lam, prior = NULL, limit = NULL)
 }
 \arguments{
 \item{w}{Input vector}
 
 \item{lam}{Regularization parameter}
-
-\item{tau}{Proximal parameter}
 
 \item{prior}{Prior weights (default uniform)}
 

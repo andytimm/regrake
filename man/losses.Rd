@@ -12,7 +12,7 @@ equality_loss(x, target)
 
 least_squares_loss(x, target, diag_weight = 1)
 
-inequality_loss(x, target, lower, upper)
+inequality_loss(x, lower, upper)
 
 kl_loss(x, target)
 }
