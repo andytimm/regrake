@@ -754,3 +754,408 @@ test_that("rr_between works as alias for rr_range", {
   expect_true(weighted_age_mean >= 38 - 0.5)
   expect_true(weighted_age_mean <= 42 + 0.5)
 })
+
+# =============================================================================
+# Cross-format equivalence and deeper pop_type coverage
+# =============================================================================
+
+test_that("all 6 pop_type formats produce equivalent weights for same targets", {
+  set.seed(42)
+  n <- 500
+  sample_data <- data.frame(
+    sex = sample(c("M", "F"), n, replace = TRUE, prob = c(0.6, 0.4)),
+    age = sample(
+      c("young", "middle", "old"),
+      n,
+      replace = TRUE,
+      prob = c(0.5, 0.3, 0.2)
+    )
+  )
+
+  sex_targets <- c(F = 0.52, M = 0.48)
+  age_targets <- c(middle = 0.35, old = 0.30, young = 0.35)
+
+  # --- proportions ---
+  pop_prop <- data.frame(
+    variable = c("sex", "sex", "age", "age", "age"),
+    level = c("M", "F", "young", "middle", "old"),
+    target = c(0.48, 0.52, 0.35, 0.35, 0.30)
+  )
+  res_prop <- regrake(
+    data = sample_data,
+    formula = ~ sex + age,
+    population_data = pop_prop,
+    pop_type = "proportions"
+  )
+
+  # --- anesrake ---
+  pop_anes <- list(
+    sex = c(M = 0.48, F = 0.52),
+    age = c(young = 0.35, middle = 0.35, old = 0.30)
+  )
+  res_anes <- regrake(
+    data = sample_data,
+    formula = ~ sex + age,
+    population_data = pop_anes,
+    pop_type = "anesrake"
+  )
+
+  # --- survey ---
+  pop_surv <- data.frame(
+    margin = c("sex", "sex", "age", "age", "age"),
+    category = c("M", "F", "young", "middle", "old"),
+    value = c(0.48, 0.52, 0.35, 0.35, 0.30)
+  )
+  res_surv <- regrake(
+    data = sample_data,
+    formula = ~ sex + age,
+    population_data = pop_surv,
+    pop_type = "survey"
+  )
+
+  # --- weighted (construct from known joint) ---
+  pop_wtd <- data.frame(
+    sex = c("M", "F", "M", "F", "M", "F"),
+    age = c("young", "young", "middle", "middle", "old", "old"),
+    wt = c(
+      0.48 * 0.35, 0.52 * 0.35,
+      0.48 * 0.35, 0.52 * 0.35,
+      0.48 * 0.30, 0.52 * 0.30
+    )
+  )
+  res_wtd <- regrake(
+    data = sample_data,
+    formula = ~ sex + age,
+    population_data = pop_wtd,
+    pop_type = "weighted",
+    pop_weights = "wt"
+  )
+
+  # All three exact-target formats should produce identical weights
+  expect_equal(res_prop$weights, res_anes$weights, tolerance = 1e-6)
+  expect_equal(res_prop$weights, res_surv$weights, tolerance = 1e-6)
+  expect_equal(res_prop$weights, res_wtd$weights, tolerance = 1e-6)
+
+  # Check all achieve correct proportions
+  for (res in list(res_prop, res_anes, res_surv, res_wtd)) {
+    w <- res$weights / sum(res$weights)
+    ws <- tapply(w, sample_data$sex, sum)
+    expect_equal(unname(ws["M"]), 0.48, tolerance = 1e-3)
+    expect_equal(unname(ws["F"]), 0.52, tolerance = 1e-3)
+  }
+})
+
+test_that("raw format works with continuous + categorical mixed variables", {
+  set.seed(42)
+  n <- 400
+
+  sample_data <- data.frame(
+    sex = sample(c("M", "F"), n, replace = TRUE, prob = c(0.6, 0.4)),
+    income = rnorm(n, mean = 50000, sd = 10000)
+  )
+
+  # Raw population data with known proportions and mean income
+  set.seed(123)
+  pop_raw <- data.frame(
+    sex = sample(c("M", "F"), 10000, replace = TRUE, prob = c(0.50, 0.50)),
+    income = rnorm(10000, mean = 55000, sd = 10000)
+  )
+
+  result <- regrake(
+    data = sample_data,
+    formula = ~ rr_exact(sex) + rr_mean(income),
+    population_data = pop_raw,
+    pop_type = "raw"
+  )
+
+  expect_length(result$weights, n)
+  w <- result$weights / sum(result$weights)
+
+  # Sex should be ~50/50
+  ws <- tapply(w, sample_data$sex, sum)
+  expect_equal(unname(ws["M"]), 0.50, tolerance = 0.02)
+
+  # Income mean should be close to population mean (~55000)
+  wmean <- sum(w * sample_data$income)
+  pop_mean <- mean(pop_raw$income)
+  expect_equal(wmean, pop_mean, tolerance = 1000)
+})
+
+test_that("weighted format works with continuous variables and rr_mean", {
+  set.seed(42)
+  n <- 400
+
+  sample_data <- data.frame(
+    sex = sample(c("M", "F"), n, replace = TRUE, prob = c(0.55, 0.45)),
+    age = rnorm(n, mean = 35, sd = 10)
+  )
+
+  # Weighted population with known sex split and age distribution
+  pop_wtd <- data.frame(
+    sex = c(rep("M", 50), rep("F", 50)),
+    age = c(rnorm(50, 42, 8), rnorm(50, 38, 8)),
+    pop_wt = rep(1, 100)
+  )
+
+  result <- regrake(
+    data = sample_data,
+    formula = ~ rr_exact(sex) + rr_mean(age),
+    population_data = pop_wtd,
+    pop_type = "weighted",
+    pop_weights = "pop_wt"
+  )
+
+  expect_length(result$weights, n)
+  w <- result$weights / sum(result$weights)
+
+  # Sex should be 50/50
+  ws <- tapply(w, sample_data$sex, sum)
+  expect_equal(unname(ws["M"]), 0.50, tolerance = 0.01)
+
+  # Age mean should match population weighted mean
+  pop_age_mean <- sum(pop_wtd$age * pop_wtd$pop_wt) / sum(pop_wtd$pop_wt)
+  achieved_age <- sum(w * sample_data$age)
+  expect_equal(achieved_age, pop_age_mean, tolerance = 0.5)
+})
+
+test_that("survey_design format works with continuous + categorical", {
+  set.seed(42)
+
+  # Population design with known proportions and mean
+  pop_data <- data.frame(
+    sex = factor(rep(c("M", "F"), each = 500)),
+    income = c(rnorm(500, 52000, 8000), rnorm(500, 58000, 8000)),
+    prob = rep(1 / 1000, 1000)
+  )
+  pop_design <- survey::svydesign(ids = ~1, probs = ~prob, data = pop_data)
+
+  sample_data <- data.frame(
+    sex = sample(c("M", "F"), 400, replace = TRUE, prob = c(0.65, 0.35)),
+    income = rnorm(400, mean = 48000, sd = 12000)
+  )
+
+  result <- regrake(
+    data = sample_data,
+    formula = ~ rr_exact(sex) + rr_mean(income),
+    population_data = pop_design,
+    pop_type = "survey_design"
+  )
+
+  expect_length(result$weights, 400)
+  w <- result$weights / sum(result$weights)
+
+  # Sex should be 50/50
+  ws <- tapply(w, sample_data$sex, sum)
+  expect_equal(unname(ws["M"]), 0.50, tolerance = 0.01)
+
+  # Income mean should be close to population mean (~55000)
+  pop_income_mean <- mean(pop_data$income)
+  achieved_income <- sum(w * sample_data$income)
+  expect_equal(achieved_income, pop_income_mean, tolerance = 1000)
+})
+
+test_that("anesrake format works with 4+ variables", {
+  set.seed(42)
+  n <- 500
+
+  sample_data <- data.frame(
+    sex = sample(c("M", "F"), n, replace = TRUE, prob = c(0.6, 0.4)),
+    region = sample(
+      c("N", "S", "E", "W"),
+      n,
+      replace = TRUE,
+      prob = c(0.4, 0.3, 0.2, 0.1)
+    ),
+    edu = sample(
+      c("HS", "College", "Grad"),
+      n,
+      replace = TRUE,
+      prob = c(0.5, 0.3, 0.2)
+    ),
+    income_grp = sample(
+      c("Low", "Mid", "High"),
+      n,
+      replace = TRUE,
+      prob = c(0.4, 0.4, 0.2)
+    )
+  )
+
+  pop_anes <- list(
+    sex = c(M = 0.48, F = 0.52),
+    region = c(N = 0.25, S = 0.25, E = 0.25, W = 0.25),
+    edu = c(HS = 0.40, College = 0.35, Grad = 0.25),
+    income_grp = c(Low = 0.30, Mid = 0.45, High = 0.25)
+  )
+
+  result <- regrake(
+    data = sample_data,
+    formula = ~ sex + region + edu + income_grp,
+    population_data = pop_anes,
+    pop_type = "anesrake"
+  )
+
+  expect_length(result$weights, n)
+  w <- result$weights / sum(result$weights)
+
+  ws <- tapply(w, sample_data$sex, sum)
+  expect_equal(unname(ws["M"]), 0.48, tolerance = 0.01)
+
+  wr <- tapply(w, sample_data$region, sum)
+  for (r in c("N", "S", "E", "W")) {
+    expect_equal(unname(wr[r]), 0.25, tolerance = 0.02)
+  }
+})
+
+test_that("survey format works with interactions through full pipeline", {
+  set.seed(42)
+  n <- 500
+
+  sample_data <- data.frame(
+    sex = sample(c("M", "F"), n, replace = TRUE, prob = c(0.6, 0.4)),
+    region = sample(c("N", "S"), n, replace = TRUE, prob = c(0.7, 0.3))
+  )
+
+  pop_surv <- data.frame(
+    margin = c("sex", "sex", rep("sex:region", 4)),
+    category = c("M", "F", "F:N", "F:S", "M:N", "M:S"),
+    value = c(0.48, 0.52, 0.26, 0.26, 0.24, 0.24)
+  )
+
+  suppressWarnings({
+    result <- regrake(
+      data = sample_data,
+      formula = ~ sex + sex:region,
+      population_data = pop_surv,
+      pop_type = "survey"
+    )
+  })
+
+  expect_length(result$weights, n)
+  w <- result$weights / sum(result$weights)
+
+  # Sex marginals
+  ws <- tapply(w, sample_data$sex, sum)
+  expect_equal(unname(ws["M"]), 0.48, tolerance = 0.01)
+
+  # Joint cells
+  for (s in c("M", "F")) {
+    for (r in c("N", "S")) {
+      achieved <- sum(w[sample_data$sex == s & sample_data$region == r])
+      if (s == "M") {
+        expect_equal(achieved, 0.24, tolerance = 0.01)
+      } else {
+        expect_equal(achieved, 0.26, tolerance = 0.01)
+      }
+    }
+  }
+})
+
+test_that("rr_l2 works with anesrake and survey formats", {
+  set.seed(42)
+  n <- 500
+
+  sample_data <- data.frame(
+    sex = sample(c("M", "F"), n, replace = TRUE, prob = c(0.6, 0.4)),
+    age = sample(
+      c("young", "old"),
+      n,
+      replace = TRUE,
+      prob = c(0.7, 0.3)
+    )
+  )
+
+  pop_anes <- list(
+    sex = c(M = 0.50, F = 0.50),
+    age = c(young = 0.50, old = 0.50)
+  )
+
+  pop_surv <- data.frame(
+    margin = c("sex", "sex", "age", "age"),
+    category = c("M", "F", "young", "old"),
+    value = c(0.50, 0.50, 0.50, 0.50)
+  )
+
+  res_anes <- suppressWarnings(regrake(
+    data = sample_data,
+    formula = ~ rr_l2(sex) + rr_l2(age),
+    population_data = pop_anes,
+    pop_type = "anesrake"
+  ))
+
+  res_surv <- suppressWarnings(regrake(
+    data = sample_data,
+    formula = ~ rr_l2(sex) + rr_l2(age),
+    population_data = pop_surv,
+    pop_type = "survey"
+  ))
+
+  # Both should produce identical weights (same targets)
+  expect_equal(res_anes$weights, res_surv$weights, tolerance = 1e-6)
+
+  # l2 is soft, but should move toward targets
+  w <- res_anes$weights / sum(res_anes$weights)
+  ws <- tapply(w, sample_data$sex, sum)
+  # Should be closer to 0.50 than the sample proportion of 0.60
+  expect_true(abs(ws["M"] - 0.50) < abs(0.60 - 0.50))
+})
+
+test_that("rr_range works with anesrake format", {
+  set.seed(42)
+  n <- 500
+
+  sample_data <- data.frame(
+    sex = sample(c("M", "F"), n, replace = TRUE, prob = c(0.65, 0.35))
+  )
+
+  pop_anes <- list(sex = c(M = 0.50, F = 0.50))
+
+  result <- regrake(
+    data = sample_data,
+    formula = ~ rr_range(sex, 0.03),
+    population_data = pop_anes,
+    pop_type = "anesrake"
+  )
+
+  expect_length(result$weights, n)
+  w <- result$weights / sum(result$weights)
+  ws <- tapply(w, sample_data$sex, sum)
+
+  # Should be within [0.47, 0.53]
+  expect_true(ws["M"] >= 0.47 - 0.01)
+  expect_true(ws["M"] <= 0.53 + 0.01)
+})
+
+test_that("weighted format handles unequal weight ratios", {
+  set.seed(42)
+
+  sample_data <- data.frame(
+    sex = sample(c("M", "F"), 300, replace = TRUE),
+    age = sample(c("young", "old"), 300, replace = TRUE)
+  )
+
+  # Unequal weights: M is 4x more common than F
+  pop_unequal <- data.frame(
+    sex = c("M", "M", "F", "F"),
+    age = c("young", "old", "young", "old"),
+    wt = c(4, 4, 1, 1)
+  )
+
+  result <- regrake(
+    data = sample_data,
+    formula = ~ sex + age,
+    population_data = pop_unequal,
+    pop_type = "weighted",
+    pop_weights = "wt"
+  )
+
+  expect_length(result$weights, 300)
+  w <- result$weights / sum(result$weights)
+
+  # M should get ~8/10 = 0.80
+  ws <- tapply(w, sample_data$sex, sum)
+  expect_equal(unname(ws["M"]), 0.80, tolerance = 0.01)
+
+  # Age should be 50/50 (equal weights within each sex)
+  wa <- tapply(w, sample_data$age, sum)
+  expect_equal(unname(wa["young"]), 0.50, tolerance = 0.01)
+})
