@@ -219,8 +219,6 @@ construct_admm_inputs <- function(
       if (term$type == "quantile") {
         # Quantile constraint: use indicator I(x <= target_quantile_value)
         # Constraint: sum(wi * I(xi <= q)) = p
-        # Here 'targets' is the quantile VALUE (from pop data), p is from term$params
-        # targets comes as a named vector, extract the single value
         if (length(targets) != 1) {
           stop(
             "Quantile constraint requires exactly one target value for variable: ",
@@ -231,60 +229,29 @@ construct_admm_inputs <- function(
         quantile_value <- unname(targets[1])
         p <- term$params$p
         values <- as.numeric(raw_values <= quantile_value)
-        # For quantile, the constraint target is p, not the quantile value
         original_target <- p
         targets <- p
         # No normalization needed for quantile (target is already a probability)
-      } else if (term$type == "var") {
-        # Variance constraint: use (x - mean(x))^2
-        # Constraint: sum(wi * (xi - x_bar)^2) = target_var
-        x_mean <- mean(raw_values)
-        values <- (raw_values - x_mean)^2
-
-        if (normalize && abs(targets) > .Machine$double.eps) {
-          values <- values / targets
-          scale_factors[[length(scale_factors) + 1]] <- list(
-            index = current_row,
-            scale = targets,
-            variable = term$variables
-          )
-          original_target <- targets
-          targets <- 1.0
-        }
-      } else if (term$type == "range") {
-        # Range (inequality) constraint for continuous variable
-        # Constraint: lower <= sum(wi * xi) - target <= upper
-        values <- raw_values
-
-        if (term$params$mode == "margin") {
-          # Margin mode: target ± margin
-          range_lower <- -term$params$margin
-          range_upper <- term$params$margin
-        } else {
-          # Explicit bounds: compute offsets from population_data target
-          range_lower <- term$params$lower - targets
-          range_upper <- term$params$upper - targets
-        }
-
-        if (normalize && abs(targets) > .Machine$double.eps) {
-          values <- values / targets
-          # Scale bounds by the same factor
-          range_lower <- range_lower / targets
-          range_upper <- range_upper / targets
-          scale_factors[[length(scale_factors) + 1]] <- list(
-            index = current_row,
-            scale = targets,
-            variable = term$variables
-          )
-          original_target <- targets
-          targets <- 1.0
-        }
       } else {
-        # Mean constraint (exact, l2): use raw values
-        # F row = [x1, x2, ..., xn] where xi is the value for sample i
-        # Constraint: sum(wi * xi) = target (e.g., weighted mean)
-        values <- raw_values
+        # Compute type-specific values
+        if (term$type == "var") {
+          x_mean <- mean(raw_values)
+          values <- (raw_values - x_mean)^2
+        } else if (term$type == "range") {
+          values <- raw_values
+          if (term$params$mode == "margin") {
+            range_lower <- -term$params$margin
+            range_upper <- term$params$margin
+          } else {
+            range_lower <- term$params$lower - targets
+            range_upper <- term$params$upper - targets
+          }
+        } else {
+          # Mean constraint (exact, l2)
+          values <- raw_values
+        }
 
+        # Normalize by target for numerical stability
         if (normalize && abs(targets) > .Machine$double.eps) {
           values <- values / targets
           scale_factors[[length(scale_factors) + 1]] <- list(
@@ -292,6 +259,10 @@ construct_admm_inputs <- function(
             scale = targets,
             variable = term$variables
           )
+          if (term$type == "range") {
+            range_lower <- range_lower / targets
+            range_upper <- range_upper / targets
+          }
           original_target <- targets
           targets <- 1.0
         }
