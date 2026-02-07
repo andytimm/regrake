@@ -62,6 +62,27 @@
 #'     level, achieved, target, residual}
 #'   \item{solution}{Full solution details from solver}
 #'   \item{diagnostics}{Weight, convergence, and margin matching diagnostics}
+#' @examples
+#' \donttest{
+#' set.seed(42)
+#' sample_data <- data.frame(
+#'   sex = sample(c("M", "F"), 200, replace = TRUE, prob = c(0.6, 0.4)),
+#'   age = sample(c("young", "old"), 200, replace = TRUE, prob = c(0.7, 0.3))
+#' )
+#' pop_targets <- data.frame(
+#'   variable = c("sex", "sex", "age", "age"),
+#'   level = c("M", "F", "young", "old"),
+#'   target = c(0.49, 0.51, 0.45, 0.55)
+#' )
+#' result <- regrake(
+#'   data = sample_data,
+#'   formula = ~ rr_exact(sex) + rr_exact(age),
+#'   population_data = pop_targets,
+#'   pop_type = "proportions"
+#' )
+#' result
+#' result$balance
+#' }
 #' @export
 regrake <- function(
   data,

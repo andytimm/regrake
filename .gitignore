@@ -24,3 +24,6 @@ ai_context/rsw_original
 
 # NYOSP presentation source materials (not tracked)
 ai_context/NYOSP_private/
+
+# Built vignettes
+inst/doc

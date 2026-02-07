@@ -23,3 +23,6 @@ Clipped vector within bounds relative to target
 \description{
 Proximal operator for inequality constraints
 }
+\examples{
+prox_inequality(c(0.3, 0.7), c(0.5, 0.5), rho = 1, lower = -0.1, upper = 0.1)
+}

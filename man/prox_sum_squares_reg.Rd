@@ -17,3 +17,6 @@ Updated vector minimizing sum squares plus proximal term
 \description{
 Proximal operator for sum squares regularizer
 }
+\examples{
+prox_sum_squares_reg(c(0.1, 0.2), lam = 0.5)
+}
