@@ -73,7 +73,7 @@ data + formula_spec + target_values → construct_admm_inputs() → design_matri
   - `control = list(margin_tol = 0.001)` targets ~0.1% max margin error
   - `control = list(eps_abs = 1e-6)` opts out of scaling for raw ADMM control
 - R CMD check: 0 errors, 0 warnings, 1 note (unrelated nyosp_regrake folder)
-- 705 tests passing
+- 699 tests passing
 
 **Known Limitations:**
 - Interactions with continuous variables not supported (e.g., `~ rr_mean(age):sex` will error)
@@ -88,7 +88,7 @@ data + formula_spec + target_values → construct_admm_inputs() → design_matri
 
 ```r
 devtools::load_all()    # Load package
-devtools::test()        # Run tests (705 pass)
+devtools::test()        # Run tests (699 pass)
 devtools::check()       # Full R CMD check (0 errors, 0 warnings)
 ```
 
