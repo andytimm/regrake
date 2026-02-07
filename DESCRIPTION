@@ -9,11 +9,12 @@ Authors@R:
 Description: A modern implementation of regularized survey raking that prioritizes 
     intuitive interfaces while maintaining flexibility and power. Built on the 
     mathematical framework from Barratt et al. (2021) 
-    <https://www-leland.stanford.edu/~boyd/papers/pdf/optimal_representative_sampling.pdf>, 
+    <https://web.stanford.edu/~boyd/papers/pdf/optimal_representative_sampling.pdf>, 
     the package provides straightforward formula interfaces for survey weight calibration 
     using various loss functions and regularization methods. Supports multiple target 
     specification formats and integrates smoothly with common survey analysis workflows.
 License: Apache License 2.0 | file LICENSE
+Language: en-US
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
