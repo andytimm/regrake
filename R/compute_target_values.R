@@ -26,6 +26,45 @@
 #' - compute_target_values: Main function to compute raking targets
 #' - expand_joint_distribution: Helper for computing joint distributions
 
+#' Normalize target proportions to sum to 1
+#'
+#' Checks that target proportions sum to approximately 1 and normalizes them.
+#' Silent for tiny deviations (< 0.1%), warns for small deviations (< 5%),
+#' errors for large deviations (>= 5%).
+#'
+#' @param targets Numeric vector of target proportions
+#' @param label Variable name for error/warning messages
+#' @return Normalized targets summing to exactly 1
+#' @keywords internal
+normalize_target_sum <- function(targets, label) {
+  s <- sum(targets)
+  diff <- abs(s - 1)
+
+  if (diff <= 1e-3) {
+    return(targets / s)
+  }
+
+  if (diff <= 0.05) {
+    rlang::warn(
+      c(
+        paste0(
+          "Targets for '", label, "' sum to ",
+          format(s, digits = 4), ", normalizing to 1.0."
+        ),
+        i = "Verify your target values are correct."
+      ),
+      class = "regrake_target_normalized"
+    )
+    return(targets / s)
+  }
+
+  stop(
+    "Targets for variable '", label, "' sum to ", round(s, 4),
+    " which is too far from 1.0 to auto-normalize. Please check your targets.",
+    call. = FALSE
+  )
+}
+
 #' Process population data into target values
 #' @description
 #' Main entry point for converting population data into the autumn format.
@@ -310,33 +349,7 @@ process_anesrake_data <- function(data) {
       )
     }
 
-    # Normalize target sum with tiered tolerance
-    s <- sum(props)
-    diff <- abs(s - 1)
-    if (diff <= 1e-3) {
-      # Silent normalization for floating point artifacts
-      props <- props / s
-    } else if (diff <= 0.05) {
-      # Warn for noticeable deviation, but still normalize
-      rlang::warn(
-        c(
-          paste0(
-            "Targets for '", var_name, "' sum to ",
-            format(s, digits = 4), ", normalizing to 1.0."
-          ),
-          i = "Verify your target values are correct."
-        ),
-        class = "regrake_target_normalized"
-      )
-      props <- props / s
-    } else {
-      # Error for large deviations
-      stop(
-        "Targets for variable '", var_name, "' sum to ", round(s, 4),
-        " which is too far from 1.0 to auto-normalize. Please check your targets.",
-        call. = FALSE
-      )
-    }
+    props <- normalize_target_sum(props, var_name)
 
     result[[i]] <- tibble::tibble(
       variable = var_name,
@@ -393,33 +406,7 @@ process_survey_data <- function(data) {
       )
     }
 
-    # Normalize target sum with tiered tolerance
-    s <- sum(result[[i]]$target)
-    diff <- abs(s - 1)
-    if (diff <= 1e-3) {
-      # Silent normalization for floating point artifacts
-      result[[i]]$target <- result[[i]]$target / s
-    } else if (diff <= 0.05) {
-      # Warn for noticeable deviation, but still normalize
-      rlang::warn(
-        c(
-          paste0(
-            "Targets for '", margin, "' sum to ",
-            format(s, digits = 4), ", normalizing to 1.0."
-          ),
-          i = "Verify your target values are correct."
-        ),
-        class = "regrake_target_normalized"
-      )
-      result[[i]]$target <- result[[i]]$target / s
-    } else {
-      # Error for large deviations
-      stop(
-        "Targets for margin '", margin, "' sum to ", round(s, 4),
-        " which is too far from 1.0 to auto-normalize. Please check your targets.",
-        call. = FALSE
-      )
-    }
+    result[[i]]$target <- normalize_target_sum(result[[i]]$target, margin)
   }
 
   do.call(rbind, result)
@@ -548,34 +535,8 @@ process_survey_design_data <- function(design, formula_spec) {
   ]]
 
   for (v in categorical_vars) {
-    s <- var_sums[v]
-    diff <- abs(s - 1)
     var_rows <- result$variable == v
-
-    if (diff <= 1e-3) {
-      # Silent normalization for floating point artifacts
-      result$target[var_rows] <- result$target[var_rows] / s
-    } else if (diff <= 0.05) {
-      # Warn for noticeable deviation, but still normalize
-      rlang::warn(
-        c(
-          paste0(
-            "Targets for '", v, "' sum to ",
-            format(s, digits = 4), ", normalizing to 1.0."
-          ),
-          i = "Verify your target values are correct."
-        ),
-        class = "regrake_target_normalized"
-      )
-      result$target[var_rows] <- result$target[var_rows] / s
-    } else {
-      # Error for large deviations
-      stop(
-        "Targets for variable '", v, "' sum to ", round(s, 4),
-        " which is too far from 1.0 to auto-normalize. Please check your targets.",
-        call. = FALSE
-      )
-    }
+    result$target[var_rows] <- normalize_target_sum(result$target[var_rows], v)
   }
 
   result
@@ -656,34 +617,9 @@ compute_target_values <- function(
   if (length(categorical_vars) > 0) {
     for (var_name in categorical_vars) {
       var_rows <- population_data$variable == var_name
-      var_targets <- population_data$target[var_rows]
-      s <- sum(var_targets)
-      diff <- abs(s - 1)
-
-      if (diff <= 1e-3) {
-        # Silent normalization for floating point artifacts (e.g., 1/3+1/3+1/3)
-        population_data$target[var_rows] <- var_targets / s
-      } else if (diff <= 0.05) {
-        # Warn for noticeable deviation (0.99 or 1.01), but still normalize
-        rlang::warn(
-          c(
-            paste0(
-              "Targets for '", var_name, "' sum to ",
-              format(s, digits = 4), ", normalizing to 1.0."
-            ),
-            i = "Verify your target values are correct."
-          ),
-          class = "regrake_target_normalized"
-        )
-        population_data$target[var_rows] <- var_targets / s
-      } else {
-        # Error for large deviations (0.8, 1.2, etc.)
-        stop(
-          "Targets for variable '", var_name, "' sum to ", round(s, 4),
-          " which is too far from 1.0 to auto-normalize. Please check your targets.",
-          call. = FALSE
-        )
-      }
+      population_data$target[var_rows] <- normalize_target_sum(
+        population_data$target[var_rows], var_name
+      )
     }
   }
 
