@@ -68,8 +68,12 @@ data + formula_spec + target_values → construct_admm_inputs() → design_matri
   - `survey` - margin/category/value columns
   - `survey_design` - survey package design objects
 - `balance` field: tidy data frame comparing achieved vs target values (columns: constraint, type, variable, level, achieved, target, residual) - ready for plotting/inspection
+- **Convergence tolerance** via `margin_tol` in `control`:
+  - Default `margin_tol = 1e-4` scales tolerance by problem size for consistent accuracy
+  - `control = list(margin_tol = 0.001)` targets ~0.1% max margin error
+  - `control = list(eps_abs = 1e-6)` opts out of scaling for raw ADMM control
 - R CMD check: 0 errors, 0 warnings, 1 note (unrelated nyosp_regrake folder)
-- 635 tests passing
+- 705 tests passing
 
 **Known Limitations:**
 - Interactions with continuous variables not supported (e.g., `~ rr_mean(age):sex` will error)
@@ -77,14 +81,14 @@ data + formula_spec + target_values → construct_admm_inputs() → design_matri
 **Strict Validation (added January 2025):**
 - **NAs:** Always errors if raking variables contain NAs (no silent dropping)
 - **Data/Target Mismatch:** Errors if data has levels with no corresponding targets
-- **Zero Weights:** Errors if non-boolean regularizer produces zero weights (indicates data issue)
+- **Zero Weights:** Errors if non-boolean regularizer produces zero weights (suggests tolerance too loose, data/target mismatch, or infeasible targets)
 - **Target Sum:** Auto-normalizes targets within 5% of 1.0 (warns if 0.1-5% off, errors if >5% off)
 
 ## Building & Testing
 
 ```r
 devtools::load_all()    # Load package
-devtools::test()        # Run tests (635 pass)
+devtools::test()        # Run tests (705 pass)
 devtools::check()       # Full R CMD check (0 errors, 0 warnings)
 ```
 
@@ -174,6 +178,21 @@ Benchmark results comparing R solver to Python implementations (January 2025):
 
 For typical survey raking problems (< 10K samples, reasonable constraint counts), the R solver is competitive with or faster than JAX.
 
+## Performance vs IPF (autumn/anesrake)
+
+ADMM is inherently slower than IPF for simple categorical raking:
+- **Per-iteration cost**: ~6x more expensive (O(n*m) vs O(n))
+- **Iteration count**: ~7x more iterations at default tolerance
+- **Combined**: ~42x slower for typical problems
+
+**Convergence tolerance scaling**: Standard ADMM convergence uses `eps_pri = sqrt(p) * eps_abs + ...` where `p = m + 2n`. This means raw `eps_abs` has different effective meaning at different problem sizes — at n=5000 with eps=1e-4, the solver can exit after 2 iterations with 7% margin error.
+
+**Solution**: `margin_tol` (default 1e-4) scales tolerance internally:
+```r
+eps = margin_tol / sqrt(m + 2*n)
+```
+This provides consistent margin accuracy regardless of n or m. Validated across n=200..10000 and m=5..31 — achieved error is consistently ~1% of margin_tol.
+
 ## Future Priorities
 
 **High priority (documentation & examples):**
@@ -204,6 +223,9 @@ For typical survey raking problems (< 10K samples, reasonable constraint counts)
 
 **Completed (February 2025):**
 - ✅ Range/inequality constraints via `rr_range()` / `rr_between()` - soft bounds on weighted statistics
+- ✅ `margin_tol` convergence parameter - size-invariant tolerance via `eps = margin_tol / sqrt(m + 2n)`
+- ✅ Improved zero-weight error message with actionable causes
+- ✅ ADMM vs IPF (autumn/anesrake) performance benchmarks
 
 ## Adding New Features
 

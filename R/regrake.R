@@ -543,6 +543,13 @@ print.regrake <- function(x, ...) {
   if (!is.null(x$exact_tol)) {
     cat(sprintf("  Exact tolerance:  %g\n", x$exact_tol))
   }
+  if (!identical(x$margin_tol, 1e-4)) {
+    if (is.null(x$margin_tol)) {
+      cat("  Margin tolerance: off (using raw eps_abs/eps_rel)\n")
+    } else {
+      cat(sprintf("  Margin tolerance: %g\n", x$margin_tol))
+    }
+  }
   if (d$converged) {
     cat(sprintf("  Converged:        Yes (%d iterations)\n", d$iterations))
   } else {
