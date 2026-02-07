@@ -72,7 +72,23 @@ control. Default is NULL (exact constraints enforced strictly).}
 scaled by their target value for numerical stability. The achieved values are
 reported in original units. Set to FALSE to disable this behavior.}
 
-\item{control}{List of control parameters for the solver}
+\item{control}{List of control parameters for the ADMM solver:
+\describe{
+\item{margin_tol}{Margin-based convergence tolerance (default 1e-4). The ADMM
+solver scales this by problem size to achieve approximately this level of
+margin accuracy regardless of sample size or constraint count. For example,
+\code{margin_tol = 0.001} targets ~0.1\% max margin error. Internally computes
+\code{eps = margin_tol / sqrt(m + 2*n)}. Set to NULL to use raw eps_abs/eps_rel
+instead.}
+\item{eps_abs}{Absolute convergence tolerance for ADMM residuals. Only used
+when margin_tol is NULL. Note: the effective tolerance scales with
+\code{sqrt(m + 2*n)}, so the same value behaves differently at different
+problem sizes. Default 1e-5.}
+\item{eps_rel}{Relative convergence tolerance for ADMM residuals. Only used
+when margin_tol is NULL. Default 1e-5.}
+\item{rho}{ADMM penalty parameter (default 50).}
+\item{maxiter}{Maximum ADMM iterations (default 5000).}
+}}
 
 \item{verbose}{Whether to print progress information}
 

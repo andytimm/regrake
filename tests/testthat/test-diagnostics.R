@@ -322,24 +322,24 @@ test_that("margin_tol scales eps_abs/eps_rel based on problem size", {
     proportion = c(0.49, 0.51)
   )
 
-  # With margin_tol, should converge to good accuracy
-
   result <- regrake(
     data = sample_data,
     formula = ~ rr_exact(sex),
     population_data = pop_data,
     pop_type = "proportions",
-    margin_tol = 0.001
+    control = list(margin_tol = 0.001)
   )
 
   expect_true(result$diagnostics$converged)
-  expect_lt(max(abs(result$balance$residual)), 0.001)  # should be well under 0.1%
+  expect_lt(max(abs(result$balance$residual)), 0.001)
+})
+
+test_that("default margin_tol = 1e-4 is used", {
+  result <- make_test_result()
+  expect_equal(result$margin_tol, 1e-4)
 })
 
 test_that("margin_tol is stored on result object", {
-  result <- make_test_result()
-  expect_null(result$margin_tol)
-
   set.seed(42)
   n <- 500
   sample_data <- data.frame(
@@ -357,10 +357,59 @@ test_that("margin_tol is stored on result object", {
     formula = ~ rr_exact(sex),
     population_data = pop_data,
     pop_type = "proportions",
-    margin_tol = 0.001
+    control = list(margin_tol = 0.001)
   )
 
   expect_equal(result$margin_tol, 0.001)
+})
+
+test_that("explicit eps_abs/eps_rel opts out of margin_tol", {
+  set.seed(42)
+  n <- 500
+  sample_data <- data.frame(
+    sex = sample(c("M", "F"), n, replace = TRUE, prob = c(0.6, 0.4))
+  )
+
+  pop_data <- data.frame(
+    variable = "sex",
+    level = c("M", "F"),
+    proportion = c(0.49, 0.51)
+  )
+
+  result <- regrake(
+    data = sample_data,
+    formula = ~ rr_exact(sex),
+    population_data = pop_data,
+    pop_type = "proportions",
+    control = list(eps_abs = 1e-6, eps_rel = 1e-6)
+  )
+
+  expect_null(result$margin_tol)
+})
+
+test_that("margin_tol = NULL uses raw eps_abs/eps_rel", {
+  set.seed(42)
+  n <- 500
+  sample_data <- data.frame(
+    sex = sample(c("M", "F"), n, replace = TRUE, prob = c(0.6, 0.4))
+  )
+
+  pop_data <- data.frame(
+    variable = "sex",
+    level = c("M", "F"),
+    proportion = c(0.49, 0.51)
+  )
+
+  result <- regrake(
+    data = sample_data,
+    formula = ~ rr_exact(sex),
+    population_data = pop_data,
+    pop_type = "proportions",
+    control = list(margin_tol = NULL, eps_abs = 1e-6, eps_rel = 1e-6)
+  )
+
+  expect_null(result$margin_tol)
+  expect_true(result$diagnostics$converged)
 })
 
 test_that("invalid margin_tol values are rejected", {
@@ -377,22 +426,26 @@ test_that("invalid margin_tol values are rejected", {
   )
 
   expect_error(
-    regrake(sample_data, ~ rr_exact(sex), pop_data, "proportions", margin_tol = -0.01),
+    regrake(sample_data, ~ rr_exact(sex), pop_data, "proportions",
+            control = list(margin_tol = -0.01)),
     "margin_tol must be a single positive number"
   )
 
   expect_error(
-    regrake(sample_data, ~ rr_exact(sex), pop_data, "proportions", margin_tol = 0),
+    regrake(sample_data, ~ rr_exact(sex), pop_data, "proportions",
+            control = list(margin_tol = 0)),
     "margin_tol must be a single positive number"
   )
 
   expect_error(
-    regrake(sample_data, ~ rr_exact(sex), pop_data, "proportions", margin_tol = c(0.01, 0.02)),
+    regrake(sample_data, ~ rr_exact(sex), pop_data, "proportions",
+            control = list(margin_tol = c(0.01, 0.02))),
     "margin_tol must be a single positive number"
   )
 
   expect_error(
-    regrake(sample_data, ~ rr_exact(sex), pop_data, "proportions", margin_tol = "0.01"),
+    regrake(sample_data, ~ rr_exact(sex), pop_data, "proportions",
+            control = list(margin_tol = "0.01")),
     "margin_tol must be a single positive number"
   )
 })
