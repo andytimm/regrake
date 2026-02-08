@@ -33,7 +33,7 @@ exactly match population marginals while *least-squares* matching joint distribu
 For more on the (very fun, elegant) optimization math here, see the
 [original paper](https://web.stanford.edu/~boyd/papers/pdf/optimal_representative_sampling.pdf)
 or my
-[NYOSP talk slides](https://github.com/andytimm/nyosp_regrake), which motivates why this is particularly helpful for survey weighting these days.
+[NYOSP talk slides](https://github.com/andytimm/nyospm_regrake_public), which motivates why this is particularly helpful for survey weighting these days.
 
 ## Setup
 

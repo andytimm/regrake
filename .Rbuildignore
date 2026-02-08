@@ -9,3 +9,4 @@
 ^\.cursor$
 ^NOTICE$
 ^CRAN-SUBMISSION$
+^cran-comments\.md$
