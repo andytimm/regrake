@@ -51,6 +51,100 @@ normalize_target_sum <- function(targets, label) {
   )
 }
 
+# Internal helper: detect known continuous statistic levels.
+# Supports qXX quantiles beyond the built-in aliases (e.g., q33.3).
+is_continuous_stat_level <- function(levels) {
+  level_lower <- tolower(as.character(levels))
+  base_levels <- c(
+    "mean", "var", "sd", "median", "min", "max",
+    "q10", "q25", "q50", "q75", "q90", "variance", "quantile"
+  )
+  level_lower %in% base_levels | grepl("^q\\d+(\\.\\d+)?$", level_lower)
+}
+
+# Internal helper: format quantile probability labels (e.g., 50, 33.3)
+format_quantile_pct <- function(pct) {
+  sub("\\.?0+$", "", format(pct, scientific = FALSE, trim = TRUE))
+}
+
+# Internal helper: select the appropriate continuous target row for a term.
+select_continuous_term_targets <- function(var_data, term) {
+  level_lower <- tolower(var_data$level)
+
+  if (term$type == "var") {
+    idx <- level_lower %in% c("var", "variance")
+    if (!any(idx)) {
+      stop(
+        "Missing target level for rr_var(", term$variables, "). ",
+        "Expected level 'var' (or 'variance') in population_data.",
+        call. = FALSE
+      )
+    }
+    if (sum(idx) > 1) {
+      stop(
+        "Multiple variance targets found for variable: ",
+        term$variables,
+        call. = FALSE
+      )
+    }
+    return(var_data[idx, , drop = FALSE])
+  }
+
+  if (term$type == "quantile") {
+    p <- term$params$p
+    expected_pct <- p * 100
+    numeric_pct <- suppressWarnings(as.numeric(sub("^q", "", level_lower)))
+    q_idx <- grepl("^q\\d+(\\.\\d+)?$", level_lower)
+    idx <- q_idx & abs(numeric_pct - expected_pct) < 1e-8
+
+    # Backward-compatible fallback for a single generic "quantile" level.
+    if (!any(idx)) {
+      generic_idx <- level_lower == "quantile"
+      if (sum(generic_idx) == 1) {
+        idx <- generic_idx
+      }
+    }
+
+    if (!any(idx)) {
+      stop(
+        "Missing target value for rr_quantile(", term$variables, ", ", p, "). ",
+        "Expected level 'q", format_quantile_pct(expected_pct),
+        "' (or a single 'quantile' level) in population_data.",
+        call. = FALSE
+      )
+    }
+    if (sum(idx) > 1) {
+      stop(
+        "Multiple target values found for rr_quantile(",
+        term$variables, ", ", p, ").",
+        call. = FALSE
+      )
+    }
+    return(var_data[idx, , drop = FALSE])
+  }
+
+  # For continuous exact/l2/kl/range terms, match the mean target.
+  idx <- level_lower == "mean"
+  if (!any(idx)) {
+    if (nrow(var_data) == 1) {
+      return(var_data)
+    }
+    stop(
+      "Missing target level for continuous variable '", term$variables, "'. ",
+      "Expected level 'mean' in population_data.",
+      call. = FALSE
+    )
+  }
+  if (sum(idx) > 1) {
+    stop(
+      "Multiple mean targets found for variable: ",
+      term$variables,
+      call. = FALSE
+    )
+  }
+  var_data[idx, , drop = FALSE]
+}
+
 #' Process population data into target values
 #' @description
 #' Main entry point for converting population data into the autumn format.
@@ -142,13 +236,9 @@ process_pop_data <- function(population_data, pop_type, pop_weights = NULL, form
   )
 
   # Normalize categorical variable targets (centralized here, not in each processor)
-  continuous_stat_levels <- c(
-    "mean", "var", "sd", "median", "min", "max",
-    "q10", "q25", "q50", "q75", "q90", "variance", "quantile"
-  )
   is_continuous <- tapply(
     result$level, result$variable,
-    function(lvls) all(lvls %in% continuous_stat_levels)
+    function(lvls) all(vapply(lvls, is_continuous_stat_level, logical(1)))
   )
   categorical_vars <- names(is_continuous)[!is_continuous]
   for (var_name in categorical_vars) {
@@ -572,6 +662,9 @@ compute_target_values <- function(
   names(targets) <- vapply(
     formula_spec$terms,
     function(t) {
+      if (!is.null(t$term_id)) {
+        return(t$term_id)
+      }
       paste0(
         t$type,
         "_",
@@ -598,6 +691,18 @@ compute_target_values <- function(
           call. = FALSE
         )
       }
+      is_continuous_var <- all(vapply(var_data$level, is_continuous_stat_level, logical(1)))
+      if (is_continuous_var) {
+        var_data <- select_continuous_term_targets(var_data, term)
+      } else if (term$type %in% c("var", "quantile")) {
+        stop(
+          "Variable '", term$variables, "' has categorical targets but term type is '",
+          term$type, "'. ",
+          "Use continuous targets (e.g., level 'var' or 'qXX').",
+          call. = FALSE
+        )
+      }
+
       targets[[i]] <- setNames(var_data$target, var_data$level)
     } else {
       # Interaction term

@@ -133,8 +133,15 @@ validate_overlapping_constraints <- function(terms) {
               call. = FALSE
             )
           }
+        } else {
+          stop(
+            var_desc,
+            " appears multiple times with duplicate rr_",
+            term_i$type,
+            "() constraints",
+            call. = FALSE
+          )
         }
-        # Same type duplicates are allowed (creates multiple terms)
       }
     }
   }
@@ -287,14 +294,12 @@ parse_formula_terms <- function(expr) {
     # Handle interactions by recursively collecting all variables
     list(create_interaction_term(collect_interaction_vars(expr)))
   } else {
-    # Default to exact matching for unknown functions
-    warning(
-      "Unknown function '",
-      fun,
-      "', defaulting to exact constraint",
+    stop(
+      "Unknown function '", fun, "' in formula. ",
+      "Supported constraint functions are rr_exact(), rr_l2(), rr_kl(), ",
+      "rr_mean(), rr_var(), rr_quantile(), rr_range(), and rr_between().",
       call. = FALSE
     )
-    list(create_exact_term(args[[1]]))
   }
 }
 

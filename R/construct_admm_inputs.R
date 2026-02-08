@@ -145,7 +145,12 @@ construct_admm_inputs <- function(
     }
 
     # Get target values for this term
-    target_key <- paste0(term$type, "_", term_name)
+    legacy_target_key <- paste0(term$type, "_", term_name)
+    target_key <- if (!is.null(term$term_id)) term$term_id else legacy_target_key
+    if (!target_key %in% names(target_values$targets) &&
+        legacy_target_key %in% names(target_values$targets)) {
+      target_key <- legacy_target_key
+    }
     if (!target_key %in% names(target_values$targets)) {
       stop("Missing target values for term: ", term_name)
     }

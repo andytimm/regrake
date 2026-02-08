@@ -1,3 +1,7 @@
+term_target <- function(result, formula_spec, idx) {
+  result$targets[[formula_spec$terms[[idx]]$term_id]]
+}
+
 test_that("compute_target_values handles basic validation", {
   # Missing required columns
   pop_data <- data.frame(
@@ -66,25 +70,31 @@ test_that("compute_target_values handles joint distributions correctly", {
   # Test structure
   expect_type(result, "list")
   expect_named(result, c("targets", "variables"))
-  expect_named(result$targets, c("exact_race", "exact_age", "exact_race:age"))
+  expect_named(
+    result$targets,
+    vapply(formula_spec$terms, function(t) t$term_id, character(1))
+  )
 
   # Test that main effect targets match
+  race_target <- term_target(result, formula_spec, 1)
+  age_target <- term_target(result, formula_spec, 2)
+  joint_target <- term_target(result, formula_spec, 3)
   expect_equal(
-    unname(result$targets$exact_race),
+    unname(race_target),
     c(0.6, 0.4)
   )
   expect_equal(
-    unname(result$targets$exact_age),
+    unname(age_target),
     c(0.3, 0.7)
   )
 
   # Test that joint distribution targets match and sum to 1
   expect_equal(
-    length(result$targets$`exact_race:age`),
+    length(joint_target),
     4 # 2x2 joint distribution
   )
   expect_equal(
-    sum(result$targets$`exact_race:age`),
+    sum(joint_target),
     1
   )
 
@@ -120,8 +130,9 @@ test_that("autumn format handles edge cases", {
     level = c("a", "b", "c"),
     target = c(0.999999, 0.000001, 0) # Very small but valid targets
   )
-  result <- compute_target_values(pop_data, parse_raking_formula(~small_var))
-  expect_equal(sum(result$targets$exact_small_var), 1)
+  formula_spec <- parse_raking_formula(~small_var)
+  result <- compute_target_values(pop_data, formula_spec)
+  expect_equal(sum(term_target(result, formula_spec, 1)), 1)
 
   # Non-standard names
   pop_data <- data.frame(
@@ -292,9 +303,9 @@ test_that("autumn format handles complex interactions", {
   result <- compute_target_values(pop_data, formula_spec)
   expect_named(
     result$targets,
-    c("exact_a", "exact_b", "exact_c", "exact_a:b:c")
+    vapply(formula_spec$terms, function(t) t$term_id, character(1))
   )
-  expect_equal(length(result$targets$`exact_a:b:c`), 8) # All combinations
+  expect_equal(length(term_target(result, formula_spec, 4)), 8) # All combinations
 
   # Missing joint distribution
   pop_data_no_joint <- pop_data[pop_data$variable != "a:b:c", ]
@@ -353,7 +364,7 @@ test_that("autumn format handles complex interactions", {
   result <- compute_target_values(pop_data, formula_spec)
   expect_named(
     result$targets,
-    c("exact_x", "exact_y", "exact_x:y", "exact_x:y:z")
+    vapply(formula_spec$terms, function(t) t$term_id, character(1))
   )
 })
 
@@ -805,6 +816,35 @@ test_that("continuous variables are not affected by sum normalization", {
 
   # Should not error - continuous age doesn't need sum validation
   expect_silent(compute_target_values(pop_data, formula_spec))
+})
+
+test_that("compute_target_values selects term-specific continuous targets", {
+  pop_data <- data.frame(
+    variable = c("x", "x", "x"),
+    level = c("mean", "var", "q50"),
+    target = c(10, 4, 9)
+  )
+
+  formula_spec <- parse_raking_formula(
+    ~ rr_mean(x) + rr_var(x) + rr_quantile(x, 0.5)
+  )
+  result <- compute_target_values(pop_data, formula_spec)
+
+  mean_target <- term_target(result, formula_spec, 1)
+  var_target <- term_target(result, formula_spec, 2)
+  q_target <- term_target(result, formula_spec, 3)
+
+  expect_equal(length(mean_target), 1)
+  expect_equal(unname(mean_target), 10)
+  expect_equal(names(mean_target), "mean")
+
+  expect_equal(length(var_target), 1)
+  expect_equal(unname(var_target), 4)
+  expect_true(tolower(names(var_target)) %in% c("var", "variance"))
+
+  expect_equal(length(q_target), 1)
+  expect_equal(unname(q_target), 9)
+  expect_equal(tolower(names(q_target)), "q50")
 })
 
 test_that("anesrake format normalizes targets silently", {

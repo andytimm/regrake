@@ -268,23 +268,22 @@ test_that("error conditions and edge cases are handled appropriately", {
   # Formula with only intercept
   expect_error(parse_raking_formula(~1), "Empty formula")
 
-  # Invalid constraint type (should default to exact)
-  expect_warning(
-    f <- parse_raking_formula(~ unknown(age)),
-    "Unknown function 'unknown', defaulting to exact constraint"
+  # Invalid constraint type should error
+  expect_error(
+    parse_raking_formula(~ unknown(age)),
+    "Unknown function 'unknown' in formula"
   )
-  expect_equal(f$terms[[1]]$type, "exact")
-  expect_equal(f$terms[[1]]$variables, "age")
 
   # Nested functions
   f2 <- parse_raking_formula(~ rr_l2(rr_exact(age)))
   expect_equal(f2$terms[[1]]$type, "l2")
   expect_equal(f2$terms[[1]]$variables, "age")
 
-  # Duplicate terms with same type are allowed
-  f3 <- parse_raking_formula(~ age + age)
-  expect_equal(length(f3$terms), 2)
-  expect_equal(length(f3$variables), 1)
+  # Duplicate same-type terms should error
+  expect_error(
+    parse_raking_formula(~ age + age),
+    "duplicate rr_exact\\(\\) constraints"
+  )
 })
 
 test_that("print method works correctly", {
@@ -328,6 +327,16 @@ test_that("mixed constraints with overlapping variables work correctly", {
 })
 
 test_that("overlapping constraints are handled appropriately", {
+  # Same-type duplicates should error
+  expect_error(
+    parse_raking_formula(~ age + age),
+    "duplicate rr_exact\\(\\) constraints"
+  )
+  expect_error(
+    parse_raking_formula(~ race:age + race:age),
+    "duplicate rr_exact\\(\\) constraints"
+  )
+
   # Pure duplicates should error
   expect_error(
     parse_raking_formula(~ age + rr_l2(age)),
