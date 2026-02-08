@@ -100,7 +100,7 @@ Moving beyond an equivalent solution to regular raking, suppose we also want to:
 - Match the mean income (a continuous target)
 - Softly match the age group-by-race interaction (L2 loss on joint cells)
 
-The interaction probably isn't too much to ask of regular raking in this case, but as weighting problems grow larger, raking with many interactions may struggle to converge, and likely will have high varaince costs.
+The interaction probably isn't too much to ask of regular raking in this case, but as weighting problems grow larger, raking with many interactions may struggle to converge, and likely will have high variance costs.
 This motivates the notion of mixing constraints: we'll use `rr_exact()` for the age/race marginals and `rr_l2()` for the joint distribution.
 
 For the interaction, we need joint distribution targets. These reflect modest
@@ -145,7 +145,7 @@ With mixed constraints, **convergence doesn't mean perfect matching**. This is
 an important difference from traditional raking — the mental shift is thinking
 about **how** the weights converged, not just whether they converged.
 
-The package provides `balance` data frame in results to examine this:
+The package provides a `balance` data frame in results to examine this:
 
 ```{r}
 bal <- result_mixed$balance
@@ -193,7 +193,7 @@ result_mixed$diagnostics[c("weight_range", "kish_deff", "kish_ess", "converged")
 
 If your weighting problem only needs exact matching on a few categorical marginals to be representative, packages like `autumn`, `anesrake`, or `survey::rake` will likely be all you need. Breaking out `regrake` becomes increasingly sensible as you have more work to do with your weighting, especially if you're sensitive to the variance price you're paying.
 
-On the other end of weighting tool complexity, there are a broad family of apporaches like (Bayesian) multilevel regression and postratification or more recent improvements, which bring even more modeling flexibility to bear on the weighting problem. These are powerful tools, but my sense is that often a bit of flexibility and regularization goes a long way- regularized raking can get you a lot of the flexibility here without all the complexity and computation fancier methods require.  
+On the other end of weighting tool complexity, there are a broad family of approaches like (Bayesian) multilevel regression and postratification or more recent improvements, which bring even more modeling flexibility to bear on the weighting problem. These are powerful tools, but my sense is that often a bit of flexibility and regularization goes a long way — regularized raking can get you a lot of the flexibility here without all the complexity and computation fancier methods require.  
 
 ## Feature reference
 
