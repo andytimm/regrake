@@ -1,8 +1,7 @@
 # regrake
 
-`regrake` calibrates survey weights to known population targets using regularized raking.
-It uses the optimization framework from Barratt et al. (2021):
-<https://web.stanford.edu/~boyd/papers/pdf/optimal_representative_sampling.pdf>.
+`regrake` provides an interface for regularized raking in R. This more general 
+formulation of the weighting problem, following [Barratt et al. (2021)](https://web.stanford.edu/~boyd/papers/pdf/optimal_representative_sampling.pdf)'s approach, enables more flexible functional forms in adherence to population targets, meaningful regularization, and ultimately more expressive and efficient survey weights.
 
 ## Installation
 
@@ -15,7 +14,7 @@ remotes::install_github("andytimm/regrake")
 ```r
 library(regrake)
 
-set.seed(42)
+set.seed(605)
 n <- 500
 
 sample_data <- data.frame(
@@ -79,6 +78,13 @@ A fitted object contains:
 - `balance`: achieved vs target values by constraint
 - `diagnostics`: convergence and weight-quality diagnostics
 - `solution`: solver internals
+
+## For more
+
+- [Barratt et al. (2021)](https://web.stanford.edu/~boyd/papers/pdf/optimal_representative_sampling.pdf):
+  overview of the underlying ADMM optimization formulation.
+- [NYOSPM regrake materials](https://github.com/andytimm/nyospm_regrake_public):
+  broader motivation and practical context for survey weighting.
 
 ## Status
 
