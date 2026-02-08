@@ -1,6 +1,6 @@
 Package: regrake
 Type: Package
-Title: Regularized Raking for Survey Weighting
+Title: Regularized Raking in R
 Version: 0.1.0
 Authors@R: 
     person("Andy", "Timm", 
