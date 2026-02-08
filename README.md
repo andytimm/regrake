@@ -1,46 +1,89 @@
 # regrake
 
-An R implementation of optimal representative sample weighting, enabling significantly more flexible raking objectives. Built on the mathematical framework from Barratt et al. (2021) <https://web.stanford.edu/~boyd/papers/pdf/optimal_representative_sampling.pdf>.
-
-🚧 This is a work in progress — it's not yet sufficiently developed to be usable. 🚧
-
-## (Intended) Features
-- Intuitive formula interface for specifying raking constraints
-- Multiple target specification formats (raw population data, weighted data, direct proportions)
-- Various loss functions and regularization methods
-- Integration with common survey analysis workflows
+`regrake` calibrates survey weights to known population targets using regularized raking.
+It uses the optimization framework from Barratt et al. (2021):
+<https://web.stanford.edu/~boyd/papers/pdf/optimal_representative_sampling.pdf>.
 
 ## Installation
 
 ```r
-# Install from GitHub:
 remotes::install_github("andytimm/regrake")
 ```
 
-## Basic Usage
+## Quick start
 
 ```r
 library(regrake)
 
-# Example usage (coming soon)
-# df %>%
-#   rsw(
-#     exact(race + educ) + l2(race:educ:income),
-#     regularizer = "entropy",
-#     bounds = c(0.2, 5),
-#     data = survey_df,
-#     population = pop_df
-#   )
+set.seed(42)
+n <- 500
+
+sample_data <- data.frame(
+  sex = sample(c("F", "M"), n, replace = TRUE, prob = c(0.55, 0.45)),
+  age_group = sample(c("18-34", "35-54", "55+"), n, replace = TRUE,
+                     prob = c(0.40, 0.35, 0.25)),
+  income = rnorm(n, mean = 58000, sd = 14000)
+)
+
+# autumn-style target table: variable / level / target
+pop_targets <- data.frame(
+  variable = c("sex", "sex", "age_group", "age_group", "age_group", "income"),
+  level = c("F", "M", "18-34", "35-54", "55+", "mean"),
+  target = c(0.51, 0.49, 0.30, 0.40, 0.30, 62000)
+)
+
+fit <- regrake(
+  data = sample_data,
+  formula = ~ rr_exact(sex) + rr_exact(age_group) + rr_mean(income),
+  population_data = pop_targets,
+  pop_type = "proportions",
+  regularizer = "entropy",
+  bounds = c(0.3, 3)
+)
+
+fit
+head(fit$weights)
+fit$balance
 ```
+
+## Formula interface
+
+Constraint helpers include:
+
+- `rr_exact()`: exact matching
+- `rr_l2()`: soft least-squares matching
+- `rr_kl()`: soft KL matching
+- `rr_range()` / `rr_between()`: bounded matching
+- `rr_mean()`: continuous mean matching
+- `rr_var()`: continuous variance matching
+- `rr_quantile(x, p)`: quantile matching
+
+Interactions are supported with `:` (for example `rr_l2(sex:age_group)`).
+
+## Population target formats
+
+`regrake()` supports:
+
+- `pop_type = "proportions"`: autumn-style table with `variable`, `level`, `target`
+- `pop_type = "raw"`: one row per population unit
+- `pop_type = "weighted"`: population microdata plus a weight column
+- `pop_type = "anesrake"`: named list of numeric vectors
+- `pop_type = "survey"`: margin/category/value table
+- `pop_type = "survey_design"`: `survey.design` object
+
+## Output
+
+A fitted object contains:
+
+- `weights`: calibrated weights (sum to sample size)
+- `balance`: achieved vs target values by constraint
+- `diagnostics`: convergence and weight-quality diagnostics
+- `solution`: solver internals
 
 ## Status
 
-🚧 This package is under active development. The API is not yet stable and may change. 🚧
-
-## Contributing
-
-Interested in contributing? Please note that this project is released with a Code of Conduct. By contributing to this project, you agree to abide by its terms.
+The package is under active development and approaching a first stable release.
 
 ## License
 
-Licensed under Apache License 2.0
+Apache License 2.0.
