@@ -113,6 +113,11 @@ test_that("diagnostics contain convergence info", {
   expect_true(is.numeric(d$dual_residual))
 })
 
+test_that("max_pct_diff handles zero targets gracefully", {
+  expect_equal(max_pct_diff(c(0.1, 0.2), c(0.2, 0.1)), 100)
+  expect_no_warning(expect_true(is.na(max_pct_diff(c(0, 0), c(0, 0)))))
+})
+
 # Kish deff / ESS -----------------------------------------------------------
 
 test_that("diagnostics contain Kish deff and ESS", {

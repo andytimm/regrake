@@ -518,9 +518,18 @@ process_admm_results <- function(
 
 # Helper to calculate max percent difference
 max_pct_diff <- function(achieved, desired) {
-  diff <- abs(achieved - desired)
-  pct_diff <- ifelse(desired != 0, (diff / abs(desired)) * 100, NA)
-  max(pct_diff, na.rm = TRUE)
+  nonzero_idx <- desired != 0
+  if (!any(nonzero_idx)) {
+    return(NA_real_)
+  }
+
+  diff <- abs(achieved[nonzero_idx] - desired[nonzero_idx])
+  pct_diff <- (diff / abs(desired[nonzero_idx])) * 100
+  pct_diff <- pct_diff[is.finite(pct_diff)]
+  if (!length(pct_diff)) {
+    return(NA_real_)
+  }
+  max(pct_diff)
 }
 
 # Helper to build balance data frame from formula_spec and results
