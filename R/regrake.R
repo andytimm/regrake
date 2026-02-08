@@ -13,6 +13,9 @@
 #' @param pop_weights Column name in population_data containing weights (if pop_type = "weighted")
 #' @param regularizer Regularization method ("entropy", "zero", "kl", or "boolean")
 #' @param lambda Regularization strength (default = 1)
+#' @param prior Optional prior weights used when `regularizer = "kl"`.
+#'   Must be a positive numeric vector of length `nrow(data)`. If it does not
+#'   sum to 1, it is normalized internally.
 #' @param k Number of samples to select (required for regularizer = "boolean")
 #' @param bounds Numeric vector of length 2 specifying (min, max) allowed weight values.
 #'   Weights returned sum to n (sample size), so `bounds = c(0.3, 3)` means each weight
@@ -92,6 +95,7 @@ regrake <- function(
   pop_weights = NULL,
   regularizer = "entropy",
   lambda = 1,
+  prior = NULL,
   k = NULL,
   bounds = c(0.1, 10),
   bounds_method = c("soft", "hard"),
@@ -104,6 +108,7 @@ regrake <- function(
   # Early input validation
   pop_type <- match.arg(pop_type)
   bounds_method <- match.arg(bounds_method)
+  regularizer <- match.arg(regularizer, c("entropy", "zero", "kl", "boolean"))
   validate_inputs(formula, population_data, pop_type, pop_weights, bounds)
 
   if (!is.null(exact_tol)) {
@@ -111,6 +116,8 @@ regrake <- function(
       stop("exact_tol must be a single positive number or NULL", call. = FALSE)
     }
   }
+
+  prior <- validate_and_prepare_prior(prior, nrow(data), regularizer)
 
   # Step 1: Parse formula into specification
   # This step determines what variables and interactions we need
@@ -226,7 +233,7 @@ regrake <- function(
   solution <- admm(
     F = admm_inputs$design_matrix,
     losses = admm_inputs$losses,
-    reg = create_regularizer(regularizer, k = k, limit = limit),
+    reg = create_regularizer(regularizer, prior = prior, k = k, limit = limit),
     lam = lambda,
     control = ctrl,
     verbose = verbose,
@@ -275,12 +282,59 @@ regrake <- function(
       formula = formula,
       regularizer = regularizer,
       lambda = lambda,
+      prior = if (regularizer == "kl") prior else NULL,
       exact_tol = exact_tol,
       margin_tol = ctrl$margin_tol,
       call = match.call()
     ),
     class = "regrake"
   )
+}
+
+# Helper to validate and normalize prior weights for KL regularization
+validate_and_prepare_prior <- function(prior, n_rows, regularizer) {
+  if (regularizer != "kl") {
+    if (!is.null(prior)) {
+      rlang::warn(
+        c(
+          "Argument `prior` is ignored unless regularizer = 'kl'.",
+          i = "Proceeding without prior weights."
+        ),
+        class = "regrake_prior_ignored"
+      )
+    }
+    return(NULL)
+  }
+
+  if (is.null(prior)) {
+    stop(
+      "prior must be provided when regularizer = 'kl'.",
+      call. = FALSE
+    )
+  }
+  if (!is.numeric(prior) || length(prior) != n_rows || any(!is.finite(prior))) {
+    stop(
+      "prior must be a finite numeric vector with length equal to nrow(data).",
+      call. = FALSE
+    )
+  }
+  if (any(prior <= 0)) {
+    stop("prior values must all be strictly positive.", call. = FALSE)
+  }
+
+  s <- sum(prior)
+  if (abs(s - 1) > 1e-8) {
+    rlang::warn(
+      c(
+        "prior does not sum to 1; normalizing internally.",
+        i = paste0("Provided sum was ", format(s, digits = 6), ".")
+      ),
+      class = "regrake_prior_normalized"
+    )
+    prior <- prior / s
+  }
+
+  prior
 }
 
 # Helper function for input validation

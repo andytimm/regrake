@@ -12,6 +12,7 @@ regrake(
   pop_weights = NULL,
   regularizer = "entropy",
   lambda = 1,
+  prior = NULL,
   k = NULL,
   bounds = c(0.1, 10),
   bounds_method = c("soft", "hard"),
@@ -44,6 +45,10 @@ regrake(
 \item{regularizer}{Regularization method ("entropy", "zero", "kl", or "boolean")}
 
 \item{lambda}{Regularization strength (default = 1)}
+
+\item{prior}{Optional prior weights used when \code{regularizer = "kl"}.
+Must be a positive numeric vector of length \code{nrow(data)}. If it does not
+sum to 1, it is normalized internally.}
 
 \item{k}{Number of samples to select (required for regularizer = "boolean")}
 
