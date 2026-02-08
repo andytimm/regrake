@@ -359,6 +359,7 @@ parse_formula_terms <- function(expr) {
 }
 
 #' Recursively collect variables from an interaction expression
+#' @param wrapper_name Optional wrapper function name used for clearer error messages.
 #' @keywords internal
 collect_interaction_vars <- function(expr, wrapper_name = NULL) {
   if (!rlang::is_call(expr)) {
@@ -398,6 +399,7 @@ create_exact_term <- function(expr) {
 }
 
 #' Create a term specification for l2/kl constraints
+#' @param wrapper_name Optional wrapper function name used for clearer error messages.
 #' @keywords internal
 create_constraint_term <- function(type, expr, wrapper_name = paste0("rr_", type)) {
   # Handle possible interactions within constraint

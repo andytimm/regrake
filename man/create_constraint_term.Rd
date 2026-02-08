@@ -4,7 +4,14 @@
 \alias{create_constraint_term}
 \title{Create a term specification for l2/kl constraints}
 \usage{
-create_constraint_term(type, expr)
+create_constraint_term(type, expr, wrapper_name = paste0("rr_", type))
+}
+\arguments{
+\item{type}{Constraint type.}
+
+\item{expr}{Expression to parse.}
+
+\item{wrapper_name}{Optional wrapper function name used for clearer error messages.}
 }
 \description{
 Create a term specification for l2/kl constraints

@@ -4,7 +4,12 @@
 \alias{collect_interaction_vars}
 \title{Recursively collect variables from an interaction expression}
 \usage{
-collect_interaction_vars(expr)
+collect_interaction_vars(expr, wrapper_name = NULL)
+}
+\arguments{
+\item{expr}{Expression to parse.}
+
+\item{wrapper_name}{Optional wrapper function name used for clearer error messages.}
 }
 \description{
 Recursively collect variables from an interaction expression

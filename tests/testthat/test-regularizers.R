@@ -8,6 +8,7 @@ test_that("zero regularizer returns input unchanged", {
 })
 
 test_that("entropy regularizer matches optimization solution", {
+  skip_if_not_installed("CVXR")
   set.seed(605)
   w <- rnorm(10)
   lambda <- 0.5
@@ -29,6 +30,7 @@ test_that("entropy regularizer matches optimization solution", {
 })
 
 test_that("kl regularizer matches optimization solution", {
+  skip_if_not_installed("CVXR")
   set.seed(605)
   w <- rnorm(10)
   prior <- runif(10)
@@ -54,6 +56,7 @@ test_that("kl regularizer matches optimization solution", {
 })
 
 test_that("sum squares regularizer matches optimization solution", {
+  skip_if_not_installed("CVXR")
   set.seed(605)
   w <- rnorm(10)
   lambda <- 0.5
