@@ -217,6 +217,10 @@ construct_admm_inputs <- function(
         # Continuous variable: design matrix row contains values
         raw_values <- mf[[term$variables]]
         original_target <- targets
+        target_label <- names(targets)[1]
+        if (is.null(target_label) || !nzchar(target_label)) {
+          target_label <- if (term$type == "var") "var" else "mean"
+        }
         if (term$type != "quantile" && length(targets) != 1) {
           stop(
             "Continuous term '", term_name,
@@ -236,11 +240,15 @@ construct_admm_inputs <- function(
             call. = FALSE
           )
         }
-        quantile_value <- unname(targets[1])
-        p <- term$params$p
+          quantile_value <- unname(targets[1])
+          p <- term$params$p
           values <- as.numeric(raw_values <= quantile_value)
-          original_target <- p
-          targets <- p
+          quantile_label <- names(original_target)[1]
+          if (is.null(quantile_label) || !nzchar(quantile_label)) {
+            quantile_label <- "quantile"
+          }
+          original_target <- stats::setNames(p, quantile_label)
+          targets <- stats::setNames(p, quantile_label)
           check_hard_point_feasibility(values, unname(targets[1]), term_name, term$type)
           # No normalization needed for quantile (target is already a probability)
         } else {
@@ -281,7 +289,7 @@ construct_admm_inputs <- function(
             range_lower <- range_lower / targets
             range_upper <- range_upper / targets
           }
-          targets <- 1.0
+          targets <- stats::setNames(1.0, target_label)
         }
       }
 

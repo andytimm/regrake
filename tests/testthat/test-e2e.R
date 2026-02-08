@@ -126,6 +126,10 @@ test_that("regrake handles variance constraints with rr_var", {
     (length(survey$income) - 1) /
     length(survey$income) # pop variance
   expect_true(weighted_var > sample_var * 1.1) # Should increase noticeably
+
+  # Balance output should retain semantic level label
+  var_rows <- result$balance$variable == "income"
+  expect_true(all(tolower(result$balance$level[var_rows]) %in% c("var", "variance")))
 })
 
 test_that("regrake handles quantile constraints with rr_quantile", {
@@ -165,6 +169,10 @@ test_that("regrake handles quantile constraints with rr_quantile", {
   w <- result$weights / sum(result$weights)
   weighted_below <- sum(w * (survey$income <= 45000))
   expect_equal(weighted_below, 0.5, tolerance = 0.02)
+
+  # Balance output should retain quantile label
+  q_rows <- result$balance$variable == "income"
+  expect_equal(tolower(result$balance$level[q_rows]), "q50")
 })
 
 # ============================================================================
@@ -480,6 +488,7 @@ test_that("balance data frame works with continuous variables", {
 
   # Check continuous target value is preserved
   expect_equal(result$balance$target[income_rows], 55000, tolerance = 1)
+  expect_equal(tolower(result$balance$level[income_rows]), "mean")
 
   # Check achieved is close to target for exact constraint
   expect_equal(
@@ -715,7 +724,7 @@ test_that("regrake errors when regularizer = 'kl' without prior", {
       pop_type = "proportions",
       regularizer = "kl"
     ),
-    "Prior weights must be provided"
+    "prior must be provided when regularizer = 'kl'"
   )
 })
 

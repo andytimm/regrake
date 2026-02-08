@@ -418,6 +418,7 @@ test_that("construct_admm_inputs normalizes continuous variables by default", {
 
   # Target should be 1.0 (normalized)
   expect_equal(unname(result_norm$losses[[1]]$target), 1.0)
+  expect_equal(names(result_norm$losses[[1]]$target), "mean")
 
   # Original target should be preserved
   expect_equal(unname(result_norm$losses[[1]]$original_target), 60000)
@@ -519,6 +520,7 @@ test_that("construct_admm_inputs normalizes variance constraint", {
 
   # Target should be 1.0 (normalized)
   expect_equal(unname(result$losses[[1]]$target), 1.0)
+  expect_true(tolower(names(result$losses[[1]]$target)) %in% c("var", "variance"))
 
   # Original target should be preserved
   expect_equal(unname(result$losses[[1]]$original_target), 200)
@@ -561,6 +563,8 @@ test_that("construct_admm_inputs handles quantile constraint", {
   # Target should be the probability p, not the quantile value
   expect_equal(unname(result$losses[[1]]$target), 0.5)
   expect_equal(unname(result$losses[[1]]$original_target), 0.5)
+  expect_equal(tolower(names(result$losses[[1]]$target)), "q50")
+  expect_equal(tolower(names(result$losses[[1]]$original_target)), "q50")
 })
 
 test_that("construct_admm_inputs errors on multiple quantile targets", {
