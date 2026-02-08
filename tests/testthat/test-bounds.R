@@ -193,3 +193,20 @@ test_that("regrake with hard bounds enforces limits", {
   achieved_sex_m <- sum(result$weights[sample_data$sex == "M"]) / sum(result$weights)
   expect_true(abs(achieved_sex_m - 0.49) < 0.05)
 })
+
+test_that("regrake errors on infeasible hard bounds", {
+  sample_data <- make_sample_sex_age(n = 120, seed = 321)
+  pop_data <- make_pop_sex_age()
+
+  expect_error(
+    regrake(
+      data = sample_data,
+      formula = ~ rr_exact(sex) + rr_exact(age),
+      population_data = pop_data,
+      pop_type = "proportions",
+      bounds = c(1.2, 2.0),
+      bounds_method = "hard"
+    ),
+    "Hard bounds are infeasible"
+  )
+})

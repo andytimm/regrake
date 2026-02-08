@@ -109,7 +109,7 @@ regrake <- function(
   pop_type <- match.arg(pop_type)
   bounds_method <- match.arg(bounds_method)
   regularizer <- match.arg(regularizer, c("entropy", "zero", "kl", "boolean"))
-  validate_inputs(formula, population_data, pop_type, pop_weights, bounds)
+  validate_inputs(formula, population_data, pop_type, pop_weights, bounds, bounds_method)
 
   if (!is.null(exact_tol)) {
     if (!is.numeric(exact_tol) || length(exact_tol) != 1 || exact_tol <= 0) {
@@ -343,7 +343,8 @@ validate_inputs <- function(
   population_data,
   pop_type,
   pop_weights,
-  bounds
+  bounds,
+  bounds_method
 ) {
   if (is.null(formula)) {
     stop(
@@ -361,6 +362,13 @@ validate_inputs <- function(
 
   if (length(bounds) != 2 || bounds[1] >= bounds[2] || bounds[1] <= 0) {
     stop("bounds must be a vector of length 2 with 0 < min < max")
+  }
+
+  if (bounds_method == "hard" && (bounds[1] > 1 || bounds[2] < 1)) {
+    stop(
+      "Hard bounds are infeasible with sum-to-n weights: require min <= 1 <= max.",
+      call. = FALSE
+    )
   }
 }
 

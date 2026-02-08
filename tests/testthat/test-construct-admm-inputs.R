@@ -880,7 +880,7 @@ test_that("construct_admm_inputs errors when data level has no target", {
   )
 })
 
-test_that("construct_admm_inputs warns when target level not in data", {
+test_that("construct_admm_inputs errors when hard-constraint target level not in data", {
   data <- data.frame(
     region = factor(c("N", "N", "S", "S")) # Only N and S
   )
@@ -897,6 +897,32 @@ test_that("construct_admm_inputs warns when target level not in data", {
   # Targets include E which doesn't exist in data
   target_values <- list(
     targets = list(exact_region = c(N = 0.4, S = 0.4, E = 0.2))
+  )
+
+  expect_error(
+    {
+      construct_admm_inputs(data, formula_spec, target_values)
+    },
+    "Infeasible hard constraint.*not present in data.*E"
+  )
+})
+
+test_that("construct_admm_inputs still warns for soft-constraint unused targets", {
+  data <- data.frame(
+    region = factor(c("N", "N", "S", "S")) # Only N and S
+  )
+
+  formula_spec <- list(
+    formula = ~ region,
+    terms = list(list(
+      type = "l2",
+      variables = "region",
+      interaction = NULL
+    ))
+  )
+
+  target_values <- list(
+    targets = list(l2_region = c(N = 0.4, S = 0.4, E = 0.2))
   )
 
   expect_warning(
@@ -965,6 +991,75 @@ test_that("construct_admm_inputs handles range constraint for continuous variabl
 
   # Target should be normalized to 1.0
   expect_equal(unname(result$losses[[1]]$target), 1.0)
+})
+
+test_that("construct_admm_inputs errors on infeasible hard continuous exact target", {
+  data <- data.frame(income = c(50000, 60000, 70000))
+
+  formula_spec <- list(
+    formula = ~income,
+    terms = list(list(
+      type = "exact",
+      variables = "income",
+      interaction = NULL
+    ))
+  )
+
+  target_values <- list(targets = list(exact_income = c(mean = 100000)))
+
+  expect_error(
+    {
+      construct_admm_inputs(data, formula_spec, target_values)
+    },
+    "outside achievable range"
+  )
+})
+
+test_that("construct_admm_inputs errors on infeasible hard continuous range target", {
+  data <- data.frame(income = c(50000, 60000, 70000))
+
+  formula_spec <- list(
+    formula = ~income,
+    terms = list(list(
+      type = "range",
+      variables = "income",
+      interaction = NULL,
+      params = list(mode = "margin", margin = 1000)
+    ))
+  )
+
+  target_values <- list(targets = list(range_income = c(mean = 100000)))
+
+  expect_error(
+    {
+      construct_admm_inputs(data, formula_spec, target_values)
+    },
+    "does not overlap achievable range"
+  )
+})
+
+test_that("construct_admm_inputs errors on infeasible quantile target threshold", {
+  data <- data.frame(income = c(50000, 60000, 70000))
+
+  formula_spec <- list(
+    formula = ~income,
+    terms = list(list(
+      type = "quantile",
+      variables = "income",
+      interaction = NULL,
+      params = list(p = 0.5)
+    ))
+  )
+
+  # Threshold below min(income) => indicator is always 0, so p=0.5 is infeasible.
+  target_values <- list(targets = list(quantile_income = c(q50 = 10000)))
+
+  expect_error(
+    {
+      construct_admm_inputs(data, formula_spec, target_values)
+    },
+    "outside achievable range"
+  )
 })
 
 test_that("construct_admm_inputs handles range constraint for continuous variable (bounds mode)", {

@@ -62,6 +62,36 @@
 #'   target value for numerical stability.
 #'
 #' @keywords internal
+check_hard_point_feasibility <- function(values, target, term_name, term_type) {
+  value_min <- min(values)
+  value_max <- max(values)
+  if (target < value_min - 1e-12 || target > value_max + 1e-12) {
+    stop(
+      "Infeasible hard constraint for '", term_name, "' (", term_type, "): ",
+      "target ", format(target, digits = 8), " is outside achievable range [",
+      format(value_min, digits = 8), ", ", format(value_max, digits = 8),
+      "] implied by sample data.",
+      call. = FALSE
+    )
+  }
+}
+
+check_hard_interval_feasibility <- function(values, lower, upper, term_name) {
+  value_min <- min(values)
+  value_max <- max(values)
+  if (upper < value_min - 1e-12 || lower > value_max + 1e-12) {
+    stop(
+      "Infeasible hard range constraint for '", term_name, "': ",
+      "allowed interval [", format(lower, digits = 8), ", ",
+      format(upper, digits = 8), "] does not overlap achievable range [",
+      format(value_min, digits = 8), ", ", format(value_max, digits = 8),
+      "] implied by sample data.",
+      call. = FALSE
+    )
+  }
+}
+
+#' @keywords internal
 construct_admm_inputs <- function(
   data,
   formula_spec,
@@ -183,13 +213,21 @@ construct_admm_inputs <- function(
       length(term$variables) == 1 &&
       is.numeric(mf[[term$variables]])
 
-    if (is_continuous) {
-      # Continuous variable: design matrix row contains values
-      raw_values <- mf[[term$variables]]
-      original_target <- targets
+      if (is_continuous) {
+        # Continuous variable: design matrix row contains values
+        raw_values <- mf[[term$variables]]
+        original_target <- targets
+        if (term$type != "quantile" && length(targets) != 1) {
+          stop(
+            "Continuous term '", term_name,
+            "' requires exactly one target value, but received ",
+            length(targets), ".",
+            call. = FALSE
+          )
+        }
 
-      if (term$type == "quantile") {
-        # Quantile constraint: use indicator I(x <= target_quantile_value)
+        if (term$type == "quantile") {
+          # Quantile constraint: use indicator I(x <= target_quantile_value)
         # Constraint: sum(wi * I(xi <= q)) = p
         if (length(targets) != 1) {
           stop(
@@ -200,30 +238,38 @@ construct_admm_inputs <- function(
         }
         quantile_value <- unname(targets[1])
         p <- term$params$p
-        values <- as.numeric(raw_values <= quantile_value)
-        original_target <- p
-        targets <- p
-        # No normalization needed for quantile (target is already a probability)
-      } else {
-        # Compute type-specific values
-        if (term$type == "var") {
-          x_mean <- mean(raw_values)
-          values <- (raw_values - x_mean)^2
-        } else if (term$type == "range") {
-          values <- raw_values
-          if (term$params$mode == "margin") {
-            range_lower <- -term$params$margin
-            range_upper <- term$params$margin
-          } else {
-            range_lower <- term$params$lower - targets
-            range_upper <- term$params$upper - targets
-          }
+          values <- as.numeric(raw_values <= quantile_value)
+          original_target <- p
+          targets <- p
+          check_hard_point_feasibility(values, unname(targets[1]), term_name, term$type)
+          # No normalization needed for quantile (target is already a probability)
         } else {
-          # Mean constraint (exact, l2)
-          values <- raw_values
-        }
+          # Compute type-specific values
+          if (term$type == "var") {
+            x_mean <- mean(raw_values)
+            values <- (raw_values - x_mean)^2
+            check_hard_point_feasibility(values, unname(targets[1]), term_name, term$type)
+          } else if (term$type == "range") {
+            values <- raw_values
+            if (term$params$mode == "margin") {
+              range_lower <- -term$params$margin
+              range_upper <- term$params$margin
+            } else {
+              range_lower <- term$params$lower - targets
+              range_upper <- term$params$upper - targets
+            }
+            feasible_lower <- unname(targets[1] + range_lower)
+            feasible_upper <- unname(targets[1] + range_upper)
+            check_hard_interval_feasibility(values, feasible_lower, feasible_upper, term_name)
+          } else {
+            # Mean constraint (exact, l2)
+            values <- raw_values
+            if (term$type == "exact") {
+              check_hard_point_feasibility(values, unname(targets[1]), term_name, term$type)
+            }
+          }
 
-        # Normalize by target for numerical stability
+          # Normalize by target for numerical stability
         if (normalize && abs(targets) > .Machine$double.eps) {
           values <- values / targets
           scale_factors[[length(scale_factors) + 1]] <- list(
@@ -306,16 +352,26 @@ construct_admm_inputs <- function(
       # Warn about target levels not in data
       unused_targets <- setdiff(target_levels, level_names)
       if (length(unused_targets) > 0) {
-        rlang::warn(
-          c(
-            paste0(
-              "Targets exist for '", term_name, "' levels not present in data: ",
-              paste(unused_targets, collapse = ", ")
+        if (term$type %in% c("exact", "range")) {
+          stop(
+            "Infeasible hard constraint for '", term_name,
+            "': target level(s) not present in data: ",
+            paste(unused_targets, collapse = ", "), ". ",
+            "Remove these levels from targets or include matching rows in data.",
+            call. = FALSE
+          )
+        } else {
+          rlang::warn(
+            c(
+              paste0(
+                "Targets exist for '", term_name, "' levels not present in data: ",
+                paste(unused_targets, collapse = ", ")
+              ),
+              i = "These targets will be ignored."
             ),
-            i = "These targets will be ignored."
-          ),
-          class = "regrake_unused_targets"
-        )
+            class = "regrake_unused_targets"
+          )
+        }
       }
 
       # Reorder targets to match design matrix row order
