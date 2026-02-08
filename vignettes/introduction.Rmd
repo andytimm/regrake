@@ -189,25 +189,11 @@ The `diagnostics` field has additional information about weight quality:
 result_mixed$diagnostics[c("weight_range", "kish_deff", "kish_ess", "converged")]
 ```
 
-A few things to watch for:
-
-- **Soft constraint residuals**: Check that L2 residuals are acceptably small
-  for your application. If they're too large, you can decrease `lambda`
-  (less regularization = closer match to targets, but more extreme weights).
-- **Large weight range**: If `weight_range` spans orders of magnitude, your
-  sample may be very different from the population. Consider tighter `bounds`
-  or fewer constraints.
-- **Low effective sample size**: `kish_ess` much smaller than your actual sample
-  size means the weights are doing a lot of work. The weighted estimates will
-  have high variance.
-
 ## When is regrake worth the complexity?
 
-If your weighting problem only needs exact matching on a few categorical
-marginals, packages like `autumn`, `anesrake`, or `survey::rake` will be faster
-and simpler. `regrake` earns its keep when you need to mix constraint types
-(exact + soft), incorporate continuous targets, or want explicit control over the
-bias-variance trade-off through regularization.
+If your weighting problem only needs exact matching on a few categorical marginals to be representative, packages like `autumn`, `anesrake`, or `survey::rake` will likely be all you need. Breaking out `regrake` becomes increasingly sensible as you have more work to do with your weighting, especially if you're sensitive to the variance price you're paying.
+
+On the other end of weighting tool complexity, there are a broad family of apporaches like (Bayesian) multilevel regression and postratification or more recent improvements, which bring even more modeling flexibility to bear on the weighting problem. These are powerful tools, but my sense is that often a bit of flexibility and regularization goes a long way- regularized raking can get you a lot of the flexibility here without all the complexity and computation fancier methods require.  
 
 ## Feature reference
 
@@ -218,7 +204,7 @@ This vignette covered the core workflow. Here's a quick index of what else
 
 - `rr_exact()` — equality constraints (equivalent to traditional raking)
 - `rr_l2()` — least-squares soft matching
-- `rr_kl()` — KL divergence soft matching
+- `rr_kl()` — KL divergence soft matching to a reference distribution
 - `rr_mean()`, `rr_var()`, `rr_quantile()` — continuous variable targets
 - `rr_range(age, 40, 50)` — constrain weighted mean to an interval
 
@@ -228,10 +214,18 @@ This vignette covered the core workflow. Here's a quick index of what else
 - `bounds_method = "hard"` — strict enforcement (default is `"soft"`)
 - `regularizer` — `"entropy"` (default), `"sum_squares"`, or `"kl"`
 
-**Population data formats:**
+**Population data:**
 
-- `"proportions"` (autumn-style), `"raw"`, `"weighted"`, `"anesrake"`,
-  `"survey"`, and `"survey_design"` objects
+- `"raw"` — unit-level population data (one row per person); regrake computes
+  proportions and means internally
+- `"weighted"` — unit-level data with a weight column (e.g., from ACS microdata)
+
+**Interoperability with other R packages:**
+
+- `"proportions"` — the `autumn` format used in this vignette
+- `"anesrake"` — named list of target vectors (as used by `anesrake::anesrake`)
+- `"survey"` / `"survey_design"` — margin tables or design objects from the
+  `survey` package
 
 **Solver tuning:**
 
