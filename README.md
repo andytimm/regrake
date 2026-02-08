@@ -1,6 +1,8 @@
 # regrake
 
-`regrake` provides an interface for regularized raking in R. This more general 
+`regrake` provides an interface for regularized raking in R. 
+
+This more general 
 formulation of the weighting problem, following [Barratt et al. (2021)](https://web.stanford.edu/~boyd/papers/pdf/optimal_representative_sampling.pdf)'s approach, enables more flexible functional forms in adherence to population targets, meaningful regularization, and ultimately more expressive and efficient survey weights.
 
 ## Installation

@@ -27,3 +27,5 @@ ai_context/NYOSP_private/
 
 # Built vignettes
 inst/doc
+
+/.quarto/
