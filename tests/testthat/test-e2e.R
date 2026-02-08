@@ -98,12 +98,12 @@ test_that("regrake handles variance constraints with rr_var", {
     target = c(0.5, 0.5, target_var)
   )
 
-  result <- regrake(
+  result <- suppressWarnings(regrake(
     data = survey,
     formula = ~ rr_exact(sex) + rr_var(income),
     population_data = pop,
     pop_type = "proportions"
-  )
+  ))
 
   # Check weights exist and are reasonable
   expect_length(result$weights, 500)

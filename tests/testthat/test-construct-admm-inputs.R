@@ -310,12 +310,12 @@ test_that("construct_admm_inputs handles continuous variables", {
   )
 
   # Use normalize = FALSE to test raw values in design matrix
-  result <- construct_admm_inputs(
+  result <- suppressWarnings(construct_admm_inputs(
     data,
     formula_spec,
     target_values,
     normalize = FALSE
-  )
+  ))
 
   # Verify structure
   expect_type(result, "list")
@@ -471,12 +471,12 @@ test_that("construct_admm_inputs handles variance constraint", {
   target_values <- list(targets = list(var_age = c(var = 250)))
 
   # Without normalization to check raw values
-  result <- construct_admm_inputs(
+  result <- suppressWarnings(construct_admm_inputs(
     data,
     formula_spec,
     target_values,
     normalize = FALSE
-  )
+  ))
 
   # Verify structure
   expect_type(result, "list")
@@ -492,6 +492,61 @@ test_that("construct_admm_inputs handles variance constraint", {
   expect_equal(result$losses[[1]]$fn, equality_loss)
   expect_equal(result$losses[[1]]$prox, prox_equality)
   expect_equal(unname(result$losses[[1]]$target), 250)
+})
+
+test_that("construct_admm_inputs centers rr_var on target mean when rr_mean exists", {
+  data <- data.frame(age = c(20, 30, 40, 50, 60))
+
+  formula_spec <- list(
+    formula = ~age,
+    terms = list(
+      list(type = "exact", variables = "age", interaction = NULL),
+      list(type = "var", variables = "age", interaction = NULL)
+    )
+  )
+
+  target_values <- list(targets = list(
+    exact_age = c(mean = 35),
+    var_age = c(var = 250)
+  ))
+
+  result <- suppressWarnings(construct_admm_inputs(
+    data,
+    formula_spec,
+    target_values,
+    normalize = FALSE
+  ))
+
+  # Row 1 is mean constraint values, row 2 is variance values centered at target mean 35.
+  expect_equal(as.vector(result$design_matrix[2, ]), c(225, 25, 25, 225, 625))
+})
+
+test_that("construct_admm_inputs warns and uses sample mean when rr_var has no rr_mean", {
+  data <- data.frame(age = c(20, 30, 40, 50, 60))
+
+  formula_spec <- list(
+    formula = ~age,
+    terms = list(list(
+      type = "var",
+      variables = "age",
+      interaction = NULL
+    ))
+  )
+
+  target_values <- list(targets = list(var_age = c(var = 250)))
+
+  expect_warning(
+    result <- construct_admm_inputs(
+      data,
+      formula_spec,
+      target_values,
+      normalize = FALSE
+    ),
+    "Centering on the sample mean"
+  )
+
+  # Centered at sample mean 40.
+  expect_equal(as.vector(result$design_matrix[1, ]), c(400, 100, 0, 100, 400))
 })
 
 test_that("construct_admm_inputs normalizes variance constraint", {
@@ -510,7 +565,7 @@ test_that("construct_admm_inputs normalizes variance constraint", {
   target_values <- list(targets = list(var_age = c(var = 200)))
 
   # With normalization (default)
-  result <- construct_admm_inputs(data, formula_spec, target_values)
+  result <- suppressWarnings(construct_admm_inputs(data, formula_spec, target_values))
 
   # Values should be scaled by target
   mean_age <- mean(data$age)

@@ -91,6 +91,49 @@ check_hard_interval_feasibility <- function(values, lower, upper, term_name) {
   }
 }
 
+resolve_term_target_key <- function(term, term_name, target_values) {
+  legacy_target_key <- paste0(term$type, "_", term_name)
+  target_key <- if (!is.null(term$term_id)) term$term_id else legacy_target_key
+
+  if (target_key %in% names(target_values$targets)) {
+    return(target_key)
+  }
+  if (legacy_target_key %in% names(target_values$targets)) {
+    return(legacy_target_key)
+  }
+
+  NULL
+}
+
+get_mean_target_for_var <- function(variable, formula_spec, target_values) {
+  for (term in formula_spec$terms) {
+    if (!is.null(term$interaction) || term$type != "exact" || !identical(term$variables, variable)) {
+      next
+    }
+
+    key <- resolve_term_target_key(term, variable, target_values)
+    if (is.null(key)) {
+      next
+    }
+
+    term_targets <- target_values$targets[[key]]
+    target_names <- names(term_targets)
+
+    if (!is.null(target_names)) {
+      mean_idx <- tolower(target_names) == "mean"
+      if (any(mean_idx)) {
+        return(unname(term_targets[which(mean_idx)[1]]))
+      }
+    }
+
+    if (length(term_targets) == 1) {
+      return(unname(term_targets[1]))
+    }
+  }
+
+  NULL
+}
+
 #' @keywords internal
 construct_admm_inputs <- function(
   data,
@@ -175,13 +218,8 @@ construct_admm_inputs <- function(
     }
 
     # Get target values for this term
-    legacy_target_key <- paste0(term$type, "_", term_name)
-    target_key <- if (!is.null(term$term_id)) term$term_id else legacy_target_key
-    if (!target_key %in% names(target_values$targets) &&
-        legacy_target_key %in% names(target_values$targets)) {
-      target_key <- legacy_target_key
-    }
-    if (!target_key %in% names(target_values$targets)) {
+    target_key <- resolve_term_target_key(term, term_name, target_values)
+    if (is.null(target_key)) {
       stop("Missing target values for term: ", term_name)
     }
     targets <- target_values$targets[[target_key]]
@@ -254,7 +292,20 @@ construct_admm_inputs <- function(
         } else {
           # Compute type-specific values
           if (term$type == "var") {
-            x_mean <- mean(raw_values)
+            x_mean <- get_mean_target_for_var(term$variables, formula_spec, target_values)
+            if (is.null(x_mean)) {
+              x_mean <- mean(raw_values)
+              rlang::warn(
+                c(
+                  paste0(
+                    "rr_var(", term$variables,
+                    ") has no matching rr_mean(", term$variables, ") term."
+                  ),
+                  i = "Centering on the sample mean. Add rr_mean() to center on population mean."
+                ),
+                class = "regrake_var_center_sample_mean"
+              )
+            }
             values <- (raw_values - x_mean)^2
             check_hard_point_feasibility(values, unname(targets[1]), term_name, term$type)
           } else if (term$type == "range") {
