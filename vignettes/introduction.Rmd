@@ -28,80 +28,59 @@ $r$ is a regularizer that keeps weights from becoming extreme.
 
 The key payoff: unlike traditional raking (which requires *exact* matching on
 every constraint), this framework enables a greater variety of constraint types. You can, for example,
-exactly match marginals while *least-squares* matching interactions or leverage continuous
-variable targets. When combined with sensible regularization, this expanded toolbox for creating weights allows for solutions that can be both more expressive and statistically efficient.  
+exactly match population marginals while *least-squares* matching joint distributions or leverage continuous targets. When combined with sensible regularization, this expanded toolbox for creating weights allows for solutions that can be both more expressive and statistically efficient.  
 
 For more on the (very fun, elegant) optimization math here, see the
 [original paper](https://web.stanford.edu/~boyd/papers/pdf/optimal_representative_sampling.pdf)
 or my
-[NYOSP talk slides](https://github.com/andytimm/nyosp_regrake), which motivate why this is particularly helpful for survey weighting these days.
+[NYOSP talk slides](https://github.com/andytimm/nyosp_regrake), which motivates why this is particularly helpful for survey weighting these days.
 
-## Setup: a pizza opinion poll
-
-Let's create a synthetic survey example. We'll have a population with known
-demographics, and a biased sample that over-represents some groups.
-
-For concreteness and amusement, let's say that the outcome is the proportion of each group that enjoys pineapple on pizza.
+## Setup
 
 ```{r}
 library(regrake)
-set.seed(604)
+set.seed(51)
 ```
 
+We need two things: population targets and a (biased) survey sample.
+
 ```{r}
-# Our "population" has known demographic proportions
-# and we know the average age is 45
 pop_targets <- data.frame(
   variable = c("age_group", "age_group", "age_group",
-               "race", "race", "race", "race",
-               "age"),
+                "race", "race", "race", "race",
+                "income"),
   level = c("young", "middle", "old",
             "white", "black", "hispanic", "asian",
             "mean"),
   target = c(0.35, 0.40, 0.25,
              0.60, 0.13, 0.18, 0.09,
-             45)
+             71092)
 )
 pop_targets
 ```
 
-This is the `"proportions"` format from the `autumn` package — a data frame with `variable`, `level`,
-and `target` columns. Howver, the package is designed to play nice with other common population target formats from packages like `anesrake`, or `survey`.
+This is the `"proportions"` format — a data frame with `variable`, `level`,
+and `target` columns (the format used by the `autumn` package). The package also
+accepts other common formats from packages like `anesrake` and `survey`; see the feature
+reference below.
+
+Now a biased sample that over-represents older and white respondents, with
+income skewed above the population mean:
 
 ```{r}
-# Draw a biased sample: over-represents old and white respondents
 n <- 800
 sample_data <- data.frame(
-  age_group = sample(
-    c("young", "middle", "old"), n, replace = TRUE,
-    prob = c(0.20, 0.35, 0.45)  # too many old
-  ),
-  race = sample(
-    c("white", "black", "hispanic", "asian"), n, replace = TRUE,
-    prob = c(0.75, 0.08, 0.10, 0.07)  # too white
-  ),
-  age = rnorm(n, mean = 52, sd = 15),  # sample skews older
-  enjoys_pizza = NA_integer_            # fill below using cell-specific rates
+  age_group = sample(c("young", "middle", "old"), n, replace = TRUE,
+                     prob = c(0.15, 0.35, 0.50)),
+  race = sample(c("asian", "black", "hispanic", "white"), n, replace = TRUE,
+                prob = c(0.05, 0.07, 0.10, 0.78)),
+  income = rnorm(n, mean = 78000, sd = 15000)
 )
-
-# Outcome model by age_group:race cell
-pizza_rate_by_cell <- c(
-  "young:asian" = 0.72, "young:black" = 0.67, "young:hispanic" = 0.70, "young:white" = 0.60,
-  "middle:asian" = 0.63, "middle:black" = 0.58, "middle:hispanic" = 0.61, "middle:white" = 0.52,
-  "old:asian" = 0.50, "old:black" = 0.46, "old:hispanic" = 0.48, "old:white" = 0.39
-)
-
-cell_key <- paste(sample_data$age_group, sample_data$race, sep = ":")
-sample_data$enjoys_pizza <- rbinom(n, 1, unname(pizza_rate_by_cell[cell_key]))
 ```
-
-This sample is clearly pretty skewed: too many old respondents, too white, and the
-average age is higher than the population.
 
 ## Basic raking with exact constraints
 
-The simplest use of `regrake` is functionally equivalent to traditional raking: exact matching on
-categorical variables with an entropy regularizer.
+The simplest use of `regrake` is functionally equivalent to traditional raking: exact matching on categorical variables with an entropy regularizer.
 
 ```{r}
 result_exact <- regrake(
@@ -114,60 +93,32 @@ result_exact <- regrake(
 result_exact
 ```
 
-The `balance` data frame shows how well we matched each target:
-
-```{r}
-result_exact$balance
-```
-
-With exact constraints, the residuals should be essentially zero. This is what
-traditional raking requires too.
-
 ## Adding complexity: mixed constraints
 
 Moving beyond an equivalent solution to regular raking, suppose we also want to:
 
-- Match the mean age (a continuous target)
+- Match the mean income (a continuous target)
 - Softly match the age group-by-race interaction (L2 loss on joint cells)
 
 The interaction probably isn't too much to ask of regular raking in this case, but as weighting problems grow larger, raking with many interactions may struggle to converge, and likely will have high varaince costs.
 This motivates the notion of mixing constraints: we'll use `rr_exact()` for the age/race marginals and `rr_l2()` for the joint distribution.
 
-For the interaction, we need joint distribution targets.
+For the interaction, we need joint distribution targets. These reflect modest
+departures from independence — younger respondents are somewhat more
+Asian/Hispanic and less White than the marginals alone would imply.
 
 ```{r}
-# Modest age-by-race interaction: younger respondents are somewhat more
-# Asian/Hispanic and less White than independence would imply.
-joint <- data.frame(
-  age_group = c(
-    "young", "young", "young", "young",
-    "middle", "middle", "middle", "middle",
-    "old", "old", "old", "old"
-  ),
-  race = c(
-    "asian", "black", "hispanic", "white",
-    "asian", "black", "hispanic", "white",
-    "asian", "black", "hispanic", "white"
-  ),
-  target = c(
-    0.0356241952790, 0.0483895413069, 0.0683533688298, 0.1976328945843,
-    0.0357384467681, 0.0517810484727, 0.0711123125397, 0.2413681922195,
-    0.0186373579529, 0.0298294102204, 0.0405343186304, 0.1609989131963
-  )
-)
-
 interaction_targets <- data.frame(
   variable = "age_group:race",
-  level = paste(joint$age_group, joint$race, sep = ":"),
-  target = joint$target
+  level = c("young:asian", "young:black", "young:hispanic", "young:white",
+            "middle:asian", "middle:black", "middle:hispanic", "middle:white",
+            "old:asian", "old:black", "old:hispanic", "old:white"),
+  target = c(0.036, 0.048, 0.068, 0.198,
+             0.036, 0.052, 0.071, 0.241,
+             0.019, 0.030, 0.041, 0.161)
 )
 
 pop_targets_full <- rbind(pop_targets, interaction_targets)
-
-# Implied population outcome rate from joint targets + cell-level outcome rates
-population_pizza_rate <- sum(
-  interaction_targets$target * unname(pizza_rate_by_cell[interaction_targets$level])
-)
 ```
 
 Now we can mix exact and soft constraints:
@@ -176,7 +127,7 @@ Now we can mix exact and soft constraints:
 result_mixed <- regrake(
   data = sample_data,
   formula = ~ rr_exact(age_group) + rr_exact(race) +
-              rr_mean(age) + rr_l2(age_group:race),
+              rr_mean(income) + rr_l2(age_group:race),
   population_data = pop_targets_full,
   pop_type = "proportions"
 )
@@ -188,33 +139,11 @@ This works smoothly because the L2 loss on the interaction doesn't demand
 right direction. The optimizer finds the best trade-off between matching all
 the constraints and keeping the weights well-behaved in a variance sense.
 
-## Evaluating weighting solutions
-
-To see progress across weighting stages, we can track the pineapple estimate:
-
-```{r}
-weighted_mean <- function(x, w) sum(x * w) / sum(w)
-
-outcome_progress <- data.frame(
-  stage = c(
-    "Unweighted sample",
-    "Exact raking (age_group + race)",
-    "Mixed constraints (+ age mean + interaction)"
-  ),
-  estimate = c(
-    mean(sample_data$enjoys_pizza),
-    weighted_mean(sample_data$enjoys_pizza, result_exact$weights),
-    weighted_mean(sample_data$enjoys_pizza, result_mixed$weights)
-  )
-)
-
-outcome_progress$error_vs_population <- outcome_progress$estimate - population_pizza_rate
-outcome_progress
-population_pizza_rate
-```
+## Checking balance
 
 With mixed constraints, **convergence doesn't mean perfect matching**. This is
-an important difference from vanilla raking- if you're coming from using traditional raked weights, the mental shift is you'll want to think about **how** the weights converged, not just whether they converged.
+an important difference from traditional raking — the mental shift is thinking
+about **how** the weights converged, not just whether they converged.
 
 The package provides `balance` data frame in results to examine this:
 
@@ -262,33 +191,50 @@ result_mixed$diagnostics[c("weight_range", "kish_deff", "kish_ess", "converged")
 
 A few things to watch for:
 
+- **Soft constraint residuals**: Check that L2 residuals are acceptably small
+  for your application. If they're too large, you can decrease `lambda`
+  (less regularization = closer match to targets, but more extreme weights).
 - **Large weight range**: If `weight_range` spans orders of magnitude, your
   sample may be very different from the population. Consider tighter `bounds`
   or fewer constraints.
 - **Low effective sample size**: `kish_ess` much smaller than your actual sample
   size means the weights are doing a lot of work. The weighted estimates will
   have high variance.
-- **Soft constraint residuals**: Check that L2 residuals are acceptably small
-  for your application. If they're too large, you can decrease `lambda`
-  (less regularization = closer match to targets, but more extreme weights).
 
-## Going further
+## When is regrake worth the complexity?
 
-This vignette covered the core workflow. `regrake` also supports:
+If your weighting problem only needs exact matching on a few categorical
+marginals, packages like `autumn`, `anesrake`, or `survey::rake` will be faster
+and simpler. `regrake` earns its keep when you need to mix constraint types
+(exact + soft), incorporate continuous targets, or want explicit control over the
+bias-variance trade-off through regularization.
 
-- **Weight bounds**: `bounds = c(0.3, 3)` limits how extreme any single weight
-  can be (as multiples of the average weight). Use `bounds_method = "hard"` for
-  strict enforcement.
-- **Range constraints**: `rr_range(age, 40, 50)` constrains the weighted mean
-  age to fall between 40 and 50, without specifying an exact target.
-- **Other loss functions**: `rr_kl()` uses KL divergence for soft matching.
-- **Other regularizers**: `regularizer = "sum_squares"` or `"kl"` (with a prior)
-  in addition to the default `"entropy"`.
-- **Multiple population formats**: Beyond `"proportions"`, regrake accepts
-  `"raw"` population data frames, `"weighted"` data with a weights column,
-  `"anesrake"` style named lists, `"survey"` margin tables, and `"survey_design"`
-  objects from the survey package. See `?regrake` for details.
-- **Convergence tuning**: `control = list(margin_tol = 0.001)` adjusts how
-  tightly the solver matches targets.
+## Feature reference
 
-See `?regrake` for full documentation of all parameters.
+This vignette covered the core workflow. Here's a quick index of what else
+`regrake` supports:
+
+**Constraint types:**
+
+- `rr_exact()` — equality constraints (equivalent to traditional raking)
+- `rr_l2()` — least-squares soft matching
+- `rr_kl()` — KL divergence soft matching
+- `rr_mean()`, `rr_var()`, `rr_quantile()` — continuous variable targets
+- `rr_range(age, 40, 50)` — constrain weighted mean to an interval
+
+**Weight control:**
+
+- `bounds = c(0.3, 3)` — limit weights to 0.3x–3x the average
+- `bounds_method = "hard"` — strict enforcement (default is `"soft"`)
+- `regularizer` — `"entropy"` (default), `"sum_squares"`, or `"kl"`
+
+**Population data formats:**
+
+- `"proportions"` (autumn-style), `"raw"`, `"weighted"`, `"anesrake"`,
+  `"survey"`, and `"survey_design"` objects
+
+**Solver tuning:**
+
+- `control = list(margin_tol = 0.001)` — adjust convergence tolerance
+
+See `?regrake` for full documentation.
