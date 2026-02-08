@@ -34,6 +34,15 @@ test_that("constraint functions are parsed correctly", {
   f4 <- parse_raking_formula(~ rr_mean(income))
   expect_equal(f4$terms[[1]]$type, "exact") # rr_mean maps to exact internally
   expect_equal(f4$terms[[1]]$variables, "income")
+
+  # rr_* wrapper supports + shorthand for convenience
+  f5 <- parse_raking_formula(~ rr_l2(age + income + education))
+  expect_equal(length(f5$terms), 3)
+  expect_equal(vapply(f5$terms, function(t) t$type, character(1)), rep("l2", 3))
+  expect_equal(
+    sort(vapply(f5$terms, function(t) t$variables, character(1))),
+    c("age", "education", "income")
+  )
 })
 
 test_that("rr_mean() works for continuous variables", {
@@ -101,6 +110,15 @@ test_that("rr_quantile() parses correctly for quantile constraints", {
   expect_equal(f2$terms[[1]]$type, "quantile")
   expect_equal(f2$terms[[1]]$variables, "age")
   expect_equal(f2$terms[[1]]$params$p, 0.25)
+
+  # + shorthand expands to multiple quantile constraints with same p
+  f2b <- parse_raking_formula(~ rr_quantile(age + income, 0.5))
+  expect_equal(length(f2b$terms), 2)
+  expect_equal(
+    sort(vapply(f2b$terms, function(t) t$variables, character(1))),
+    c("age", "income")
+  )
+  expect_equal(vapply(f2b$terms, function(t) t$params$p, numeric(1)), c(0.5, 0.5))
 
   # Combined with other constraints
   f3 <- parse_raking_formula(
@@ -180,6 +198,16 @@ test_that("rr_range() parses correctly for range/inequality constraints", {
   expect_equal(length(f7$terms[[1]]$interaction), 2)
   expect_equal(f7$terms[[1]]$params$mode, "margin")
   expect_equal(f7$terms[[1]]$params$margin, 0.02)
+
+  # + shorthand expands to multiple range constraints with same params
+  f7b <- parse_raking_formula(~ rr_range(age + income, margin = 0.02))
+  expect_equal(length(f7b$terms), 2)
+  expect_equal(
+    sort(vapply(f7b$terms, function(t) t$variables, character(1))),
+    c("age", "income")
+  )
+  expect_equal(vapply(f7b$terms, function(t) t$params$mode, character(1)), c("margin", "margin"))
+  expect_equal(vapply(f7b$terms, function(t) t$params$margin, numeric(1)), c(0.02, 0.02))
 
   # Combined with other constraint types
   f8 <- parse_raking_formula(~ rr_exact(sex) + rr_range(age, 40, 45))
@@ -274,10 +302,23 @@ test_that("error conditions and edge cases are handled appropriately", {
     "Unknown function 'unknown' in formula"
   )
 
-  # Nested functions
-  f2 <- parse_raking_formula(~ rr_l2(rr_exact(age)))
-  expect_equal(f2$terms[[1]]$type, "l2")
-  expect_equal(f2$terms[[1]]$variables, "age")
+  # Transformed/nested expressions should fail fast with clear errors
+  expect_error(
+    parse_raking_formula(~ rr_l2(log(age))),
+    "only supports bare variable names"
+  )
+  expect_error(
+    parse_raking_formula(~ rr_quantile(sqrt(income), 0.5)),
+    "only supports bare variable names"
+  )
+  expect_error(
+    parse_raking_formula(~ rr_range(abs(age), 0.02)),
+    "only supports bare variable names"
+  )
+  expect_error(
+    parse_raking_formula(~ rr_l2(age:log(income))),
+    "only supports bare variable names"
+  )
 
   # Duplicate same-type terms should error
   expect_error(

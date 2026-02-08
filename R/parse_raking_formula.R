@@ -181,6 +181,34 @@ validate_overlapping_constraints <- function(terms) {
 
 #' Parse formula terms recursively
 #' @keywords internal
+split_plus_terms <- function(expr) {
+  if (rlang::is_call(expr, "+")) {
+    args <- rlang::call_args(expr)
+    return(c(split_plus_terms(args[[1]]), split_plus_terms(args[[2]])))
+  }
+  list(expr)
+}
+
+#' @keywords internal
+abort_unsupported_constraint_expr <- function(expr, wrapper_name) {
+  expr_text <- paste(deparse(expr), collapse = "")
+  if (identical(wrapper_name, "formula")) {
+    stop(
+      "Formula terms only support bare variable names and ':' interactions. ",
+      "Unsupported expression: ", expr_text, ". ",
+      "Create transformed columns in `data` and use those column names in the formula.",
+      call. = FALSE
+    )
+  }
+  stop(
+    wrapper_name, "() only supports bare variable names, ':' interactions, ",
+    "or '+' combinations of those. Unsupported expression: ", expr_text, ". ",
+    "Create transformed columns in `data` and use those column names in the formula.",
+    call. = FALSE
+  )
+}
+
+#' @keywords internal
 parse_formula_terms <- function(expr) {
   if (!rlang::is_call(expr)) {
     # Base case: single variable
@@ -199,7 +227,12 @@ parse_formula_terms <- function(expr) {
     # rr_mean maps to exact constraint (for continuous variables)
     # rr_var keeps its own type for variance matching
     internal_type <- if (fun == "rr_mean") "exact" else sub("^rr_", "", fun)
-    list(create_constraint_term(internal_type, args[[1]]))
+    term_exprs <- split_plus_terms(args[[1]])
+    out <- vector("list", length(term_exprs))
+    for (i in seq_along(term_exprs)) {
+      out[[i]] <- create_constraint_term(internal_type, term_exprs[[i]], wrapper_name = fun)
+    }
+    out
   } else if (fun == "rr_quantile") {
     # rr_quantile(x, p) matches the p-th quantile of x
     # args[[1]] is the variable, args[[2]] or args$p is the probability
@@ -220,7 +253,12 @@ parse_formula_terms <- function(expr) {
         call. = FALSE
       )
     }
-    list(create_quantile_term(args[[1]], p))
+    term_exprs <- split_plus_terms(args[[1]])
+    out <- vector("list", length(term_exprs))
+    for (i in seq_along(term_exprs)) {
+      out[[i]] <- create_quantile_term(term_exprs[[i]], p)
+    }
+    out
   } else if (fun %in% c("rr_range", "rr_between")) {
     # rr_range(x, margin) or rr_range(x, lower, upper)
     # Also supports: rr_range(x, margin = 0.02), rr_range(x, lower = 0.4, upper = 0.6)
@@ -250,6 +288,7 @@ parse_formula_terms <- function(expr) {
     has_lower <- !is.null(arg_names) && "lower" %in% arg_names
     has_upper <- !is.null(arg_names) && "upper" %in% arg_names
     has_margin <- !is.null(arg_names) && "margin" %in% arg_names
+    term_exprs <- split_plus_terms(args[[1]])
 
     if (has_lower && has_upper) {
       # Named bounds: rr_range(x, lower = 0.4, upper = 0.6)
@@ -261,21 +300,33 @@ parse_formula_terms <- function(expr) {
       if (any(lower >= upper)) {
         stop("rr_range lower must be less than upper", call. = FALSE)
       }
-      list(create_range_term(args[[1]], lower = lower, upper = upper))
+      out <- vector("list", length(term_exprs))
+      for (i in seq_along(term_exprs)) {
+        out[[i]] <- create_range_term(term_exprs[[i]], lower = lower, upper = upper)
+      }
+      out
     } else if (has_margin) {
       # Named margin: rr_range(x, margin = 0.02)
       margin <- eval_arg(args$margin)
       if (!is.numeric(margin) || any(margin <= 0)) {
         stop("rr_range margin must be a positive number", call. = FALSE)
       }
-      list(create_range_term(args[[1]], margin = margin))
+      out <- vector("list", length(term_exprs))
+      for (i in seq_along(term_exprs)) {
+        out[[i]] <- create_range_term(term_exprs[[i]], margin = margin)
+      }
+      out
     } else if (length(args) == 2) {
       # Positional margin: rr_range(x, 0.02) or rr_range(x, c(A=0.02, B=0.03))
       margin <- eval_arg(args[[2]])
       if (!is.numeric(margin) || any(margin <= 0)) {
         stop("rr_range margin must be a positive number (or named vector of positive numbers)", call. = FALSE)
       }
-      list(create_range_term(args[[1]], margin = margin))
+      out <- vector("list", length(term_exprs))
+      for (i in seq_along(term_exprs)) {
+        out[[i]] <- create_range_term(term_exprs[[i]], margin = margin)
+      }
+      out
     } else if (length(args) >= 3) {
       # Positional bounds: rr_range(x, 0.4, 0.6)
       lower <- eval_arg(args[[2]])
@@ -286,7 +337,11 @@ parse_formula_terms <- function(expr) {
       if (any(lower >= upper)) {
         stop("rr_range lower must be less than upper", call. = FALSE)
       }
-      list(create_range_term(args[[1]], lower = lower, upper = upper))
+      out <- vector("list", length(term_exprs))
+      for (i in seq_along(term_exprs)) {
+        out[[i]] <- create_range_term(term_exprs[[i]], lower = lower, upper = upper)
+      }
+      out
     } else {
       stop("rr_range requires margin or lower/upper bounds", call. = FALSE)
     }
@@ -305,8 +360,11 @@ parse_formula_terms <- function(expr) {
 
 #' Recursively collect variables from an interaction expression
 #' @keywords internal
-collect_interaction_vars <- function(expr) {
+collect_interaction_vars <- function(expr, wrapper_name = NULL) {
   if (!rlang::is_call(expr)) {
+    if (!rlang::is_symbol(expr)) {
+      abort_unsupported_constraint_expr(expr, if (is.null(wrapper_name)) "formula" else wrapper_name)
+    }
     # Base case: single variable
     return(list(expr))
   }
@@ -316,10 +374,12 @@ collect_interaction_vars <- function(expr) {
 
   if (fun == ":") {
     # Recursively collect variables from both sides
-    c(collect_interaction_vars(args[[1]]), collect_interaction_vars(args[[2]]))
+    c(
+      collect_interaction_vars(args[[1]], wrapper_name = wrapper_name),
+      collect_interaction_vars(args[[2]], wrapper_name = wrapper_name)
+    )
   } else {
-    # Non-: call, treat as single term
-    list(expr)
+    abort_unsupported_constraint_expr(expr, if (is.null(wrapper_name)) "formula" else wrapper_name)
   }
 }
 
@@ -339,11 +399,11 @@ create_exact_term <- function(expr) {
 
 #' Create a term specification for l2/kl constraints
 #' @keywords internal
-create_constraint_term <- function(type, expr) {
+create_constraint_term <- function(type, expr, wrapper_name = paste0("rr_", type)) {
   # Handle possible interactions within constraint
   if (rlang::is_call(expr, ":")) {
     # Use collect_interaction_vars for consistent n-way interaction handling
-    vars <- collect_interaction_vars(expr)
+    vars <- collect_interaction_vars(expr, wrapper_name = wrapper_name)
     var_names <- unname(vapply(vars, as.character, character(1)))
     structure(
       list(
@@ -355,9 +415,8 @@ create_constraint_term <- function(type, expr) {
       class = "raking_term"
     )
   } else {
-    # Handle nested functions by getting the innermost expression
-    while (rlang::is_call(expr)) {
-      expr <- rlang::call_args(expr)[[1]]
+    if (!rlang::is_symbol(expr)) {
+      abort_unsupported_constraint_expr(expr, wrapper_name)
     }
     structure(
       list(
@@ -374,9 +433,8 @@ create_constraint_term <- function(type, expr) {
 #' Create a term specification for quantile constraints
 #' @keywords internal
 create_quantile_term <- function(expr, p) {
-  # Handle nested functions by getting the innermost expression
-  while (rlang::is_call(expr)) {
-    expr <- rlang::call_args(expr)[[1]]
+  if (!rlang::is_symbol(expr)) {
+    abort_unsupported_constraint_expr(expr, "rr_quantile")
   }
   structure(
     list(
@@ -405,7 +463,7 @@ create_range_term <- function(expr, margin = NULL, lower = NULL, upper = NULL) {
 
   # Handle interactions
   if (rlang::is_call(expr, ":")) {
-    vars <- collect_interaction_vars(expr)
+    vars <- collect_interaction_vars(expr, wrapper_name = "rr_range")
     var_names <- unname(vapply(vars, as.character, character(1)))
 
     return(structure(
@@ -420,9 +478,8 @@ create_range_term <- function(expr, margin = NULL, lower = NULL, upper = NULL) {
     ))
   }
 
-  # Handle nested functions by getting the innermost expression
-  while (rlang::is_call(expr)) {
-    expr <- rlang::call_args(expr)[[1]]
+  if (!rlang::is_symbol(expr)) {
+    abort_unsupported_constraint_expr(expr, "rr_range")
   }
 
   structure(
