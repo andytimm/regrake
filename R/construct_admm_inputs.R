@@ -1,67 +1,3 @@
-#' Construct inputs for ADMM solver
-#'
-#' @description
-#' Builds the design matrix and loss functions needed by the ADMM solver.
-#' This function takes parsed formula specifications and target values to create
-#' a sparse design matrix and corresponding loss functions for optimization.
-#'
-#' The design matrix is constructed as a sparse indicator matrix where:
-#' - Each row represents a constraint (level of a factor or interaction)
-#' - Each column represents a sample
-#' - Matrix entries are 1 where a sample belongs to a level, 0 otherwise
-#'
-#' For interactions, the function creates rows for each unique combination of levels.
-#'
-#' @param data Data frame containing sample data. Character columns will be
-#'   automatically converted to factors.
-#' @param formula_spec A list containing the parsed formula specification from
-#'   \code{parse_raking_formula}, with components:
-#'   \itemize{
-#'     \item \code{formula}: The model formula
-#'     \item \code{terms}: List of term specifications, each containing:
-#'       \itemize{
-#'         \item \code{type}: Term type ("exact", "l2", "kl", "var", "quantile", or "range")
-#'         \item \code{variables}: Variable names
-#'         \item \code{interaction}: List of variable expressions (NULL for main effects)
-#'       }
-#'   }
-#' @param target_values List containing target values computed from population data,
-#'   with components:
-#'   \itemize{
-#'     \item \code{targets}: Named list of target values for each term
-#'   }
-#'
-#' @return A list containing:
-#'   \itemize{
-#'     \item \code{design_matrix}: A sparse Matrix (class "dgCMatrix") where each row
-#'       represents a constraint and each column represents a sample. For factor
-#'       variables, each level gets a row. For interactions, each combination of
-#'       levels gets a row.
-#'     \item \code{losses}: A list of loss functions, one per term. Each loss
-#'       contains:
-#'       \itemize{
-#'         \item \code{fn}: The loss function
-#'         \item \code{target}: Target values for this term
-#'         \item \code{prox}: The proximal operator for this loss
-#'       }
-#'   }
-#'
-#' @details
-#' The function performs several key steps:
-#' 1. Converts character columns to factors
-#' 2. Creates model matrices for each term
-#' 3. Converts to sparse format for efficiency
-#' 4. Assigns appropriate loss functions based on term type
-#'
-#' For sparse matrix operations, the function uses the Matrix package's dgCMatrix
-#' format. Column sums of the design matrix should equal 1 for each sample,
-#' indicating that each sample belongs to exactly one level of each factor.
-#'
-#'
-#' @param normalize Logical. If TRUE, continuous variables are scaled by their
-#'   target value for numerical stability.
-#'
-#' @keywords internal
 check_hard_point_feasibility <- function(values, target, term_name, term_type) {
   value_min <- min(values)
   value_max <- max(values)
@@ -134,6 +70,67 @@ get_mean_target_for_var <- function(variable, formula_spec, target_values) {
   NULL
 }
 
+#' Construct inputs for ADMM solver
+#'
+#' @description
+#' Builds the design matrix and loss functions needed by the ADMM solver.
+#' This function takes parsed formula specifications and target values to create
+#' a sparse design matrix and corresponding loss functions for optimization.
+#'
+#' The design matrix is constructed as a sparse indicator matrix where:
+#' - Each row represents a constraint (level of a factor or interaction)
+#' - Each column represents a sample
+#' - Matrix entries are 1 where a sample belongs to a level, 0 otherwise
+#'
+#' For interactions, the function creates rows for each unique combination of levels.
+#'
+#' @param data Data frame containing sample data. Character columns will be
+#'   automatically converted to factors.
+#' @param formula_spec A list containing the parsed formula specification from
+#'   \code{parse_raking_formula}, with components:
+#'   \itemize{
+#'     \item \code{formula}: The model formula
+#'     \item \code{terms}: List of term specifications, each containing:
+#'       \itemize{
+#'         \item \code{type}: Term type ("exact", "l2", "kl", "var", "quantile", or "range")
+#'         \item \code{variables}: Variable names
+#'         \item \code{interaction}: List of variable expressions (NULL for main effects)
+#'       }
+#'   }
+#' @param target_values List containing target values computed from population data,
+#'   with components:
+#'   \itemize{
+#'     \item \code{targets}: Named list of target values for each term
+#'   }
+#' @param normalize Logical. If TRUE, continuous variables are scaled by their
+#'   target value for numerical stability.
+#'
+#' @return A list containing:
+#'   \itemize{
+#'     \item \code{design_matrix}: A sparse Matrix (class "dgCMatrix") where each row
+#'       represents a constraint and each column represents a sample. For factor
+#'       variables, each level gets a row. For interactions, each combination of
+#'       levels gets a row.
+#'     \item \code{losses}: A list of loss functions, one per term. Each loss
+#'       contains:
+#'       \itemize{
+#'         \item \code{fn}: The loss function
+#'         \item \code{target}: Target values for this term
+#'         \item \code{prox}: The proximal operator for this loss
+#'       }
+#'   }
+#'
+#' @details
+#' The function performs several key steps:
+#' 1. Converts character columns to factors
+#' 2. Creates model matrices for each term
+#' 3. Converts to sparse format for efficiency
+#' 4. Assigns appropriate loss functions based on term type
+#'
+#' For sparse matrix operations, the function uses the Matrix package's dgCMatrix
+#' format. Column sums of the design matrix should equal 1 for each sample,
+#' indicating that each sample belongs to exactly one level of each factor.
+#'
 #' @keywords internal
 construct_admm_inputs <- function(
   data,

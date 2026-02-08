@@ -1,7 +1,7 @@
 Package: regrake
 Type: Package
 Title: Regularized Raking in R
-Version: 0.1.0
+Version: 1.0.0
 Authors@R: 
     person("Andy", "Timm", 
            email = "timmandrew1@gmail.com",

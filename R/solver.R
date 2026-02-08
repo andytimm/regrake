@@ -208,7 +208,7 @@ compute_norms_and_epsilons <- function(
 #' @return List containing f (final f vector), w (final weights), w_bar
 #'   (projected weights), w_tilde (regularized weights), y/z/u (dual variables),
 #'   and w_best (best solution found)
-#' @export
+#' @keywords internal
 admm <- function(
   F,
   losses,

@@ -10,21 +10,16 @@
 #' @param lambda Regularization strength
 #' @return Vector of regularized weights
 #' @name regularizers
+#' @keywords internal
 NULL
 
 #' @describeIn regularizers No regularization (identity function)
-#' @export
-#' @examples
-#' zero_regularizer(c(0.1, 0.2), 0.5)
 zero_regularizer <- function(w, lambda) {
   w
 }
 
 #' @describeIn regularizers Negative entropy regularization
 #' @param limit Optional upper bound on weight magnitudes
-#' @export
-#' @examples
-#' entropy_regularizer(c(0.1, 0.2), 0.5)
 entropy_regularizer <- function(w, lambda, limit = NULL) {
   if (!is.null(limit) && limit <= 1) {
     rlang::abort(
@@ -44,9 +39,6 @@ entropy_regularizer <- function(w, lambda, limit = NULL) {
 #' @describeIn regularizers KL divergence from prior regularization
 #' @param prior Numeric vector of prior weights (must sum to 1)
 #' @param limit Optional upper bound on weight magnitudes
-#' @export
-#' @examples
-#' kl_regularizer(c(0.1, 0.2), 0.5, prior = c(0.5, 0.5))
 kl_regularizer <- function(w, lambda, prior, limit = NULL) {
   if (!is.numeric(prior)) {
     rlang::abort("Prior must be numeric", class = "regrake_type_error")
@@ -58,9 +50,6 @@ kl_regularizer <- function(w, lambda, prior, limit = NULL) {
 }
 
 #' @describeIn regularizers Least squares regularization
-#' @export
-#' @examples
-#' sum_squares_regularizer(c(0.1, 0.2), 0.5)
 sum_squares_regularizer <- function(w, lambda) {
   w / (1 + 2 * lambda)
 }
@@ -71,9 +60,6 @@ sum_squares_regularizer <- function(w, lambda) {
 #' @param prior Prior weights (default uniform)
 #' @param limit Optional upper bound on weight magnitudes
 #' @return Updated vector minimizing KL divergence plus proximal term
-#' @export
-#' @examples
-#' prox_kl_reg(c(0.1, 0.2), lam = 0.5)
 prox_kl_reg <- function(w, lam, prior = NULL, limit = NULL) {
   if (is.null(prior)) {
     prior <- rep(1 / length(w), length(w))
@@ -90,9 +76,6 @@ prox_kl_reg <- function(w, lam, prior = NULL, limit = NULL) {
 #' @param w Input vector
 #' @param lam Regularization parameter
 #' @return Original vector (identity operation)
-#' @export
-#' @examples
-#' prox_equality_reg(c(0.1, 0.2), lam = 0.5)
 prox_equality_reg <- function(w, lam) {
   w
 }
@@ -101,9 +84,6 @@ prox_equality_reg <- function(w, lam) {
 #' @param w Input vector
 #' @param lam Regularization parameter
 #' @return Updated vector minimizing sum squares plus proximal term
-#' @export
-#' @examples
-#' prox_sum_squares_reg(c(0.1, 0.2), lam = 0.5)
 prox_sum_squares_reg <- function(w, lam) {
   w / (1 + 2 * lam)
 }
@@ -118,9 +98,6 @@ prox_sum_squares_reg <- function(w, lam) {
 #' @param lam Regularization parameter (unused, kept for interface consistency)
 #' @param k Number of samples to select
 #' @return Vector with k non-zero entries, each equal to 1/k
-#' @export
-#' @examples
-#' prox_boolean_reg(c(0.3, 0.1, 0.6), lam = 0.5, k = 2)
 prox_boolean_reg <- function(w, lam, k) {
   n <- length(w)
   if (k < 1 || k > n) {

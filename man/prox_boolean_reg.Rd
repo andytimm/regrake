@@ -21,6 +21,3 @@ Selects top-k weights and assigns them equal weight 1/k.
 All other weights are set to zero. This is used for representative
 sample selection where exactly k samples should be selected.
 }
-\examples{
-prox_boolean_reg(c(0.3, 0.1, 0.6), lam = 0.5, k = 2)
-}

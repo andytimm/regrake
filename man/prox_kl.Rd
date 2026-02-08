@@ -21,6 +21,3 @@ Updated vector minimizing KL divergence plus proximal term
 \description{
 Proximal operator for KL divergence loss
 }
-\examples{
-prox_kl(c(0.3, 0.7), c(0.5, 0.5), rho = 1)
-}

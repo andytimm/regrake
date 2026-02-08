@@ -53,3 +53,4 @@ The implementation uses sparse matrix operations and cached Cholesky factorizati
 for efficiency. Numerical stability is ensured through careful matrix conditioning
 and damping.
 }
+\keyword{internal}

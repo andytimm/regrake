@@ -10,6 +10,7 @@
 #' @param target Numeric vector of target values
 #' @return Vector of loss values
 #' @name losses
+#' @keywords internal
 NULL
 
 # Internal helper for length validation
@@ -25,9 +26,6 @@ check_loss_lengths <- function(x, target) {
 
 #' @describeIn losses Absolute difference loss for exact matching constraints
 #' @return Numeric vector of absolute differences between x and target
-#' @export
-#' @examples
-#' equality_loss(c(0.1, 0.2), c(0.15, 0.25))
 equality_loss <- function(x, target) {
   check_loss_lengths(x, target)
   abs(x - target)
@@ -38,9 +36,6 @@ equality_loss <- function(x, target) {
 #' @param target Target vector
 #' @param rho Proximal parameter (unused for equality constraints)
 #' @return Projected vector equal to target
-#' @export
-#' @examples
-#' prox_equality(c(0.3, 0.7), c(0.5, 0.5), rho = 1)
 prox_equality <- function(x, target, rho) {
   target
 }
@@ -48,10 +43,6 @@ prox_equality <- function(x, target, rho) {
 #' @describeIn losses Squared error (least squares) loss
 #' @param diag_weight Numeric scalar or vector of weights for each element (default 1)
 #' @return Numeric vector of weighted squared differences between x and target
-#' @export
-#' @examples
-#' least_squares_loss(c(0.1, 0.2), c(0.15, 0.25))
-#' least_squares_loss(c(0.1, 0.2), c(0.15, 0.25), diag_weight = c(2, 1))
 least_squares_loss <- function(x, target, diag_weight = 1) {
   check_loss_lengths(x, target)
   (diag_weight * (x - target))^2
@@ -63,9 +54,6 @@ least_squares_loss <- function(x, target, diag_weight = 1) {
 #' @param tau Proximal parameter (1/rho)
 #' @param diag_weight Numeric scalar or vector of weights for each element (default 1)
 #' @return Updated vector minimizing weighted quadratic plus proximal term
-#' @export
-#' @examples
-#' prox_least_squares(c(0.3, 0.7), c(0.5, 0.5), tau = 1)
 prox_least_squares <- function(x, target, tau, diag_weight = 1) {
   # tau is passed as 1/ρ, so set r = 1/tau = ρ.
   # Matches Python: (diag_weight^2 * fdes + f / lam) / (diag_weight^2 + 1 / lam)
@@ -77,9 +65,6 @@ prox_least_squares <- function(x, target, tau, diag_weight = 1) {
 #' @describeIn losses Inequality constraint loss
 #' @param lower Lower bound
 #' @param upper Upper bound
-#' @export
-#' @examples
-#' inequality_loss(c(0.3, 0.7), lower = 0.2, upper = 0.6)
 inequality_loss <- function(x, lower, upper) {
   pmax(pmax(lower - x, x - upper), 0)
 }
@@ -91,9 +76,6 @@ inequality_loss <- function(x, lower, upper) {
 #' @param lower Lower bound
 #' @param upper Upper bound
 #' @return Clipped vector within bounds relative to target
-#' @export
-#' @examples
-#' prox_inequality(c(0.3, 0.7), c(0.5, 0.5), rho = 1, lower = -0.1, upper = 0.1)
 prox_inequality <- function(x, target, rho, lower, upper) {
   # Clip x - target to [lower, upper], then add target back
   target + pmin(pmax(x - target, lower), upper)
@@ -104,9 +86,6 @@ prox_inequality <- function(x, target, rho, lower, upper) {
 #' Returns Inf for non-positive values and NA for NA/NaN inputs.
 #' @return Numeric vector of KL divergence values. Returns Inf for non-positive inputs
 #'   and NA for NA/NaN inputs.
-#' @export
-#' @examples
-#' kl_loss(c(0.1, 0.2), c(0.15, 0.25))
 kl_loss <- function(x, target) {
   check_loss_lengths(x, target)
   ifelse(x > 0 & target > 0, x * log(x / target) - x + target, Inf)
@@ -118,9 +97,6 @@ kl_loss <- function(x, target) {
 #' @param rho Proximal parameter
 #' @param scale Scale factor for KL divergence (default 0.5, matching the Python reference)
 #' @return Updated vector minimizing KL divergence plus proximal term
-#' @export
-#' @examples
-#' prox_kl(c(0.3, 0.7), c(0.5, 0.5), rho = 1)
 prox_kl <- function(x, target, rho, scale = 0.5) {
   check_loss_lengths(x, target)
 

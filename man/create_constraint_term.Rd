@@ -7,10 +7,6 @@
 create_constraint_term(type, expr, wrapper_name = paste0("rr_", type))
 }
 \arguments{
-\item{type}{Constraint type.}
-
-\item{expr}{Expression to parse.}
-
 \item{wrapper_name}{Optional wrapper function name used for clearer error messages.}
 }
 \description{

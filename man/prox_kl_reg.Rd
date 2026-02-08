@@ -21,6 +21,3 @@ Updated vector minimizing KL divergence plus proximal term
 \description{
 Proximal operator for KL regularizer
 }
-\examples{
-prox_kl_reg(c(0.1, 0.2), lam = 0.5)
-}

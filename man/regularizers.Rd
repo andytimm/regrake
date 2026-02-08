@@ -48,9 +48,4 @@ These functions implement different regularization methods:
 \item \code{sum_squares_regularizer()}: Least squares regularization
 
 }}
-\examples{
-zero_regularizer(c(0.1, 0.2), 0.5)
-entropy_regularizer(c(0.1, 0.2), 0.5)
-kl_regularizer(c(0.1, 0.2), 0.5, prior = c(0.5, 0.5))
-sum_squares_regularizer(c(0.1, 0.2), 0.5)
-}
+\keyword{internal}

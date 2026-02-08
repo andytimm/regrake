@@ -21,6 +21,3 @@ Updated vector minimizing weighted quadratic plus proximal term
 \description{
 Proximal operator for least squares loss
 }
-\examples{
-prox_least_squares(c(0.3, 0.7), c(0.5, 0.5), tau = 1)
-}

@@ -39,7 +39,7 @@ or my
 
 ```{r}
 library(regrake)
-set.seed(51)
+set.seed(604)
 ```
 
 We need two things: population targets and a (biased) survey sample.
@@ -71,10 +71,10 @@ income skewed above the population mean:
 n <- 800
 sample_data <- data.frame(
   age_group = sample(c("young", "middle", "old"), n, replace = TRUE,
-                     prob = c(0.15, 0.35, 0.50)),
+                     prob = c(0.20, 0.35, 0.45)),
   race = sample(c("asian", "black", "hispanic", "white"), n, replace = TRUE,
-                prob = c(0.05, 0.07, 0.10, 0.78)),
-  income = rnorm(n, mean = 78000, sd = 15000)
+                prob = c(0.06, 0.10, 0.14, 0.70)),
+  income = rnorm(n, mean = 72000, sd = 15000)
 )
 ```
 

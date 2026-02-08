@@ -19,6 +19,3 @@ Projected vector equal to target
 \description{
 Proximal operator for equality constraints
 }
-\examples{
-prox_equality(c(0.3, 0.7), c(0.5, 0.5), rho = 1)
-}

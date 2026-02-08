@@ -17,6 +17,3 @@ Original vector (identity operation)
 \description{
 Proximal operator for equality regularizer
 }
-\examples{
-prox_equality_reg(c(0.1, 0.2), lam = 0.5)
-}

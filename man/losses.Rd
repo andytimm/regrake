@@ -61,10 +61,4 @@ Returns Inf for non-positive values and NA for NA/NaN inputs.
 \item \code{kl_loss()}: Kullback-Leibler divergence loss
 
 }}
-\examples{
-equality_loss(c(0.1, 0.2), c(0.15, 0.25))
-least_squares_loss(c(0.1, 0.2), c(0.15, 0.25))
-least_squares_loss(c(0.1, 0.2), c(0.15, 0.25), diag_weight = c(2, 1))
-inequality_loss(c(0.3, 0.7), lower = 0.2, upper = 0.6)
-kl_loss(c(0.1, 0.2), c(0.15, 0.25))
-}
+\keyword{internal}
