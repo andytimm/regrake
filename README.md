@@ -52,8 +52,8 @@ fit$balance
 Constraint helpers include:
 
 - `rr_exact()`: exact matching
-- `rr_l2()`: soft least-squares matching
-- `rr_kl()`: soft KL matching
+- `rr_l2()`:  least-squares matching
+- `rr_kl()`: KL matching
 - `rr_range()` / `rr_between()`: bounded matching
 - `rr_mean()`: continuous mean matching
 - `rr_var()`: continuous variance matching
@@ -90,7 +90,7 @@ A fitted object contains:
 
 ## Status
 
-The package is under active development and approaching a first stable release.
+1.0.0 released; should get this bad boy on CRAN soon.
 
 ## License
 
