@@ -17,7 +17,7 @@ Useful links:
 
 }
 \author{
-\strong{Maintainer}: Andy Timm \email{timmandrew1@gmail.com}
+\strong{Maintainer}: Andy Timm \email{timmandrew1@gmail.com} [copyright holder]
 
 }
 \keyword{internal}
