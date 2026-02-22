@@ -9,10 +9,10 @@ Authors@R:
 Description: Calibrates survey weights to known population targets using regularized
     raking. Constraints are specified with a formula interface (for example,
     rr_exact(), rr_l2(), rr_range(), rr_mean(), rr_var(), and rr_quantile()).
-    Supports common target formats including autumn-style proportions tables
-    (variable/level/target), raw or weighted population microdata,
-    anesrake-style lists, survey margin tables, and
-    survey.design objects. Optimization follows Barratt et al. (2021)
+    Supports common target formats including autumn-style proportions tables,
+    raw or weighted population microdata, named-list targets (as in
+    'anesrake'), and 'survey' package design
+    objects. Optimization follows Barratt et al. (2021)
     <https://web.stanford.edu/~boyd/papers/pdf/optimal_representative_sampling.pdf>
     and returns calibrated weights with balance and convergence diagnostics.
 License: Apache License 2.0 | file LICENSE
