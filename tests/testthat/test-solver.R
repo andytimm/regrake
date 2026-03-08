@@ -212,7 +212,7 @@ test_that("compute_norms_and_epsilons is invariant to scaling (F fixed)", {
 # Test ADMM solver ---------------------------------------------------------------
 
 test_that("ADMM solver basic convergence", {
-  skip_if_not_installed("CVXR")
+  skip_if_cvxr_unavailable()
   # Problem setup similar to Python test
   n <- 100
   m <- 20
