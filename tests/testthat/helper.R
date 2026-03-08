@@ -1,6 +1,12 @@
 # Shared test fixtures
 # Automatically sourced by testthat before running tests.
 
+# Limit BLAS threads via dynamic API call (works even after BLAS is loaded,
+# unlike env vars which must be set before OpenBLAS initializes).
+if (requireNamespace("RhpcBLASctl", quietly = TRUE)) {
+  RhpcBLASctl::blas_set_num_threads(2L)
+}
+
 #' Generate standard sex + age sample data
 #' @param n Sample size
 #' @param seed Random seed

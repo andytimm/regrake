@@ -12,6 +12,13 @@ knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>"
 )
+
+# Limit BLAS threads to comply with CRAN's 2-core limit.
+# RhpcBLASctl makes a direct runtime API call to BLAS (more reliable than
+# env vars, which OpenBLAS may read only at library load time).
+if (requireNamespace("RhpcBLASctl", quietly = TRUE)) {
+  RhpcBLASctl::blas_set_num_threads(2L)
+}
 ```
 
 ## What is regrake?

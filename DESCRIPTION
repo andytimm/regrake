@@ -33,7 +33,8 @@ Suggests:
     testthat (>= 3.0.0),
     knitr,
     rmarkdown,
-    CVXR
+    CVXR,
+    RhpcBLASctl
 Config/testthat/edition: 3
 VignetteBuilder: knitr
 URL: https://github.com/andytimm/regrake
