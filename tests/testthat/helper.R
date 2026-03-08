@@ -1,16 +1,6 @@
 # Shared test fixtures
 # Automatically sourced by testthat before running tests.
 
-# CVXR's solve() was removed from exports in newer versions; skip any test
-# that depends on it if it's unavailable.
-skip_if_cvxr_unavailable <- function() {
-  skip_if_not_installed("CVXR")
-  skip_if_not(
-    exists("solve", envir = asNamespace("CVXR"), inherits = FALSE),
-    "CVXR::solve not exported in this version of CVXR"
-  )
-}
-
 # Limit BLAS threads via dynamic API call (works even after BLAS is loaded,
 # unlike env vars which must be set before OpenBLAS initializes).
 if (requireNamespace("RhpcBLASctl", quietly = TRUE)) {

@@ -8,7 +8,7 @@ test_that("zero regularizer returns input unchanged", {
 })
 
 test_that("entropy regularizer matches optimization solution", {
-  skip_if_cvxr_unavailable()
+  skip_if_not_installed("CVXR")
   set.seed(605)
   w <- rnorm(10)
   lambda <- 0.5
@@ -23,14 +23,14 @@ test_that("entropy regularizer matches optimization solution", {
     -sum(entr(what)) + 1 / (2 * lambda) * sum_squares(what - w)
   )
   problem <- Problem(objective)
-  solution <- CVXR::solve(problem)
-  opt_what <- as.vector(solution$getValue(what))
+  psolve(problem)
+  opt_what <- as.vector(value(what))
 
   expect_equal(result, opt_what, tolerance = 1e-4)
 })
 
 test_that("kl regularizer matches optimization solution", {
-  skip_if_cvxr_unavailable()
+  skip_if_not_installed("CVXR")
   set.seed(605)
   w <- rnorm(10)
   prior <- runif(10)
@@ -49,14 +49,14 @@ test_that("kl regularizer matches optimization solution", {
       1 / (2 * lambda) * sum_squares(what - w)
   )
   problem <- Problem(objective)
-  solution <- CVXR::solve(problem)
-  opt_what <- as.vector(solution$getValue(what))
+  psolve(problem)
+  opt_what <- as.vector(value(what))
 
   expect_equal(result, opt_what, tolerance = 1e-4)
 })
 
 test_that("sum squares regularizer matches optimization solution", {
-  skip_if_cvxr_unavailable()
+  skip_if_not_installed("CVXR")
   set.seed(605)
   w <- rnorm(10)
   lambda <- 0.5
@@ -71,8 +71,8 @@ test_that("sum squares regularizer matches optimization solution", {
     sum_squares(what) + 1 / (2 * lambda) * sum_squares(what - w)
   )
   problem <- Problem(objective)
-  solution <- CVXR::solve(problem)
-  opt_what <- as.vector(solution$getValue(what))
+  psolve(problem)
+  opt_what <- as.vector(value(what))
 
   expect_equal(result, opt_what, tolerance = 1e-4)
 })

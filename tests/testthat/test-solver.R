@@ -212,7 +212,7 @@ test_that("compute_norms_and_epsilons is invariant to scaling (F fixed)", {
 # Test ADMM solver ---------------------------------------------------------------
 
 test_that("ADMM solver basic convergence", {
-  skip_if_cvxr_unavailable()
+  skip_if_not_installed("CVXR")
   # Problem setup similar to Python test
   n <- 100
   m <- 20
@@ -271,8 +271,7 @@ test_that("ADMM solver basic convergence", {
     max_entries(abs(F[(m %/% 2 + 1):m, , drop = FALSE] %*% w - fdes2)) <= 1
   )
   prob <- Problem(Minimize(obj), constraints)
-  result <- CVXR::solve(prob, solver = "ECOS")
-  cvxr_obj <- result$value
+  cvxr_obj <- psolve(prob)
 
   expect_equal(admm_obj, cvxr_obj, tolerance = 1e-2)
 })

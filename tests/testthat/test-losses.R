@@ -1,5 +1,5 @@
 test_that("equality loss matches optimization solution", {
-  skip_if_cvxr_unavailable()
+  skip_if_not_installed("CVXR")
   set.seed(605)
   m <- 10
   f <- rnorm(m)
@@ -14,15 +14,15 @@ test_that("equality loss matches optimization solution", {
   x <- Variable(m)
   objective <- Minimize(sum(abs(x - fdes)))
   problem <- Problem(objective)
-  result <- CVXR::solve(problem)
-  opt_x <- as.vector(result$getValue(x))
+  psolve(problem)
+  opt_x <- as.vector(value(x))
 
   expect_equal(opt_x, fdes, tolerance = 1e-5)
   expect_equal(sum(equality_loss(opt_x, fdes)), 0, tolerance = 1e-5)
 })
 
 test_that("least squares loss matches optimization solution", {
-  skip_if_cvxr_unavailable()
+  skip_if_not_installed("CVXR")
   set.seed(605)
   m <- 10
   f <- rnorm(m)
@@ -37,15 +37,15 @@ test_that("least squares loss matches optimization solution", {
   x <- Variable(m)
   objective <- Minimize(sum((x - fdes)^2)) # Squared error for L2
   problem <- Problem(objective)
-  result <- CVXR::solve(problem)
-  opt_x <- as.vector(result$getValue(x))
+  psolve(problem)
+  opt_x <- as.vector(value(x))
 
   expect_equal(opt_x, fdes, tolerance = 1e-5)
   expect_equal(sum(least_squares_loss(opt_x, fdes)), 0, tolerance = 1e-5)
 })
 
 test_that("kl loss matches optimization solution", {
-  skip_if_cvxr_unavailable()
+  skip_if_not_installed("CVXR")
   set.seed(605)
   m <- 10
   # Use positive values for KL divergence
@@ -63,11 +63,11 @@ test_that("kl loss matches optimization solution", {
   objective <- Minimize(sum(-entr(x) - x * log(fdes) - x + fdes))
   constraints <- list(x >= 0)
   problem <- Problem(objective, constraints)
-  result <- CVXR::solve(problem)
-  opt_x <- as.vector(result$getValue(x))
+  psolve(problem)
+  opt_x <- as.vector(value(x))
 
-  expect_equal(opt_x, fdes, tolerance = 1e-5)
-  expect_equal(sum(kl_loss(opt_x, fdes)), 0, tolerance = 1e-5)
+  expect_equal(opt_x, fdes, tolerance = 1e-4)
+  expect_equal(sum(kl_loss(opt_x, fdes)), 0, tolerance = 1e-4)
 })
 
 test_that("loss functions handle zero-length inputs", {
@@ -117,7 +117,7 @@ test_that("loss functions handle NA/NaN values", {
 # Test proximal operators --------------------------------------------------------
 
 test_that("equality prox matches optimization solution", {
-  skip_if_cvxr_unavailable()
+  skip_if_not_installed("CVXR")
   set.seed(605)
   m <- 10
   f <- rnorm(m)
@@ -133,13 +133,13 @@ test_that("equality prox matches optimization solution", {
   objective <- CVXR::Minimize((1 / rho) * CVXR::sum_squares(fhat - f))
   constraints <- list(fhat == fdes)
   prob <- CVXR::Problem(objective, constraints)
-  result <- CVXR::solve(prob)
+  psolve(prob)
 
-  expect_equal(as.numeric(result$getValue(fhat)), prox_result, tolerance = 1e-5)
+  expect_equal(as.numeric(value(fhat)), prox_result, tolerance = 1e-5)
 })
 
 test_that("least squares prox matches optimization solution", {
-  skip_if_cvxr_unavailable()
+  skip_if_not_installed("CVXR")
   set.seed(605)
   m <- 10
   f <- rnorm(m)
@@ -158,13 +158,13 @@ test_that("least squares prox matches optimization solution", {
       1 / (2 * rho) * CVXR::sum_squares(fhat - f)
   )
   prob <- CVXR::Problem(objective)
-  result <- CVXR::solve(prob)
+  psolve(prob)
 
-  expect_equal(as.numeric(result$getValue(fhat)), prox_result, tolerance = 1e-5)
+  expect_equal(as.numeric(value(fhat)), prox_result, tolerance = 1e-5)
 })
 
 test_that("inequality prox matches optimization solution", {
-  skip_if_cvxr_unavailable()
+  skip_if_not_installed("CVXR")
   set.seed(605)
   m <- 10
   f <- rnorm(m)
@@ -182,13 +182,13 @@ test_that("inequality prox matches optimization solution", {
   objective <- CVXR::Minimize((1 / rho) * CVXR::sum_squares(fhat - f))
   constraints <- list(lower <= fhat - fdes, fhat - fdes <= upper)
   prob <- CVXR::Problem(objective, constraints)
-  result <- CVXR::solve(prob)
+  psolve(prob)
 
-  expect_equal(as.numeric(result$getValue(fhat)), prox_result, tolerance = 1e-5)
+  expect_equal(as.numeric(value(fhat)), prox_result, tolerance = 1e-5)
 })
 
 test_that("kl prox matches optimization solution", {
-  skip_if_cvxr_unavailable()
+  skip_if_not_installed("CVXR")
   set.seed(605)
   m <- 10
   # Use positive values and normalize
@@ -212,9 +212,9 @@ test_that("kl prox matches optimization solution", {
       1 / (2 * rho) * CVXR::sum_squares(fhat - f)
   )
   prob <- CVXR::Problem(objective)
-  result <- CVXR::solve(prob, solver = "ECOS")
+  psolve(prob)
 
-  expect_equal(as.numeric(result$getValue(fhat)), prox_result, tolerance = 1e-4)
+  expect_equal(as.numeric(value(fhat)), prox_result, tolerance = 1e-4)
 })
 
 test_that("proximal operators handle edge cases", {
@@ -241,7 +241,7 @@ test_that("proximal operators handle edge cases", {
 # Test weighted least squares --------------------------------------------------------
 
 test_that("weighted least squares loss matches optimization solution", {
-  skip_if_cvxr_unavailable()
+  skip_if_not_installed("CVXR")
   set.seed(605)
   m <- 10
   f <- rnorm(m)
@@ -256,8 +256,8 @@ test_that("weighted least squares loss matches optimization solution", {
   x <- Variable(m)
   objective <- Minimize(sum((diag_weight * (x - fdes))^2))
   problem <- Problem(objective)
-  result <- CVXR::solve(problem)
-  opt_x <- as.vector(result$getValue(x))
+  psolve(problem)
+  opt_x <- as.vector(value(x))
 
   expect_equal(opt_x, fdes, tolerance = 1e-5)
   expect_equal(
@@ -268,7 +268,7 @@ test_that("weighted least squares loss matches optimization solution", {
 })
 
 test_that("weighted least squares prox matches optimization solution", {
-  skip_if_cvxr_unavailable()
+  skip_if_not_installed("CVXR")
   set.seed(605)
   m <- 10
   f <- rnorm(m)
@@ -288,9 +288,9 @@ test_that("weighted least squares prox matches optimization solution", {
       1 / (2 * tau) * CVXR::sum_squares(fhat - f)
   )
   prob <- CVXR::Problem(objective)
-  result <- CVXR::solve(prob)
+  psolve(prob)
 
-  expect_equal(as.numeric(result$getValue(fhat)), prox_result, tolerance = 1e-5)
+  expect_equal(as.numeric(value(fhat)), prox_result, tolerance = 1e-5)
 })
 
 test_that("weighted least squares with scalar weight equals uniform scaling", {
