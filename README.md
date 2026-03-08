@@ -16,7 +16,7 @@ remotes::install_github("andytimm/regrake")
 ```r
 library(regrake)
 
-set.seed(605)
+set.seed(604)
 n <- 500
 
 sample_data <- data.frame(
