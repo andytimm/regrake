@@ -35,7 +35,7 @@ pop_targets <- data.frame(
 
 fit <- regrake(
   data = sample_data,
-  formula = ~ rr_exact(sex) + rr_exact(age_group) + rr_mean(income),
+  formula = ~ rr_exact(sex + age_group) + rr_mean(income),
   population_data = pop_targets,
   pop_type = "proportions",
   regularizer = "entropy",
@@ -59,7 +59,9 @@ Constraint helpers include:
 - `rr_var()`: continuous variance matching
 - `rr_quantile(x, p)`: quantile matching
 
-Interactions are supported with `:` (for example `rr_l2(sex:age_group)`).
+Variables sharing a constraint type can be combined with `+` inside the wrapper
+(for example `rr_exact(sex + age_group)`). Interactions use `:` (for example
+`rr_l2(sex:age_group)`).
 
 ## Population target formats
 

@@ -92,7 +92,7 @@ The simplest use of `regrake` is functionally equivalent to traditional raking: 
 ```{r}
 result_exact <- regrake(
   data = sample_data,
-  formula = ~ rr_exact(age_group) + rr_exact(race),
+  formula = ~ rr_exact(age_group + race),
   population_data = pop_targets,
   regularizer = "entropy", # default behavior, but showing for clarity
   pop_type = "proportions"
@@ -108,7 +108,7 @@ Moving beyond an equivalent solution to regular raking, suppose we also want to:
 - Softly match the age group-by-race interaction (L2 loss on joint cells)
 
 The interaction probably isn't too much to ask of regular raking in this case, but as weighting problems grow larger, raking with many interactions may struggle to converge, and likely will have high variance costs.
-This motivates the notion of mixing constraints: we'll use `rr_exact()` for the age/race marginals and `rr_l2()` for the joint distribution.
+This motivates the notion of mixing constraints: we'll use `rr_exact()` for the age/race marginals (combining them in one call with `+`) and `rr_l2()` for the joint distribution.
 
 For the interaction, we need joint distribution targets. These reflect modest
 departures from independence — younger respondents are somewhat more
@@ -133,7 +133,7 @@ Now we can mix exact and soft constraints:
 ```{r}
 result_mixed <- regrake(
   data = sample_data,
-  formula = ~ rr_exact(age_group) + rr_exact(race) +
+  formula = ~ rr_exact(age_group + race) +
               rr_mean(income) + rr_l2(age_group:race),
   population_data = pop_targets_full,
   pop_type = "proportions"
