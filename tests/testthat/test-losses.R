@@ -1,5 +1,6 @@
+# CVXR >= 1.8.1 required: solve() was removed; we use psolve() + value()
 test_that("equality loss matches optimization solution", {
-  skip_if_not_installed("CVXR")
+  skip_if_not_installed("CVXR", minimum_version = "1.8.1")
   set.seed(605)
   m <- 10
   f <- rnorm(m)
@@ -22,7 +23,7 @@ test_that("equality loss matches optimization solution", {
 })
 
 test_that("least squares loss matches optimization solution", {
-  skip_if_not_installed("CVXR")
+  skip_if_not_installed("CVXR", minimum_version = "1.8.1")
   set.seed(605)
   m <- 10
   f <- rnorm(m)
@@ -45,7 +46,7 @@ test_that("least squares loss matches optimization solution", {
 })
 
 test_that("kl loss matches optimization solution", {
-  skip_if_not_installed("CVXR")
+  skip_if_not_installed("CVXR", minimum_version = "1.8.1")
   set.seed(605)
   m <- 10
   # Use positive values for KL divergence
@@ -117,7 +118,7 @@ test_that("loss functions handle NA/NaN values", {
 # Test proximal operators --------------------------------------------------------
 
 test_that("equality prox matches optimization solution", {
-  skip_if_not_installed("CVXR")
+  skip_if_not_installed("CVXR", minimum_version = "1.8.1")
   set.seed(605)
   m <- 10
   f <- rnorm(m)
@@ -139,7 +140,7 @@ test_that("equality prox matches optimization solution", {
 })
 
 test_that("least squares prox matches optimization solution", {
-  skip_if_not_installed("CVXR")
+  skip_if_not_installed("CVXR", minimum_version = "1.8.1")
   set.seed(605)
   m <- 10
   f <- rnorm(m)
@@ -164,7 +165,7 @@ test_that("least squares prox matches optimization solution", {
 })
 
 test_that("inequality prox matches optimization solution", {
-  skip_if_not_installed("CVXR")
+  skip_if_not_installed("CVXR", minimum_version = "1.8.1")
   set.seed(605)
   m <- 10
   f <- rnorm(m)
@@ -188,7 +189,7 @@ test_that("inequality prox matches optimization solution", {
 })
 
 test_that("kl prox matches optimization solution", {
-  skip_if_not_installed("CVXR")
+  skip_if_not_installed("CVXR", minimum_version = "1.8.1")
   set.seed(605)
   m <- 10
   # Use positive values and normalize
@@ -241,7 +242,7 @@ test_that("proximal operators handle edge cases", {
 # Test weighted least squares --------------------------------------------------------
 
 test_that("weighted least squares loss matches optimization solution", {
-  skip_if_not_installed("CVXR")
+  skip_if_not_installed("CVXR", minimum_version = "1.8.1")
   set.seed(605)
   m <- 10
   f <- rnorm(m)
@@ -268,7 +269,7 @@ test_that("weighted least squares loss matches optimization solution", {
 })
 
 test_that("weighted least squares prox matches optimization solution", {
-  skip_if_not_installed("CVXR")
+  skip_if_not_installed("CVXR", minimum_version = "1.8.1")
   set.seed(605)
   m <- 10
   f <- rnorm(m)

@@ -1,6 +1,6 @@
 Package: regrake
 Type: Package
-Title: Regularized Raking in R
+Title: Regularized Survey Raking
 Version: 1.0.0
 Authors@R: 
     person("Andy", "Timm", 
@@ -15,7 +15,7 @@ Description: Calibrates survey weights to known population targets using regular
     objects. Optimization follows Barratt et al. (2021)
     <https://web.stanford.edu/~boyd/papers/pdf/optimal_representative_sampling.pdf>
     and returns calibrated weights with balance and convergence diagnostics.
-License: Apache License 2.0 | file LICENSE
+License: Apache License (== 2.0) | file LICENSE
 Language: en-US
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
