@@ -4,7 +4,10 @@
 # Limit BLAS threads via dynamic API call (works even after BLAS is loaded,
 # unlike env vars which must be set before OpenBLAS initializes).
 if (requireNamespace("RhpcBLASctl", quietly = TRUE)) {
-  RhpcBLASctl::blas_set_num_threads(2L)
+  # Use 1 thread on CRAN to avoid CPU/elapsed time ratio NOTEs
+  # (implicit BLAS parallelism inflates ratio on many-core check machines)
+  n_threads <- if (identical(Sys.getenv("NOT_CRAN"), "true")) 2L else 1L
+  RhpcBLASctl::blas_set_num_threads(n_threads)
 }
 
 #' Generate standard sex + age sample data

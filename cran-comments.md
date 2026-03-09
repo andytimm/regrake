@@ -10,7 +10,7 @@ Changes since previous submission:
 
 * Addressed "CPU time > 2.5 times elapsed time" NOTE via `RhpcBLASctl::blas_set_num_threads(2L)`.
 * Spell-check NOTE: all flagged words (`Barratt`, `et`, `al`, `microdata`) are
-  in `inst/WORDLIST`; not certain why this isn't sufficient to whitelist them, but none are typos.
+  in `inst/WORDLIST`; not certain why this isn't sufficient to whitelist them on win-builder, but none are typos.
 * Fixed CVXR test compatibility for win-builder, given 1.8.1 API changes.
 * DESCRIPTION Title and License format.
 
