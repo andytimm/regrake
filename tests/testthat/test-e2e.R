@@ -41,6 +41,7 @@ test_that("basic raking workflow works end-to-end with categorical variables", {
 })
 
 test_that("regrake handles continuous variables with rr_mean", {
+  skip_on_cran()
   set.seed(42)
 
   # Sample data: sex slightly skewed, age mean around 35
@@ -80,6 +81,7 @@ test_that("regrake handles continuous variables with rr_mean", {
 })
 
 test_that("regrake handles variance constraints with rr_var", {
+  skip_on_cran()
   set.seed(42)
 
   # Sample data: income with lower variance than target
@@ -133,6 +135,7 @@ test_that("regrake handles variance constraints with rr_var", {
 })
 
 test_that("regrake handles quantile constraints with rr_quantile", {
+  skip_on_cran()
   set.seed(42)
 
   # Sample data: income skewed low (most below 50000)
@@ -180,6 +183,7 @@ test_that("regrake handles quantile constraints with rr_quantile", {
 # ============================================================================
 
 test_that("regrake works with raw population data format", {
+  skip_on_cran()
   set.seed(42)
   n <- 500
 
@@ -263,6 +267,7 @@ test_that("regrake works with anesrake population data format", {
 })
 
 test_that("regrake works with survey population data format", {
+  skip_on_cran()
   set.seed(42)
   n <- 500
 
@@ -298,6 +303,7 @@ test_that("regrake works with survey population data format", {
 })
 
 test_that("regrake works with weighted population data format", {
+  skip_on_cran()
   set.seed(42)
   n <- 500
 
@@ -419,6 +425,7 @@ test_that("balance data frame has correct structure and values", {
 })
 
 test_that("balance data frame works with interactions", {
+  skip_on_cran()
   set.seed(42)
   n <- 500
 
@@ -458,6 +465,7 @@ test_that("balance data frame works with interactions", {
 })
 
 test_that("balance data frame works with continuous variables", {
+  skip_on_cran()
   set.seed(42)
   n <- 500
 
@@ -776,6 +784,7 @@ test_that("regrake errors on invalid regularizer name", {
 # =============================================================================
 
 test_that("regrake handles rr_range with categorical variable (margin mode)", {
+  skip_on_cran()
   set.seed(42)
   n <- 500
 
@@ -817,6 +826,7 @@ test_that("regrake handles rr_range with categorical variable (margin mode)", {
 })
 
 test_that("regrake handles rr_range with continuous variable (margin mode)", {
+  skip_on_cran()
   set.seed(42)
   n <- 500
 
@@ -852,6 +862,7 @@ test_that("regrake handles rr_range with continuous variable (margin mode)", {
 })
 
 test_that("regrake handles rr_range with continuous variable (explicit bounds)", {
+  skip_on_cran()
   set.seed(42)
   n <- 500
 
@@ -887,6 +898,7 @@ test_that("regrake handles rr_range with continuous variable (explicit bounds)",
 })
 
 test_that("regrake handles rr_range with categorical interaction", {
+  skip_on_cran()
   set.seed(42)
   n <- 500
 
@@ -925,6 +937,7 @@ test_that("regrake handles rr_range with categorical interaction", {
 })
 
 test_that("rr_between works as alias for rr_range", {
+  skip_on_cran()
   set.seed(42)
   n <- 500
 
@@ -963,6 +976,7 @@ test_that("rr_between works as alias for rr_range", {
 # =============================================================================
 
 test_that("all 6 pop_type formats produce equivalent weights for same targets", {
+  skip_on_cran()
   set.seed(42)
   n <- 500
   sample_data <- data.frame(
@@ -1049,6 +1063,7 @@ test_that("all 6 pop_type formats produce equivalent weights for same targets", 
 })
 
 test_that("raw format works with continuous + categorical mixed variables", {
+  skip_on_cran()
   set.seed(42)
   n <- 400
 
@@ -1085,6 +1100,7 @@ test_that("raw format works with continuous + categorical mixed variables", {
 })
 
 test_that("weighted format works with continuous variables and rr_mean", {
+  skip_on_cran()
   set.seed(42)
   n <- 400
 
@@ -1122,6 +1138,7 @@ test_that("weighted format works with continuous variables and rr_mean", {
 })
 
 test_that("survey_design format works with continuous + categorical", {
+  skip_on_cran()
   set.seed(42)
 
   # Population design with known proportions and mean
@@ -1158,6 +1175,7 @@ test_that("survey_design format works with continuous + categorical", {
 })
 
 test_that("anesrake format works with 4+ variables", {
+  skip_on_cran()
   set.seed(42)
   n <- 500
 
@@ -1210,6 +1228,7 @@ test_that("anesrake format works with 4+ variables", {
 })
 
 test_that("survey format works with interactions through full pipeline", {
+  skip_on_cran()
   set.seed(42)
   n <- 500
 
@@ -1254,6 +1273,7 @@ test_that("survey format works with interactions through full pipeline", {
 })
 
 test_that("rr_l2 works with anesrake and survey formats", {
+  skip_on_cran()
   set.seed(42)
   n <- 500
 
@@ -1303,6 +1323,7 @@ test_that("rr_l2 works with anesrake and survey formats", {
 })
 
 test_that("rr_range works with anesrake format", {
+  skip_on_cran()
   set.seed(42)
   n <- 500
 
@@ -1329,6 +1350,7 @@ test_that("rr_range works with anesrake format", {
 })
 
 test_that("weighted format handles unequal weight ratios", {
+  skip_on_cran()
   set.seed(42)
 
   sample_data <- data.frame(

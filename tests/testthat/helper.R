@@ -6,7 +6,9 @@
 if (requireNamespace("RhpcBLASctl", quietly = TRUE)) {
   # Use 1 thread on CRAN to avoid CPU/elapsed time ratio NOTEs
   # (implicit BLAS parallelism inflates ratio on many-core check machines)
-  n_threads <- 2L # temporarily hardcoded to test if 1-thread fixes CRAN NOTE
+  # Use 1 thread on CRAN to avoid CPU/elapsed time ratio NOTEs
+  # (implicit BLAS parallelism inflates ratio on many-core check machines)
+  n_threads <- if (identical(Sys.getenv("NOT_CRAN"), "true")) 2L else 1L
   RhpcBLASctl::blas_set_num_threads(n_threads)
 }
 
