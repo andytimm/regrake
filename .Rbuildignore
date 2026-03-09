@@ -10,3 +10,4 @@
 ^NOTICE$
 ^CRAN-SUBMISSION$
 ^cran-comments\.md$
+^\.github$
